@@ -1,0 +1,80 @@
+[gd_resource type="Theme" format=3]
+
+[ext_resource type="FontFile" path="res://assets/fonts/Nunito-ExtraBold.woff2" id="1_body"]
+[ext_resource type="FontFile" path="res://assets/fonts/LilitaOne-Regular.woff2" id="2_title"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_focus"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
+content_margin_left = 34.0
+content_margin_top = 26.0
+content_margin_right = 34.0
+content_margin_bottom = 28.0
+bg_color = Color(0.97, 0.98, 1, 0.97)
+border_width_left = 5
+border_width_top = 5
+border_width_right = 5
+border_width_bottom = 5
+border_color = Color(1, 1, 1, 1)
+corner_radius_top_left = 26
+corner_radius_top_right = 26
+corner_radius_bottom_right = 26
+corner_radius_bottom_left = 26
+shadow_color = Color(0, 0, 0, 0.35)
+shadow_size = 16
+shadow_offset = Vector2(0, 8)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hud"]
+content_margin_left = 24.0
+content_margin_top = 8.0
+content_margin_right = 24.0
+content_margin_bottom = 10.0
+bg_color = Color(0.04, 0.07, 0.18, 0.78)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(1, 1, 1, 0.3)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+skew = Vector2(0.18, 0)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_line"]
+content_margin_top = 2.0
+content_margin_bottom = 2.0
+bg_color = Color(0.15, 0.17, 0.22, 0.15)
+
+[resource]
+default_font = ExtResource("1_body")
+default_font_size = 20
+Button/colors/font_color = Color(0.15, 0.16, 0.21, 1)
+Button/colors/font_disabled_color = Color(0.15, 0.16, 0.21, 0.4)
+Button/colors/font_focus_color = Color(0.15, 0.16, 0.21, 1)
+Button/colors/font_hover_color = Color(0.15, 0.16, 0.21, 1)
+Button/colors/font_hover_pressed_color = Color(0.15, 0.16, 0.21, 1)
+Button/colors/font_pressed_color = Color(0.15, 0.16, 0.21, 1)
+Button/font_sizes/font_size = 28
+Button/fonts/font = ExtResource("1_body")
+Button/styles/focus = SubResource("StyleBoxEmpty_focus")
+HSeparator/styles/separator = SubResource("StyleBoxFlat_line")
+HudPanel/base_type = &"PanelContainer"
+HudPanel/styles/panel = SubResource("StyleBoxFlat_hud")
+Label/colors/font_color = Color(1, 1, 1, 1)
+Label/colors/font_outline_color = Color(0.04, 0.06, 0.16, 1)
+PanelContainer/styles/panel = SubResource("StyleBoxFlat_panel")
+PanelLabel/base_type = &"Label"
+PanelLabel/colors/font_color = Color(0.15, 0.16, 0.21, 1)
+PanelLabel/colors/font_outline_color = Color(1, 1, 1, 0)
+PanelLabel/constants/outline_size = 0
+PanelLabel/font_sizes/font_size = 20
+PanelSoft/base_type = &"Label"
+PanelSoft/colors/font_color = Color(0.36, 0.38, 0.46, 1)
+PanelSoft/font_sizes/font_size = 18
+TitleLabel/base_type = &"Label"
+TitleLabel/colors/font_color = Color(1, 0.82, 0.1, 1)
+TitleLabel/colors/font_outline_color = Color(0.04, 0.06, 0.16, 1)
+TitleLabel/constants/outline_size = 14
+TitleLabel/font_sizes/font_size = 56
+TitleLabel/fonts/font = ExtResource("2_title")

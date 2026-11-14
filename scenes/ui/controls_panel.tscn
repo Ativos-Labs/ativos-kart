@@ -1,0 +1,89 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/controls_panel.gd" id="1_panel"]
+[ext_resource type="Script" path="res://scripts/ui/ribbon_label.gd" id="2_ribbon"]
+[ext_resource type="Script" path="res://scripts/ui/fancy_button.gd" id="3_button"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_tip"]
+content_margin_left = 18.0
+content_margin_top = 12.0
+content_margin_right = 18.0
+content_margin_bottom = 14.0
+bg_color = Color(1, 0.86, 0.25, 1)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+
+[node name="ControlsPanel" type="Control"]
+process_mode = 3
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_panel")
+
+[node name="Dim" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.02, 0.04, 0.12, 0.55)
+
+[node name="Center" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Panel" type="PanelContainer" parent="Center"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(760, 0)
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="Center/Panel"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Title" type="Control" parent="Center/Panel/VBox"]
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+size_flags_horizontal = 0
+mouse_filter = 2
+script = ExtResource("2_ribbon")
+text = "CONTROLES"
+font_size = 36
+
+[node name="ControlsGrid" type="GridContainer" parent="Center/Panel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/h_separation = 40
+theme_override_constants/v_separation = 10
+columns = 3
+
+[node name="Tip" type="PanelContainer" parent="Center/Panel/VBox"]
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_tip")
+
+[node name="Tips" type="Label" parent="Center/Panel/VBox/Tip"]
+custom_minimum_size = Vector2(660, 0)
+layout_mode = 2
+theme_type_variation = &"PanelLabel"
+theme_override_font_sizes/font_size = 17
+text = "Drift: pule e segure o drift virando numa curva. As faíscas mudam de cor (azul, laranja, roxo) — solte para ganhar um turbo! Placas laranjas na pista também dão turbo. Acelere logo depois do \"2\" na contagem para largar com turbo."
+autowrap_mode = 3
+
+[node name="ControlsBackButton" type="Button" parent="Center/Panel/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(240, 58)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "Voltar"
+script = ExtResource("3_button")
+icon_kind = "back"
