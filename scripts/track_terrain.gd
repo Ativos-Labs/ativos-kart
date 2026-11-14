@@ -1,0 +1,440 @@
+@tool
+class_name TrackTerrain
+extends RefCounted
+## Terreno em volta da pista: plano perto do traçado, colinas e lagos mais longe e
+## uma cadeia de montanhas no horizonte. Opcionais: colinas em degraus (mesas de
+## deserto), mar em volta (ilha), rios cavando o chão e vão livre embaixo das pontes.
+## Também responde a altura do chão e a distância até a pista em qualquer ponto
+## (usado para pôr árvores, outdoors e balões no lugar certo).
+
+## Tamanho (m) das células do mapa de distâncias até a pista e até os rios.
+const CELL := 4.0
+const RIVER_CELL := 6.0
+## Quanto o mapa dos rios passa da área da pista (depois disso o rio some aos poucos).
+const RIVER_MARGIN := 330.0
+
+## Até essa distância do centro da pista o chão é plano (asfalto + grama + mureta).
+var flat_distance := 16.0
+## Largura da subida entre a parte plana e as colinas.
+var rise_distance := 60.0
+var hill_height := 13.0
+var hill_bias := 2.0
+var water_level := -1.4
+var mountain_height := 190.0
+## Distância do centro da pista onde as montanhas começam e onde chegam ao máximo.
+var mountain_start := 300.0
+var mountain_end := 650.0
+## Altura dos degraus das colinas (0 = colinas lisas; ex.: 7 = mesas de deserto).
+var terrace_step := 0.0
+## Ilha: a partir dessa distância da pista o chão desce para o mar (0 = sem mar).
+var sea_distance := 0.0
+var sea_depth := 9.0
+## Rios: largura do leito, profundidade abaixo da água e largura da margem.
+var river_width := 22.0
+var river_depth := 2.5
+var river_bank := 12.0
+## Quanto a margem alarga por metro de profundidade (0 = paredões retos).
+var river_valley := 0.6
+## Embaixo das pontes o chão fica pelo menos essa distância abaixo do asfalto.
+var bridge_clearance := 2.4
+## Meia largura ocupada pela pista (do centro até o lado de fora da mureta).
+var deck_half := 14.0
+## Centro (x, z) do traçado.
+var center := Vector2.ZERO
+## Meia largura da área do traçado (x, z).
+var half_extent := Vector2.ZERO
+## Áreas planas extras: Vector3(x, z, raio).
+var flat_spots: Array[Vector3] = []
+
+var _pts := PackedVector2Array()
+var _ys := PackedFloat32Array()
+var _mean_y := 0.0
+## Pista toda na mesma altura (atalho: sem interpolar alturas).
+var _flat := true
+var _solid := Field.new()
+var _bridge := Field.new()
+## Para cada ponto do mapa das pontes: 2 = água embaixo, 1 = ponte comum.
+var _bridge_kind := PackedByteArray()
+var _river := Field.new()
+var _hills := FastNoiseLite.new()
+var _ridges := FastNoiseLite.new()
+var _coast := FastNoiseLite.new()
+
+
+## Mapa de "ponto mais perto": para cada célula da grade guarda qual ponto da
+## lista está mais perto (propagação em duas passadas, bem mais rápida que medir
+## a distância para todos os pontos).
+class Field:
+	var cell := 4.0
+	var origin := Vector2.ZERO
+	var w := 0
+	var h := 0
+	var pts := PackedVector2Array()
+	## Índice de cada ponto na lista original (amostras da pista).
+	var ids := PackedInt32Array()
+	var nearest := PackedInt32Array()
+
+	func is_empty() -> bool:
+		return pts.is_empty()
+
+	func build(points: PackedVector2Array, point_ids: PackedInt32Array, min_p: Vector2, max_p: Vector2, p_cell: float) -> void:
+		cell = p_cell
+		pts = points
+		ids = point_ids
+		origin = min_p
+		w = int(ceil((max_p.x - min_p.x) / cell)) + 1
+		h = int(ceil((max_p.y - min_p.y) / cell)) + 1
+		nearest.resize(w * h)
+		nearest.fill(-1)
+		if pts.is_empty():
+			return
+		var best := PackedFloat32Array()
+		best.resize(w * h)
+		best.fill(INF)
+		for i in pts.size():
+			var cx := int((pts[i].x - origin.x) / cell)
+			var cz := int((pts[i].y - origin.y) / cell)
+			if cx < 0 or cz < 0 or cx >= w or cz >= h:
+				continue
+			var k := cz * w + cx
+			var d := _cell_center(cx, cz).distance_squared_to(pts[i])
+			if d < best[k]:
+				best[k] = d
+				nearest[k] = i
+		var forward: Array[Vector2i] = [Vector2i(-1, 0), Vector2i(-1, -1), Vector2i(0, -1), Vector2i(1, -1)]
+		var backward: Array[Vector2i] = [Vector2i(1, 0), Vector2i(1, 1), Vector2i(0, 1), Vector2i(-1, 1)]
+		for cz in h:
+			for cx in w:
+				_relax(cx, cz, forward, best)
+		for cz in range(h - 1, -1, -1):
+			for cx in range(w - 1, -1, -1):
+				_relax(cx, cz, backward, best)
+
+	## Índice (em `pts`) do ponto mais perto, ou -1 fora da grade.
+	func find(x: float, z: float) -> int:
+		var fx := (x - origin.x) / cell
+		var fz := (z - origin.y) / cell
+		var cx := int(floor(fx))
+		var cz := int(floor(fz))
+		if cx < 0 or cz < 0 or cx >= w or cz >= h:
+			return -1
+		# Confere a célula e as vizinhas mais próximas do ponto.
+		var ox := 1 if fx - cx > 0.5 else -1
+		var oz := 1 if fz - cz > 0.5 else -1
+		var p := Vector2(x, z)
+		var best := INF
+		var best_i := -1
+		for c: Vector2i in [Vector2i(cx, cz), Vector2i(cx + ox, cz), Vector2i(cx, cz + oz), Vector2i(cx + ox, cz + oz)]:
+			if c.x < 0 or c.y < 0 or c.x >= w or c.y >= h:
+				continue
+			var i := nearest[c.y * w + c.x]
+			if i < 0:
+				continue
+			var d := p.distance_squared_to(pts[i])
+			if d < best:
+				best = d
+				best_i = i
+		return best_i
+
+	## Distância (m) do ponto até a borda da grade (negativa fora dela).
+	func inside_margin(x: float, z: float) -> float:
+		var lx := x - origin.x
+		var lz := z - origin.y
+		return minf(minf(lx, w * cell - lx), minf(lz, h * cell - lz))
+
+	func _relax(cx: int, cz: int, offsets: Array[Vector2i], best: PackedFloat32Array) -> void:
+		var k := cz * w + cx
+		var c := _cell_center(cx, cz)
+		for o in offsets:
+			var nx := cx + o.x
+			var nz := cz + o.y
+			if nx < 0 or nz < 0 or nx >= w or nz >= h:
+				continue
+			var i := nearest[nz * w + nx]
+			if i < 0:
+				continue
+			var d := c.distance_squared_to(pts[i])
+			if d < best[k]:
+				best[k] = d
+				nearest[k] = i
+
+	func _cell_center(cx: int, cz: int) -> Vector2:
+		return origin + Vector2(cx + 0.5, cz + 0.5) * cell
+
+
+## `bridge_mask[i]` = true nas amostras que ficam em cima de ponte (o chão não
+## segue essas amostras). `rivers` = linhas centrais dos rios (x, z).
+func setup(samples: PackedVector3Array, seed_value: int, bridge_mask := PackedByteArray(),
+		rivers: Array[PackedVector2Array] = [], margin := 90.0) -> void:
+	_hills.seed = seed_value
+	_hills.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	_hills.frequency = 0.0075
+	_hills.fractal_type = FastNoiseLite.FRACTAL_FBM
+	_hills.fractal_octaves = 4
+	_ridges.seed = seed_value + 17
+	_ridges.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	_ridges.frequency = 0.0045
+	_ridges.fractal_type = FastNoiseLite.FRACTAL_RIDGED
+	_ridges.fractal_octaves = 4
+	_coast.seed = seed_value + 31
+	_coast.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	_coast.frequency = 0.02
+	_coast.fractal_octaves = 2
+
+	var count := samples.size()
+	_pts.resize(count)
+	_ys.resize(count)
+	var min_p := Vector2(INF, INF)
+	var max_p := Vector2(-INF, -INF)
+	var sum_y := 0.0
+	var solid_pts := PackedVector2Array()
+	var solid_ids := PackedInt32Array()
+	var bridge_pts := PackedVector2Array()
+	var bridge_ids := PackedInt32Array()
+	for i in count:
+		var s := samples[i]
+		_pts[i] = Vector2(s.x, s.z)
+		_ys[i] = s.y
+		min_p = min_p.min(_pts[i])
+		max_p = max_p.max(_pts[i])
+		var on_bridge := i < bridge_mask.size() and bridge_mask[i] != 0
+		if on_bridge:
+			bridge_pts.append(_pts[i])
+			bridge_ids.append(i)
+			_bridge_kind.append(bridge_mask[i])
+		else:
+			solid_pts.append(_pts[i])
+			solid_ids.append(i)
+			sum_y += s.y
+	_mean_y = sum_y / maxf(solid_pts.size(), 1)
+	for y in _ys:
+		if absf(y - _ys[0]) > 0.001:
+			_flat = false
+			break
+	center = (min_p + max_p) * 0.5
+	half_extent = (max_p - min_p) * 0.5
+	var lo := min_p - Vector2(margin, margin)
+	var hi := max_p + Vector2(margin, margin)
+	_solid.build(solid_pts, solid_ids, lo, hi, CELL)
+	if not bridge_pts.is_empty():
+		_bridge.build(bridge_pts, bridge_ids, lo, hi, CELL)
+
+	# Rios: pontos a cada ~3 m ao longo das linhas.
+	var river_pts := PackedVector2Array()
+	for line in rivers:
+		for k in line.size() - 1:
+			var a := line[k]
+			var b := line[k + 1]
+			var steps := maxi(1, int(a.distance_to(b) / 3.0))
+			for s in steps:
+				river_pts.append(a.lerp(b, float(s) / steps))
+		if line.size() > 0:
+			river_pts.append(line[line.size() - 1])
+	if not river_pts.is_empty():
+		var r_ids := PackedInt32Array()
+		r_ids.resize(river_pts.size())
+		_river.build(river_pts, r_ids, min_p - Vector2.ONE * RIVER_MARGIN, max_p + Vector2.ONE * RIVER_MARGIN, RIVER_CELL)
+
+
+## Distância (no plano) até o centro da pista e altura do chão da pista ali perto
+## (sem contar as pontes). Longe da pista (fora do mapa) devolve uma distância grande.
+func nearest_info(x: float, z: float) -> Vector2:
+	var k := _solid.find(x, z)
+	if k < 0:
+		var far := maxf(absf(x - center.x) - half_extent.x, absf(z - center.y) - half_extent.y)
+		return Vector2(maxf(far, 120.0), _mean_y)
+	var p := Vector2(x, z)
+	if _flat:
+		return Vector2(p.distance_to(_solid.pts[k]), _ys[0])
+	return Vector2(p.distance_to(_solid.pts[k]), _interp_y(_solid.ids[k], p))
+
+
+## Índice da amostra da pista (fora das pontes) mais perto do ponto, ou -1.
+func nearest_track_index(x: float, z: float) -> int:
+	var k := _solid.find(x, z)
+	return _solid.ids[k] if k >= 0 else -1
+
+
+## Distância até a pista, contando também os trechos em cima de ponte.
+func distance_to_track(x: float, z: float) -> float:
+	var d := nearest_info(x, z).x
+	if not _bridge.is_empty():
+		var k := _bridge.find(x, z)
+		if k >= 0:
+			d = minf(d, Vector2(x, z).distance_to(_bridge.pts[k]))
+	return d
+
+
+func height_at(x: float, z: float) -> float:
+	return _sample(x, z).x
+
+
+## 1 perto da pista (grama aparada em listras), 0 longe.
+func mow_factor(distance: float) -> float:
+	return 1.0 - smoothstep(flat_distance - 2.0, flat_distance + 16.0, distance)
+
+
+## (altura do chão, fator de grama aparada) num ponto.
+func _sample(x: float, z: float) -> Vector2:
+	var info := nearest_info(x, z)
+	var d := info.x
+	# Longe da pista a altura de base vai para a média (pistas com subidas não
+	# deixam degraus na borda do mapa).
+	var base := info.y if _flat else lerpf(info.y, _mean_y, smoothstep(40.0, 88.0, d))
+	var m := smoothstep(flat_distance, flat_distance + rise_distance, d)
+	for spot in flat_spots:
+		m *= smoothstep(spot.z, spot.z + 40.0, Vector2(x - spot.x, z - spot.y).length())
+	var h := base - 0.03
+	if m > 0.0:
+		var relief := _hills.get_noise_2d(x, z) * hill_height + hill_bias
+		var ring := smoothstep(mountain_start, mountain_end, Vector2(x, z).distance_to(center))
+		if ring > 0.0:
+			relief += ring * mountain_height * (0.3 + 0.7 * clampf(_ridges.get_noise_2d(x, z) * 0.6 + 0.5, 0.0, 1.2))
+		if terrace_step > 0.0:
+			relief = _terrace(relief)
+		h += m * relief
+	if sea_distance > 0.0:
+		var coast := _coast.get_noise_2d(x, z) * 14.0
+		h -= sea_depth * smoothstep(sea_distance, sea_distance + 42.0, d + coast)
+	if not _river.is_empty():
+		h = _carve_river(x, z, h, d)
+	if not _bridge.is_empty():
+		h = _under_bridge(x, z, h, d)
+	return Vector2(h, mow_factor(d))
+
+
+## Degraus: patamares planos e paredões entre eles (mesas e cânions).
+func _terrace(h: float) -> float:
+	var k := h / terrace_step
+	var f := floorf(k)
+	return (f + smoothstep(0.5, 0.85, k - f)) * terrace_step
+
+
+## Leito do rio: fundo abaixo da água e margens subindo até o chão em volta.
+## Não cava perto da pista (as cabeceiras das pontes ficam firmes).
+func _carve_river(x: float, z: float, h: float, d_track: float) -> float:
+	var k := _river.find(x, z)
+	if k < 0:
+		return h
+	var rd := Vector2(x, z).distance_to(_river.pts[k])
+	var half := river_width * 0.5
+	var bed := water_level - river_depth
+	# Onde o chão é alto o vale abre (encostas em "V"); com river_valley = 0 as
+	# paredes ficam retas como num cânion.
+	var bank := river_bank + maxf(0.0, h - bed) * river_valley
+	if rd > half + bank:
+		return h
+	var carved := lerpf(bed, h, smoothstep(half * 0.45, half + bank, rd))
+	var protect := smoothstep(flat_distance - 2.0, flat_distance + 10.0, d_track)
+	var fade := smoothstep(0.0, 70.0, _river.inside_margin(x, z))
+	return lerpf(h, minf(h, carved), protect * fade)
+
+
+## Embaixo das pontes o chão fica abaixo do tabuleiro. Nas pontes com água embaixo
+## ele afunda até o fundo do mar/lagoa (menos perto da pista, onde as cabeceiras
+## ficam firmes).
+func _under_bridge(x: float, z: float, h: float, d_track: float) -> float:
+	var k := _bridge.find(x, z)
+	if k < 0:
+		return h
+	var p := Vector2(x, z)
+	var bd := p.distance_to(_bridge.pts[k])
+	var limit := deck_half + 2.0
+	if _bridge_kind[k] == 2:
+		var reach := limit + 34.0
+		if bd < reach:
+			var floor_y := water_level - 3.0 + smoothstep(limit, reach, bd) * 40.0
+			var protect := smoothstep(flat_distance - 2.0, flat_distance + 12.0, d_track)
+			h = lerpf(h, minf(h, floor_y), protect)
+	if bd > limit + 26.0:
+		return h
+	var cap := _interp_y(_bridge.ids[k], p) - bridge_clearance + smoothstep(limit, limit + 26.0, bd) * 120.0
+	return minf(h, cap)
+
+
+## Altura da pista perto da amostra `i`, interpolando com a vizinha do lado de `p`.
+func _interp_y(i: int, p: Vector2) -> float:
+	var n := _pts.size()
+	var c := _pts[i]
+	var j := (i + 1) % n
+	var seg := _pts[j] - c
+	var t := (p - c).dot(seg) / maxf(seg.length_squared(), 0.0001)
+	if t < 0.0:
+		j = (i - 1 + n) % n
+		seg = _pts[j] - c
+		t = (p - c).dot(seg) / maxf(seg.length_squared(), 0.0001)
+	return lerpf(_ys[i], _ys[j], clampf(t, 0.0, 1.0))
+
+
+# --- Malha ------------------------------------------------------------------------
+
+## Grade com células pequenas perto da pista e cada vez maiores para fora.
+## `resolution` = células em x e z; `inner_half` = meia largura (x, z) da parte fina.
+func build_mesh(resolution: Vector2i, inner_half: Vector2, outer_half: float, material: Material) -> ArrayMesh:
+	var nx := maxi(resolution.x, 8)
+	var nz := maxi(resolution.y, 8)
+	var xs := PackedFloat32Array()
+	for i in nx + 1:
+		xs.append(_warp(float(i) / nx * 2.0 - 1.0, inner_half.x, outer_half))
+	var zs := PackedFloat32Array()
+	for j in nz + 1:
+		zs.append(_warp(float(j) / nz * 2.0 - 1.0, inner_half.y, outer_half))
+	var row := nx + 1
+	var rows := nz + 1
+	var verts := PackedVector3Array()
+	var colors := PackedColorArray()
+	verts.resize(row * rows)
+	colors.resize(row * rows)
+	for j in rows:
+		for i in row:
+			var x := center.x + xs[i]
+			var z := center.y + zs[j]
+			var s := _sample(x, z)
+			verts[j * row + i] = Vector3(x, s.x, z)
+			colors[j * row + i] = Color(s.y, 0.0, 0.0)
+	var normals := PackedVector3Array()
+	normals.resize(row * rows)
+	for j in rows:
+		for i in row:
+			var tx := verts[j * row + mini(i + 1, nx)] - verts[j * row + maxi(i - 1, 0)]
+			var tz := verts[mini(j + 1, nz) * row + i] - verts[maxi(j - 1, 0) * row + i]
+			normals[j * row + i] = tz.cross(tx).normalized()
+	var indices := PackedInt32Array()
+	indices.resize(nx * nz * 6)
+	var k := 0
+	for j in nz:
+		for i in nx:
+			var a := j * row + i
+			var b := a + 1
+			var c := a + row
+			var d := c + 1
+			# Ordem dos vértices: Godot desenha a face da frente no sentido horário.
+			indices[k] = a
+			indices[k + 1] = b
+			indices[k + 2] = c
+			indices[k + 3] = b
+			indices[k + 4] = d
+			indices[k + 5] = c
+			k += 6
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_COLOR] = colors
+	arrays[Mesh.ARRAY_INDEX] = indices
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	mesh.surface_set_material(0, material)
+	return mesh
+
+
+static func _warp(u: float, inner_half: float, outer_half: float) -> float:
+	var a := absf(u)
+	var split := 0.72
+	var slope := inner_half / split
+	var r := a * slope
+	if a > split:
+		var t := (a - split) / (1.0 - split)
+		var extra := outer_half - inner_half - slope * (1.0 - split)
+		r = inner_half + slope * (a - split) + extra * t * t
+	return signf(u) * r
