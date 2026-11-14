@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="CharacterData" format=3]
+
+[ext_resource type="Script" path="res://scripts/character_data.gd" id="1_data"]
+[ext_resource type="PackedScene" path="res://assets/models/personagens/celerino.glb" id="2_model"]
+
+[resource]
+script = ExtResource("1_data")
+display_name = "Boleto"
+tagline = "Nunca chega atrasado"
+description = "Pontual e insistente. Embala devagar, mas na reta ninguém segura."
+model_scene = ExtResource("2_model")
+kart_scale = 0.55
+showcase_scale = 1.0
+seat_height = 0.54
+color = Color(0.98, 0.76, 0.1, 1)
+color_dark = Color(0.42, 0.3, 0.02, 1)
+model_tint = Color(1, 0.78, 0.08, 1)
+tint_materials = PackedStringArray("Cel_Blue", "Cel_LightBlue", "Cel_Cheek", "Cel_DarkBlue")
+speed = 4
+acceleration = 3
+handling = 2
+weight = 4

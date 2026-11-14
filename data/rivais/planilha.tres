@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="CharacterData" format=3]
+
+[ext_resource type="Script" path="res://scripts/character_data.gd" id="1_data"]
+[ext_resource type="PackedScene" path="res://assets/models/personagens/celerino.glb" id="2_model"]
+
+[resource]
+script = ExtResource("1_data")
+display_name = "Planilha"
+tagline = "Calcula cada curva"
+description = "Organizada até o último centavo: faz as curvas certinhas e não desperdiça nenhum metro."
+model_scene = ExtResource("2_model")
+kart_scale = 0.55
+showcase_scale = 1.0
+seat_height = 0.54
+color = Color(0.16, 0.72, 0.32, 1)
+color_dark = Color(0.04, 0.26, 0.1, 1)
+model_tint = Color(0.13, 0.72, 0.3, 1)
+tint_materials = PackedStringArray("Cel_Blue", "Cel_LightBlue", "Cel_Cheek", "Cel_DarkBlue")
+speed = 3
+acceleration = 3
+handling = 4
+weight = 3

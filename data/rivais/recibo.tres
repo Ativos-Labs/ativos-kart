@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="CharacterData" format=3]
+
+[ext_resource type="Script" path="res://scripts/character_data.gd" id="1_data"]
+[ext_resource type="PackedScene" path="res://assets/models/personagens/celerino.glb" id="2_model"]
+
+[resource]
+script = ExtResource("1_data")
+display_name = "Recibo"
+tagline = "Rápido na saída"
+description = "Pequeno e leve: dispara na largada e escapa das batidas."
+model_scene = ExtResource("2_model")
+kart_scale = 0.55
+showcase_scale = 1.0
+seat_height = 0.54
+color = Color(1, 0.52, 0.12, 1)
+color_dark = Color(0.42, 0.18, 0.03, 1)
+model_tint = Color(1, 0.5, 0.1, 1)
+tint_materials = PackedStringArray("Cel_Blue", "Cel_LightBlue", "Cel_Cheek", "Cel_DarkBlue")
+speed = 2
+acceleration = 5
+handling = 4
+weight = 2
