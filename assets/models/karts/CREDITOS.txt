@@ -1,0 +1,51 @@
+Modelo: "standard kart"
+Autor: amogusstrikesback2 (https://sketchfab.com/amogusstrikesback2)
+Fonte: https://sketchfab.com/3d-models/standard-kart-2e0996e9b43e4a9385c4e0ee64cbb169
+Licença: CC BY 4.0 (http://creativecommons.org/licenses/by/4.0/)
+No jogo: "Kart Padrão" (standard_kart.glb)
+
+Modelo: "jon arbuckle's kart (speed)"
+Autor: amogusstrikesback2 (https://sketchfab.com/amogusstrikesback2)
+Fonte: https://sketchfab.com/3d-models/jon-arbuckles-kart-speed-dc709b0e6bf643b3a3d6980d1b938ac9
+Licença: CC BY 4.0 (http://creativecommons.org/licenses/by/4.0/)
+No jogo: "Relâmpago" (jon_arbuckles_kart_speed.glb)
+
+Modelo: "practice kart"
+Autor: amogusstrikesback2 (https://sketchfab.com/amogusstrikesback2)
+Fonte: https://sketchfab.com/3d-models/practice-kart-47a59d8980a44d318c489ebd054b11ba
+Licença: CC BY 4.0 (http://creativecommons.org/licenses/by/4.0/)
+No jogo: "Kart de Treino" (practice_kart.glb)
+
+Modelo: "Crash Team Racing Nitro-Fueled kart"
+Autor: drance (https://sketchfab.com/drance)
+Fonte: https://sketchfab.com/3d-models/crash-team-racing-nitro-fueled-kart-c77db250241a41178f69b2d8b12c396e
+Licença: CC BY-SA 4.0 (http://creativecommons.org/licenses/by-sa/4.0/)
+No jogo: "Bólido" (bolido.glb) — modificado: rodas separadas em peças próprias e
+adesivos da Ativos colados. Por ser CC BY-SA, o bolido.glb modificado também fica
+sob CC BY-SA 4.0.
+
+Modelo: "kartrider olypios"
+Autor: amogusstrikesback2 (https://sketchfab.com/amogusstrikesback2)
+Fonte: https://sketchfab.com/3d-models/kartrider-olypios-ce2e8de73eaf4d1eabe04b8667045ba9
+Licença: CC BY 4.0 (http://creativecommons.org/licenses/by/4.0/)
+No jogo: "Cometa" (cometa.glb) — modificado: emblema da lateral trocado pelo "at".
+
+Modelo: "pink excalibur"
+Autor: amogusstrikesback2 (https://sketchfab.com/amogusstrikesback2)
+Fonte: https://sketchfab.com/3d-models/pink-excalibur-3e516d1e746244df80d54517301547d6
+Licença: CC BY 4.0 (http://creativecommons.org/licenses/by/4.0/)
+No jogo: "Motoca" (motoca.glb) — modificado: emblemas do tanque trocados pelo "at".
+
+Modelo: "thermal buggy"
+Autor: amogusstrikesback2 (https://sketchfab.com/amogusstrikesback2)
+Fonte: https://sketchfab.com/3d-models/thermal-buggy-19e7c3a0e1f64d3d8a24977b0fd4f05c
+Licença: CC BY 4.0 (http://creativecommons.org/licenses/by/4.0/)
+No jogo: "Bugre" (bugre.glb) — modificado: adesivos originais trocados pelas logos
+da Ativos.
+
+Os quatro últimos são gerados a partir dos originais (tools/karts/originais/) pelo
+script tools/karts/build_karts.py.
+
+As licenças CC BY 4.0 e CC BY-SA 4.0 exigem dar crédito ao autor. O crédito aparece no rodapé da
+tela inicial e, para cada kart, na tela de seleção de kart — mantenha-os se for
+publicar o jogo.

@@ -1,0 +1,45 @@
+[gd_resource type="Resource" script_class="KartData" format=3]
+
+[ext_resource type="Script" path="res://scripts/kart_data.gd" id="1_data"]
+[ext_resource type="PackedScene" path="res://assets/models/karts/motoca.glb" id="2_model"]
+[ext_resource type="Script" path="res://scripts/kart_exhaust.gd" id="3_exhaust"]
+
+[sub_resource type="Resource" id="Resource_saida1"]
+script = ExtResource("3_exhaust")
+position = Vector3(-0.243, 0.594, 0.893)
+direction = Vector3(0, 0.39, 0.92)
+radius = 0.045
+length = 0.7
+
+[sub_resource type="Resource" id="Resource_saida2"]
+script = ExtResource("3_exhaust")
+position = Vector3(0.264, 0.594, 0.893)
+direction = Vector3(0, 0.39, 0.92)
+radius = 0.045
+length = 0.7
+
+[resource]
+script = ExtResource("1_data")
+display_name = "Motoca"
+description = "A moto do grid: levíssima, arranca rápido e faz as curvas mais fechadas — mas qualquer encostão a tira da linha."
+credits = "Modelo por amogusstrikesback2 (Sketchfab) — CC BY 4.0, modificado"
+model_scene = ExtResource("2_model")
+model_scale = 1.25
+model_rotation_degrees = Vector3(0, -90, 0)
+model_offset = Vector3(0, 0.064, 0.377)
+race_scale = 0.8
+turn_lean_degrees = 28.0
+speed = 3
+acceleration = 4
+handling = 5
+weight = 1
+front_wheels = PackedStringArray("RodaFrente")
+rear_wheels = PackedStringArray("RodaTras")
+front_wheel_radius = 0.294
+rear_wheel_radius = 0.298
+seat_position = Vector3(0, 0.9, 0.44)
+steering_wheel_center = Vector3(0, 1.12, -0.155)
+steering_wheel_axis = Vector3(0, 0.3, 0.95)
+steering_wheel_radius = 0.36
+hand_angle = 90.0
+exhausts = Array[ExtResource("3_exhaust")]([SubResource("Resource_saida1"), SubResource("Resource_saida2")])

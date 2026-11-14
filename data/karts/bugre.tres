@@ -1,0 +1,43 @@
+[gd_resource type="Resource" script_class="KartData" format=3]
+
+[ext_resource type="Script" path="res://scripts/kart_data.gd" id="1_data"]
+[ext_resource type="PackedScene" path="res://assets/models/karts/bugre.glb" id="2_model"]
+[ext_resource type="Script" path="res://scripts/kart_exhaust.gd" id="3_exhaust"]
+
+[sub_resource type="Resource" id="Resource_saida1"]
+script = ExtResource("3_exhaust")
+position = Vector3(0.29, 0.192, 0.985)
+direction = Vector3(0, -0.05, 1)
+radius = 0.055
+length = 0.65
+
+[sub_resource type="Resource" id="Resource_saida2"]
+script = ExtResource("3_exhaust")
+position = Vector3(-0.29, 0.192, 0.985)
+direction = Vector3(0, -0.05, 1)
+radius = 0.055
+length = 0.65
+
+[resource]
+script = ExtResource("1_data")
+display_name = "Bugre"
+description = "Buggy de praia robusto e pesado. Empurra os outros sem dó e quase não perde velocidade fora do asfalto."
+credits = "Modelo por amogusstrikesback2 (Sketchfab) — CC BY 4.0, modificado"
+model_scene = ExtResource("2_model")
+model_scale = 1.1
+model_rotation_degrees = Vector3(0, -90, 0)
+model_offset = Vector3(0, 0.064, 0.348)
+speed = 3
+acceleration = 3
+handling = 2
+weight = 5
+front_wheels = PackedStringArray("RodaFrenteEsq", "RodaFrenteDir")
+rear_wheels = PackedStringArray("RodaTrasEsq", "RodaTrasDir")
+front_wheel_radius = 0.23
+rear_wheel_radius = 0.272
+seat_position = Vector3(0, 0.42, 0.43)
+steering_wheel_center = Vector3(0, 0.717, -0.081)
+steering_wheel_axis = Vector3(0, 0.52, 0.85)
+steering_wheel_radius = 0.1
+hand_angle = 75.0
+exhausts = Array[ExtResource("3_exhaust")]([SubResource("Resource_saida1"), SubResource("Resource_saida2")])
