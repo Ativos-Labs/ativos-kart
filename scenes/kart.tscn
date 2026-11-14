@@ -1,0 +1,122 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/kart.gd" id="1_kart"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_body"]
+size = Vector3(1.8, 0.5, 2.3)
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_floor"]
+radius = 0.3
+height = 2.0
+
+[sub_resource type="Gradient" id="Gradient_soft"]
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_soft"]
+gradient = SubResource("Gradient_soft")
+width = 64
+height = 64
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(1, 0.5)
+
+[sub_resource type="Curve" id="Curve_shrink"]
+_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_shrink"]
+curve = SubResource("Curve_shrink")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_sparks"]
+emission_shape = 1
+emission_sphere_radius = 0.06
+direction = Vector3(0, 0.7, 1)
+spread = 40.0
+initial_velocity_min = 2.0
+initial_velocity_max = 4.5
+gravity = Vector3(0, -9, 0)
+scale_min = 0.6
+scale_max = 1.3
+scale_curve = SubResource("CurveTexture_shrink")
+color = Color(0.25, 0.65, 1, 1)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_glow"]
+transparency = 1
+blend_mode = 1
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = SubResource("GradientTexture2D_soft")
+billboard_mode = 3
+billboard_keep_scale = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_spark"]
+material = SubResource("StandardMaterial3D_glow")
+size = Vector2(0.2, 0.2)
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_dust"]
+emission_shape = 3
+emission_box_extents = Vector3(0.8, 0.05, 0.1)
+direction = Vector3(0, 1, 1)
+spread = 30.0
+initial_velocity_min = 1.0
+initial_velocity_max = 2.5
+gravity = Vector3(0, -2, 0)
+scale_min = 0.8
+scale_max = 1.6
+color = Color(0.55, 0.47, 0.32, 0.55)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_dust"]
+transparency = 1
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = SubResource("GradientTexture2D_soft")
+billboard_mode = 3
+billboard_keep_scale = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_dust"]
+material = SubResource("StandardMaterial3D_dust")
+size = Vector2(0.55, 0.55)
+
+[node name="Kart" type="CharacterBody3D"]
+floor_snap_length = 0.4
+floor_max_angle = 0.872665
+script = ExtResource("1_kart")
+
+[node name="ColisaoCorpo" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+shape = SubResource("BoxShape3D_body")
+
+[node name="ColisaoChao" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0.3, 0)
+shape = SubResource("CapsuleShape3D_floor")
+
+[node name="Visual" type="Node3D" parent="."]
+
+[node name="ModelSlot" type="Node3D" parent="Visual"]
+
+[node name="SparksL" type="GPUParticles3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.74, 0.06, 0.78)
+emitting = false
+amount = 36
+lifetime = 0.35
+process_material = SubResource("ParticleProcessMaterial_sparks")
+draw_pass_1 = SubResource("QuadMesh_spark")
+
+[node name="SparksR" type="GPUParticles3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.74, 0.06, 0.78)
+emitting = false
+amount = 36
+lifetime = 0.35
+process_material = SubResource("ParticleProcessMaterial_sparks")
+draw_pass_1 = SubResource("QuadMesh_spark")
+
+[node name="Dust" type="GPUParticles3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 0.9)
+emitting = false
+amount = 24
+lifetime = 0.6
+process_material = SubResource("ParticleProcessMaterial_dust")
+draw_pass_1 = SubResource("QuadMesh_dust")
+
+[node name="EngineAudio" type="AudioStreamPlayer" parent="."]
+volume_db = -12.0
