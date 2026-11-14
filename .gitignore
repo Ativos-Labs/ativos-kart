@@ -1,0 +1,18 @@
+# Godot 4+ specific ignores
+.godot/
+/android/
+# Saída do export web (gerada por web/export.sh)
+/web/dist/
+# Saída do export Linux (gerada por linux/export.sh)
+/linux/dist/
+
+# Arquivos do sistema
+.DS_Store
+
+# Cache do Python (tools/)
+__pycache__/
+*.pyc
+
+# Scripts de sonda temporários e configuração local do Claude Code
+/_probe/
+/.claude/
