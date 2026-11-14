@@ -1,0 +1,264 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/main_menu.gd" id="1_menu"]
+[ext_resource type="PackedScene" path="res://scenes/tracks/circuito_ativos.tscn" id="2_track"]
+[ext_resource type="FontVariation" path="res://ui/fonts/lilita_italic.tres" id="3_italic"]
+[ext_resource type="Script" path="res://scripts/ui/fancy_button.gd" id="4_button"]
+[ext_resource type="Shader" path="res://shaders/ui_checker.gdshader" id="5_checker"]
+[ext_resource type="Script" path="res://scripts/ui/hint_bar.gd" id="6_hints"]
+[ext_resource type="PackedScene" path="res://scenes/ui/controls_panel.tscn" id="7_controls"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_checker"]
+shader = ExtResource("5_checker")
+shader_parameter/edge = 0.4
+shader_parameter/slant = 0.12
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_banner"]
+content_margin_left = 40.0
+content_margin_top = 0.0
+content_margin_right = 40.0
+content_margin_bottom = 4.0
+bg_color = Color(0.93, 0.15, 0.2, 1)
+border_width_left = 5
+border_width_top = 5
+border_width_right = 5
+border_width_bottom = 5
+border_color = Color(1, 1, 1, 1)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+shadow_color = Color(0, 0, 0, 0.35)
+shadow_size = 8
+shadow_offset = Vector2(0, 6)
+skew = Vector2(0.25, 0)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_chip"]
+content_margin_left = 16.0
+content_margin_top = 6.0
+content_margin_right = 18.0
+content_margin_bottom = 7.0
+bg_color = Color(1, 1, 1, 0.96)
+border_width_bottom = 3
+border_color = Color(0.68, 0.73, 0.82, 1)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+shadow_color = Color(0, 0, 0, 0.25)
+shadow_size = 4
+shadow_offset = Vector2(0, 3)
+
+[node name="MenuPrincipal" type="Node3D"]
+script = ExtResource("1_menu")
+
+[node name="Pista" parent="." instance=ExtResource("2_track")]
+
+[node name="Vitrine" type="Node3D" parent="."]
+
+[node name="Camera" type="Camera3D" parent="."]
+current = true
+h_offset = -1.75
+fov = 48.0
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="Root" type="Control" parent="UI"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Checker" type="ColorRect" parent="UI/Root"]
+unique_name_in_owner = true
+material = SubResource("ShaderMaterial_checker")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="TitleBox" type="VBoxContainer" parent="UI/Root"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 40.0
+offset_top = 14.0
+offset_right = 500.0
+offset_bottom = 236.0
+mouse_filter = 2
+theme_override_constants/separation = -30
+
+[node name="Ativos" type="Label" parent="UI/Root/TitleBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.82, 0.1, 1)
+theme_override_colors/font_outline_color = Color(0.04, 0.06, 0.16, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.3)
+theme_override_constants/outline_size = 30
+theme_override_constants/shadow_offset_y = 7
+theme_override_fonts/font = ExtResource("3_italic")
+theme_override_font_sizes/font_size = 124
+text = "ATIVOS"
+horizontal_alignment = 1
+
+[node name="BannerCenter" type="CenterContainer" parent="UI/Root/TitleBox"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="KartBanner" type="PanelContainer" parent="UI/Root/TitleBox/BannerCenter"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_banner")
+
+[node name="Kart" type="Label" parent="UI/Root/TitleBox/BannerCenter/KartBanner"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0.04, 0.06, 0.16, 1)
+theme_override_constants/outline_size = 20
+theme_override_fonts/font = ExtResource("3_italic")
+theme_override_font_sizes/font_size = 76
+text = "KART"
+horizontal_alignment = 1
+
+[node name="MenuBox" type="VBoxContainer" parent="UI/Root"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 74.0
+offset_top = 280.0
+offset_right = 474.0
+offset_bottom = 530.0
+theme_override_constants/separation = 20
+
+[node name="PlayButton" type="Button" parent="UI/Root/MenuBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 70)
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "Jogar"
+script = ExtResource("4_button")
+icon_kind = "flag"
+align_left = true
+
+[node name="ControlsButton" type="Button" parent="UI/Root/MenuBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 62)
+layout_mode = 2
+text = "Controles"
+script = ExtResource("4_button")
+icon_kind = "gamepad"
+align_left = true
+
+[node name="QuitButton" type="Button" parent="UI/Root/MenuBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 62)
+layout_mode = 2
+text = "Sair"
+script = ExtResource("4_button")
+icon_kind = "exit"
+align_left = true
+
+[node name="Chips" type="HBoxContainer" parent="UI/Root"]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 48.0
+offset_top = -112.0
+offset_right = 620.0
+offset_bottom = -66.0
+grow_vertical = 0
+mouse_filter = 2
+theme_override_constants/separation = 14
+
+[node name="RecordChip" type="PanelContainer" parent="UI/Root/Chips"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_chip")
+
+[node name="HBox" type="HBoxContainer" parent="UI/Root/Chips/RecordChip"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Title" type="Label" parent="UI/Root/Chips/RecordChip/HBox"]
+layout_mode = 2
+theme_type_variation = &"PanelSoft"
+theme_override_font_sizes/font_size = 15
+text = "RECORDE"
+
+[node name="RecordLabel" type="Label" parent="UI/Root/Chips/RecordChip/HBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"PanelLabel"
+theme_override_font_sizes/font_size = 19
+text = "-:--.---"
+
+[node name="DriverChip" type="PanelContainer" parent="UI/Root/Chips"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_chip")
+
+[node name="HBox" type="HBoxContainer" parent="UI/Root/Chips/DriverChip"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Title" type="Label" parent="UI/Root/Chips/DriverChip/HBox"]
+layout_mode = 2
+theme_type_variation = &"PanelSoft"
+theme_override_font_sizes/font_size = 15
+text = "PILOTO"
+
+[node name="DriverLabel" type="Label" parent="UI/Root/Chips/DriverChip/HBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"PanelLabel"
+theme_override_font_sizes/font_size = 19
+text = "Celerino"
+
+[node name="Version" type="Label" parent="UI/Root"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -120.0
+offset_top = 16.0
+offset_right = -24.0
+offset_bottom = 40.0
+grow_horizontal = 0
+theme_override_colors/font_color = Color(1, 1, 1, 0.75)
+theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 15
+text = "v0.2"
+horizontal_alignment = 2
+
+[node name="Hints" type="Control" parent="UI/Root"]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -48.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+script = ExtResource("6_hints")
+hints = PackedStringArray("↑  ↓|Navegar", "Enter|Confirmar")
+
+[node name="Footer" type="Label" parent="UI/Root/Hints"]
+layout_mode = 1
+anchors_preset = 9
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_right = 700.0
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.65)
+theme_override_font_sizes/font_size = 13
+text = "Modelos dos karts: amogusstrikesback2 (CC BY 4.0) e drance (CC BY-SA 4.0), no Sketchfab"
+vertical_alignment = 1
+
+[node name="ControlsPanel" parent="UI/Root" instance=ExtResource("7_controls")]
+unique_name_in_owner = true
+layout_mode = 1

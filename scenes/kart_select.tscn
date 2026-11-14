@@ -1,0 +1,325 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/kart_select.gd" id="1_select"]
+[ext_resource type="Shader" path="res://shaders/ui_stripes.gdshader" id="2_stripes"]
+[ext_resource type="Script" path="res://scripts/ui/ribbon_label.gd" id="3_ribbon"]
+[ext_resource type="Script" path="res://scripts/ui/stat_bars.gd" id="4_stats"]
+[ext_resource type="Script" path="res://scripts/ui/fancy_button.gd" id="5_button"]
+[ext_resource type="Script" path="res://scripts/ui/arrow_button.gd" id="6_arrow"]
+[ext_resource type="Script" path="res://scripts/ui/hint_bar.gd" id="7_hints"]
+[ext_resource type="FontFile" path="res://assets/fonts/LilitaOne-Regular.woff2" id="8_title"]
+[ext_resource type="FontVariation" path="res://ui/fonts/lilita_italic.tres" id="9_italic"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_bg"]
+shader = ExtResource("2_stripes")
+shader_parameter/color_top = Color(1, 0.55, 0.22, 1)
+shader_parameter/color_bottom = Color(0.42, 0.06, 0.2, 1)
+shader_parameter/glow_color = Color(1, 0.9, 0.6, 0.45)
+shader_parameter/glow_center = Vector2(0.33, 0.5)
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_luz"]
+sky_top_color = Color(0.62, 0.7, 0.95, 1)
+sky_horizon_color = Color(0.95, 0.85, 0.78, 1)
+ground_bottom_color = Color(0.22, 0.24, 0.42, 1)
+ground_horizon_color = Color(0.62, 0.55, 0.55, 1)
+sun_angle_max = 20.0
+
+[sub_resource type="Sky" id="Sky_luz"]
+sky_material = SubResource("ProceduralSkyMaterial_luz")
+radiance_size = 1
+
+[sub_resource type="Environment" id="Environment_studio"]
+background_mode = 3
+background_canvas_max_layer = -1
+sky = SubResource("Sky_luz")
+ambient_light_source = 3
+ambient_light_energy = 0.95
+reflected_light_source = 2
+tonemap_mode = 0
+ssao_enabled = true
+ssao_radius = 0.5
+ssao_intensity = 1.4
+ssao_light_affect = 0.25
+glow_enabled = true
+glow_intensity = 0.25
+glow_hdr_threshold = 1.2
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_podium"]
+albedo_color = Color(0.2, 0.27, 0.55, 1)
+metallic = 0.2
+roughness = 0.3
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_podium"]
+material = SubResource("StandardMaterial3D_podium")
+top_radius = 1.9
+bottom_radius = 1.7
+height = 0.3
+radial_segments = 64
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_trim"]
+albedo_color = Color(1, 0.82, 0.1, 1)
+emission_enabled = true
+emission = Color(1, 0.75, 0.15, 1)
+emission_energy_multiplier = 0.25
+
+[sub_resource type="TorusMesh" id="TorusMesh_trim"]
+material = SubResource("StandardMaterial3D_trim")
+inner_radius = 1.86
+outer_radius = 1.98
+rings = 64
+ring_segments = 8
+
+[node name="SelecaoKart" type="Node3D"]
+script = ExtResource("1_select")
+
+[node name="Fundo" type="CanvasLayer" parent="."]
+layer = -1
+
+[node name="Background" type="ColorRect" parent="Fundo"]
+material = SubResource("ShaderMaterial_bg")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_studio")
+
+[node name="LuzPrincipal" type="DirectionalLight3D" parent="."]
+rotation = Vector3(-0.75, 0.55, 0)
+light_energy = 1.15
+shadow_enabled = true
+
+[node name="LuzContorno" type="DirectionalLight3D" parent="."]
+rotation = Vector3(-0.35, 2.7, 0)
+light_color = Color(1, 0.85, 0.75, 1)
+light_energy = 0.8
+
+[node name="Palco" type="Node3D" parent="."]
+
+[node name="Base" type="MeshInstance3D" parent="Palco"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.15, 0)
+mesh = SubResource("CylinderMesh_podium")
+
+[node name="Borda" type="MeshInstance3D" parent="Palco"]
+mesh = SubResource("TorusMesh_trim")
+
+[node name="Giro" type="Node3D" parent="Palco"]
+rotation = Vector3(0, 2.45, 0)
+
+[node name="Camera" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.75, 4.6)
+rotation = Vector3(-0.3, 0, 0)
+current = true
+h_offset = 0.95
+fov = 40.0
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="Root" type="Control" parent="UI"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Header" type="Control" parent="UI/Root"]
+layout_mode = 0
+offset_left = 30.0
+offset_top = 26.0
+offset_right = 520.0
+offset_bottom = 82.0
+mouse_filter = 2
+script = ExtResource("3_ribbon")
+text = "ESCOLHA SEU KART"
+font_size = 38
+color = Color(0.42, 0.06, 0.2, 1)
+
+[node name="InfoPanel" type="PanelContainer" parent="UI/Root"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -560.0
+offset_top = 28.0
+offset_right = -40.0
+offset_bottom = 548.0
+grow_horizontal = 0
+
+[node name="VBox" type="VBoxContainer" parent="UI/Root/InfoPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="DriverRow" type="HBoxContainer" parent="UI/Root/InfoPanel/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="DriverPortrait" type="TextureRect" parent="UI/Root/InfoPanel/VBox/DriverRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(76, 76)
+layout_mode = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="DriverText" type="VBoxContainer" parent="UI/Root/InfoPanel/VBox/DriverRow"]
+layout_mode = 2
+size_flags_vertical = 4
+theme_override_constants/separation = -6
+
+[node name="DriverTitle" type="Label" parent="UI/Root/InfoPanel/VBox/DriverRow/DriverText"]
+layout_mode = 2
+theme_type_variation = &"PanelSoft"
+theme_override_font_sizes/font_size = 16
+text = "PILOTO"
+
+[node name="DriverName" type="Label" parent="UI/Root/InfoPanel/VBox/DriverRow/DriverText"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"PanelLabel"
+theme_override_fonts/font = ExtResource("9_italic")
+theme_override_font_sizes/font_size = 34
+text = "Celerino"
+
+[node name="Separator" type="HSeparator" parent="UI/Root/InfoPanel/VBox"]
+layout_mode = 2
+
+[node name="NameRow" type="HBoxContainer" parent="UI/Root/InfoPanel/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="PrevButton" type="Button" parent="UI/Root/InfoPanel/VBox/NameRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(54, 54)
+layout_mode = 2
+size_flags_vertical = 4
+focus_mode = 0
+script = ExtResource("6_arrow")
+direction = -1
+
+[node name="KartName" type="Label" parent="UI/Root/InfoPanel/VBox/NameRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"PanelLabel"
+theme_override_fonts/font = ExtResource("8_title")
+theme_override_font_sizes/font_size = 42
+text = "Kart Padrão"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="NextButton" type="Button" parent="UI/Root/InfoPanel/VBox/NameRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(54, 54)
+layout_mode = 2
+size_flags_vertical = 4
+focus_mode = 0
+script = ExtResource("6_arrow")
+
+[node name="KartCounter" type="Label" parent="UI/Root/InfoPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"PanelSoft"
+theme_override_font_sizes/font_size = 15
+text = "1 de 1"
+horizontal_alignment = 1
+
+[node name="KartDescription" type="Label" parent="UI/Root/InfoPanel/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(430, 0)
+layout_mode = 2
+theme_type_variation = &"PanelSoft"
+text = "Descrição"
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="KartCredits" type="Label" parent="UI/Root/InfoPanel/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(430, 0)
+layout_mode = 2
+theme_type_variation = &"PanelSoft"
+theme_override_colors/font_color = Color(0.5, 0.53, 0.6, 1)
+theme_override_font_sizes/font_size = 12
+text = "Modelo"
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="StatsTitle" type="Label" parent="UI/Root/InfoPanel/VBox"]
+layout_mode = 2
+theme_type_variation = &"PanelSoft"
+theme_override_font_sizes/font_size = 15
+text = "ATRIBUTOS (KART + PILOTO)"
+
+[node name="Stats" type="Control" parent="UI/Root/InfoPanel/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(440, 144)
+layout_mode = 2
+mouse_filter = 2
+script = ExtResource("4_stats")
+
+[node name="Buttons" type="HBoxContainer" parent="UI/Root"]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -620.0
+offset_top = -134.0
+offset_right = -50.0
+offset_bottom = -68.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_constants/separation = 34
+alignment = 2
+
+[node name="BackButton" type="Button" parent="UI/Root/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(200, 60)
+layout_mode = 2
+text = "Voltar"
+script = ExtResource("5_button")
+icon_kind = "back"
+
+[node name="RaceButton" type="Button" parent="UI/Root/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(260, 64)
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "Próximo"
+script = ExtResource("5_button")
+icon_kind = "next"
+primary = true
+
+[node name="Toast" type="Label" parent="UI/Root"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 48.0
+offset_top = -128.0
+offset_right = 640.0
+offset_bottom = -76.0
+grow_vertical = 0
+theme_override_colors/font_color = Color(1, 0.82, 0.1, 1)
+theme_override_constants/outline_size = 14
+theme_override_fonts/font = ExtResource("9_italic")
+theme_override_font_sizes/font_size = 36
+text = "Novos karts em breve!"
+
+[node name="Hints" type="Control" parent="UI/Root"]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -48.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+script = ExtResource("7_hints")
+hints = PackedStringArray("←  →|Trocar kart", "Arraste|Girar", "Enter|Escolher pista", "Esc|Voltar")

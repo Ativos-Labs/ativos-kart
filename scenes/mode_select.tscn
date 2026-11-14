@@ -1,0 +1,56 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/mode_select.gd" id="1_mode"]
+[ext_resource type="Shader" path="res://shaders/ui_stripes.gdshader" id="2_stripes"]
+[ext_resource type="Script" path="res://scripts/ui/ribbon_label.gd" id="3_ribbon"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_bg"]
+shader = ExtResource("2_stripes")
+shader_parameter/color_top = Color(0.32, 0.5, 1, 1)
+shader_parameter/color_bottom = Color(0.05, 0.1, 0.36, 1)
+shader_parameter/glow_center = Vector2(0.5, 0.35)
+
+[node name="ModoDeJogo" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_mode")
+
+[node name="Fundo" type="CanvasLayer" parent="."]
+layer = -1
+
+[node name="Background" type="ColorRect" parent="Fundo"]
+material = SubResource("ShaderMaterial_bg")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="Root" type="Control" parent="UI"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Header" type="Control" parent="UI/Root"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 30.0
+offset_top = 26.0
+offset_right = 450.0
+offset_bottom = 82.0
+mouse_filter = 2
+script = ExtResource("3_ribbon")
+text = "MODO DE JOGO"
+font_size = 38

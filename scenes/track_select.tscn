@@ -1,0 +1,224 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/track_select.gd" id="1_select"]
+[ext_resource type="Script" path="res://scripts/ui/ribbon_label.gd" id="2_ribbon"]
+[ext_resource type="Script" path="res://scripts/ui/fancy_button.gd" id="3_button"]
+[ext_resource type="Script" path="res://scripts/ui/hint_bar.gd" id="4_hints"]
+[ext_resource type="Script" path="res://scripts/ui/track_preview.gd" id="5_preview"]
+[ext_resource type="FontFile" path="res://assets/fonts/LilitaOne-Regular.woff2" id="6_title"]
+[ext_resource type="FontVariation" path="res://ui/fonts/lilita_italic.tres" id="7_italic"]
+
+[sub_resource type="Gradient" id="Gradient_shade"]
+offsets = PackedFloat32Array(0, 0.4, 0.6, 1)
+colors = PackedColorArray(0.03, 0.05, 0.16, 0.78, 0.03, 0.05, 0.16, 0.5, 0.03, 0.05, 0.16, 0, 0.03, 0.05, 0.16, 0)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_shade"]
+gradient = SubResource("Gradient_shade")
+width = 256
+height = 4
+
+[node name="SelecaoPista" type="Node3D"]
+script = ExtResource("1_select")
+
+[node name="Camera" type="Camera3D" parent="."]
+current = true
+fov = 58.0
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="Root" type="Control" parent="UI"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Shade" type="TextureRect" parent="UI/Root"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = SubResource("GradientTexture2D_shade")
+expand_mode = 1
+
+[node name="Header" type="Control" parent="UI/Root"]
+layout_mode = 0
+offset_left = 30.0
+offset_top = 26.0
+offset_right = 520.0
+offset_bottom = 82.0
+mouse_filter = 2
+script = ExtResource("2_ribbon")
+text = "ESCOLHA A PISTA"
+font_size = 38
+color = Color(0.149, 0.239, 0.749, 1)
+
+[node name="CupBox" type="VBoxContainer" parent="UI/Root"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 100.0
+offset_right = 552.0
+offset_bottom = 246.0
+theme_override_constants/separation = 8
+
+[node name="Cups" type="HBoxContainer" parent="UI/Root/CupBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="CupRibbon" type="Control" parent="UI/Root/CupBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+size_flags_horizontal = 0
+mouse_filter = 2
+script = ExtResource("2_ribbon")
+text = "COPA ATIVOS"
+font_size = 26
+color = Color(0.06, 0.09, 0.22, 1)
+slant = 16.0
+
+[node name="Grid" type="GridContainer" parent="UI/Root"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 46.0
+offset_top = 266.0
+offset_right = 540.0
+offset_bottom = 610.0
+theme_override_constants/h_separation = 22
+theme_override_constants/v_separation = 22
+columns = 2
+
+[node name="InfoPanel" type="PanelContainer" parent="UI/Root"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -520.0
+offset_top = 28.0
+offset_right = -40.0
+offset_bottom = 548.0
+grow_horizontal = 0
+
+[node name="VBox" type="VBoxContainer" parent="UI/Root/InfoPanel"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="TrackName" type="Label" parent="UI/Root/InfoPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"PanelLabel"
+theme_override_fonts/font = ExtResource("6_title")
+theme_override_font_sizes/font_size = 42
+text = "Circuito Ativos"
+
+[node name="TrackSubtitle" type="Label" parent="UI/Root/InfoPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"PanelSoft"
+theme_override_fonts/font = ExtResource("7_italic")
+theme_override_font_sizes/font_size = 18
+text = "Copa Ativos  •  Pista 1 de 4"
+
+[node name="Separator" type="HSeparator" parent="UI/Root/InfoPanel/VBox"]
+layout_mode = 2
+
+[node name="Preview" type="Control" parent="UI/Root/InfoPanel/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(400, 168)
+layout_mode = 2
+mouse_filter = 2
+script = ExtResource("5_preview")
+
+[node name="Separator2" type="HSeparator" parent="UI/Root/InfoPanel/VBox"]
+layout_mode = 2
+
+[node name="Stats" type="GridContainer" parent="UI/Root/InfoPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/h_separation = 14
+theme_override_constants/v_separation = 8
+columns = 3
+
+[node name="Description" type="Label" parent="UI/Root/InfoPanel/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(400, 0)
+layout_mode = 2
+theme_type_variation = &"PanelSoft"
+theme_override_font_sizes/font_size = 16
+text = "Descrição"
+autowrap_mode = 3
+
+[node name="Buttons" type="HBoxContainer" parent="UI/Root"]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -620.0
+offset_top = -134.0
+offset_right = -50.0
+offset_bottom = -68.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_constants/separation = 34
+alignment = 2
+
+[node name="BackButton" type="Button" parent="UI/Root/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(200, 60)
+layout_mode = 2
+text = "Voltar"
+script = ExtResource("3_button")
+icon_kind = "back"
+
+[node name="RaceButton" type="Button" parent="UI/Root/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(260, 64)
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "Correr!"
+script = ExtResource("3_button")
+icon_kind = "flag"
+primary = true
+
+[node name="Toast" type="Label" parent="UI/Root"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -640.0
+offset_top = -196.0
+offset_right = -50.0
+offset_bottom = -144.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_colors/font_color = Color(1, 0.82, 0.1, 1)
+theme_override_constants/outline_size = 14
+theme_override_fonts/font = ExtResource("7_italic")
+theme_override_font_sizes/font_size = 34
+text = "Novas pistas em breve!"
+horizontal_alignment = 2
+
+[node name="Hints" type="Control" parent="UI/Root"]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -48.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+script = ExtResource("4_hints")
+hints = PackedStringArray("↑  ↓  ←  →|Escolher pista", "Enter|Correr!", "Esc|Voltar")

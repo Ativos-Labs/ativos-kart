@@ -1,0 +1,294 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/character_select.gd" id="1_select"]
+[ext_resource type="Shader" path="res://shaders/ui_stripes.gdshader" id="2_stripes"]
+[ext_resource type="Script" path="res://scripts/ui/ribbon_label.gd" id="3_ribbon"]
+[ext_resource type="Script" path="res://scripts/ui/stat_bars.gd" id="4_stats"]
+[ext_resource type="Script" path="res://scripts/ui/fancy_button.gd" id="5_button"]
+[ext_resource type="Script" path="res://scripts/ui/hint_bar.gd" id="6_hints"]
+[ext_resource type="FontFile" path="res://assets/fonts/LilitaOne-Regular.woff2" id="7_title"]
+[ext_resource type="FontVariation" path="res://ui/fonts/lilita_italic.tres" id="8_italic"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_bg"]
+shader = ExtResource("2_stripes")
+shader_parameter/color_top = Color(0.3, 0.55, 1, 1)
+shader_parameter/color_bottom = Color(0.05, 0.12, 0.42, 1)
+shader_parameter/glow_center = Vector2(0.72, 0.5)
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_luz"]
+sky_top_color = Color(0.6, 0.72, 1, 1)
+sky_horizon_color = Color(0.82, 0.86, 0.95, 1)
+ground_bottom_color = Color(0.2, 0.25, 0.5, 1)
+ground_horizon_color = Color(0.55, 0.58, 0.72, 1)
+sun_angle_max = 20.0
+
+[sub_resource type="Sky" id="Sky_luz"]
+sky_material = SubResource("ProceduralSkyMaterial_luz")
+radiance_size = 1
+
+[sub_resource type="Environment" id="Environment_studio"]
+background_mode = 3
+background_canvas_max_layer = -1
+sky = SubResource("Sky_luz")
+ambient_light_source = 3
+ambient_light_energy = 0.95
+reflected_light_source = 2
+tonemap_mode = 0
+ssao_enabled = true
+ssao_radius = 0.5
+ssao_intensity = 1.4
+ssao_light_affect = 0.25
+glow_enabled = true
+glow_intensity = 0.25
+glow_hdr_threshold = 1.2
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_podium"]
+albedo_color = Color(0.2, 0.27, 0.55, 1)
+metallic = 0.2
+roughness = 0.3
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_podium"]
+material = SubResource("StandardMaterial3D_podium")
+top_radius = 1.05
+bottom_radius = 0.9
+height = 0.3
+radial_segments = 48
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_trim"]
+albedo_color = Color(1, 0.82, 0.1, 1)
+emission_enabled = true
+emission = Color(1, 0.75, 0.15, 1)
+emission_energy_multiplier = 0.25
+
+[sub_resource type="TorusMesh" id="TorusMesh_trim"]
+material = SubResource("StandardMaterial3D_trim")
+inner_radius = 1.02
+outer_radius = 1.12
+rings = 48
+ring_segments = 8
+
+[node name="SelecaoPersonagem" type="Node3D"]
+script = ExtResource("1_select")
+
+[node name="Fundo" type="CanvasLayer" parent="."]
+layer = -1
+
+[node name="Background" type="ColorRect" parent="Fundo"]
+unique_name_in_owner = true
+material = SubResource("ShaderMaterial_bg")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_studio")
+
+[node name="LuzPrincipal" type="DirectionalLight3D" parent="."]
+rotation = Vector3(-0.6, 0.5, 0)
+light_energy = 1.15
+shadow_enabled = true
+
+[node name="LuzContorno" type="DirectionalLight3D" parent="."]
+rotation = Vector3(-0.35, 2.7, 0)
+light_color = Color(0.75, 0.88, 1, 1)
+light_energy = 0.9
+
+[node name="Palco" type="Node3D" parent="."]
+
+[node name="Base" type="MeshInstance3D" parent="Palco"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.15, 0)
+mesh = SubResource("CylinderMesh_podium")
+
+[node name="Borda" type="MeshInstance3D" parent="Palco"]
+mesh = SubResource("TorusMesh_trim")
+
+[node name="Giro" type="Node3D" parent="Palco"]
+
+[node name="Camera" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.45, 5.6)
+rotation = Vector3(-0.168, 0, 0)
+current = true
+h_offset = -1.45
+fov = 40.0
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="Root" type="Control" parent="UI"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Header" type="Control" parent="UI/Root"]
+layout_mode = 0
+offset_left = 30.0
+offset_top = 26.0
+offset_right = 560.0
+offset_bottom = 82.0
+mouse_filter = 2
+script = ExtResource("3_ribbon")
+text = "ESCOLHA SEU PILOTO"
+font_size = 38
+
+[node name="Grid" type="GridContainer" parent="UI/Root"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 58.0
+offset_top = 116.0
+offset_right = 610.0
+offset_bottom = 384.0
+theme_override_constants/h_separation = 18
+theme_override_constants/v_separation = 18
+columns = 4
+
+[node name="InfoPanel" type="PanelContainer" parent="UI/Root"]
+layout_mode = 0
+offset_left = 46.0
+offset_top = 410.0
+offset_right = 620.0
+offset_bottom = 640.0
+mouse_filter = 2
+
+[node name="VBox" type="VBoxContainer" parent="UI/Root/InfoPanel"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 12
+
+[node name="Description" type="Label" parent="UI/Root/InfoPanel/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(480, 0)
+layout_mode = 2
+theme_type_variation = &"PanelSoft"
+text = "Descrição"
+autowrap_mode = 3
+
+[node name="Stats" type="Control" parent="UI/Root/InfoPanel/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(480, 144)
+layout_mode = 2
+mouse_filter = 2
+script = ExtResource("4_stats")
+
+[node name="LockedMark" type="Label" parent="UI/Root"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.62
+anchor_top = 0.18
+anchor_right = 0.92
+anchor_bottom = 0.7
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.85)
+theme_override_colors/font_outline_color = Color(0.05, 0.07, 0.16, 0.6)
+theme_override_constants/outline_size = 24
+theme_override_fonts/font = ExtResource("7_title")
+theme_override_font_sizes/font_size = 220
+text = "?"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="NamePlate" type="VBoxContainer" parent="UI/Root"]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -560.0
+offset_top = -232.0
+offset_right = -40.0
+offset_bottom = -132.0
+grow_horizontal = 0
+grow_vertical = 0
+mouse_filter = 2
+theme_override_constants/separation = 2
+alignment = 2
+
+[node name="NameRibbon" type="Control" parent="UI/Root/NamePlate"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 8
+mouse_filter = 2
+script = ExtResource("3_ribbon")
+text = "CELERINO"
+font_size = 56
+color = Color(0.17, 0.38, 0.93, 1)
+
+[node name="Tagline" type="Label" parent="UI/Root/NamePlate"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/outline_size = 8
+theme_override_font_sizes/font_size = 22
+text = "O mascote da Ativos"
+horizontal_alignment = 2
+
+[node name="Buttons" type="HBoxContainer" parent="UI/Root"]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -620.0
+offset_top = -124.0
+offset_right = -50.0
+offset_bottom = -62.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_constants/separation = 34
+alignment = 2
+
+[node name="BackButton" type="Button" parent="UI/Root/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(200, 58)
+layout_mode = 2
+text = "Voltar"
+script = ExtResource("5_button")
+icon_kind = "back"
+
+[node name="ConfirmButton" type="Button" parent="UI/Root/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(250, 58)
+layout_mode = 2
+text = "Escolher"
+script = ExtResource("5_button")
+icon_kind = "next"
+primary = true
+
+[node name="Toast" type="Label" parent="UI/Root"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.5
+anchor_top = 0.11
+anchor_right = 0.98
+anchor_bottom = 0.11
+offset_bottom = 50.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(1, 0.82, 0.1, 1)
+theme_override_constants/outline_size = 14
+theme_override_fonts/font = ExtResource("8_italic")
+theme_override_font_sizes/font_size = 36
+text = "Em breve!"
+horizontal_alignment = 2
+
+[node name="Hints" type="Control" parent="UI/Root"]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -48.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+script = ExtResource("6_hints")
+hints = PackedStringArray("←  →  ↑  ↓|Escolher", "Enter|Confirmar", "Esc|Voltar")
