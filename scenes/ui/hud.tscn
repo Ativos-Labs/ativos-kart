@@ -1,0 +1,461 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/hud.gd" id="1_hud"]
+[ext_resource type="FontFile" path="res://assets/fonts/LilitaOne-Regular.woff2" id="2_title"]
+[ext_resource type="FontVariation" path="res://ui/fonts/lilita_italic.tres" id="3_italic"]
+[ext_resource type="Script" path="res://scripts/ui/minimap.gd" id="4_minimap"]
+[ext_resource type="Script" path="res://scripts/ui/fancy_button.gd" id="5_button"]
+[ext_resource type="Script" path="res://scripts/ui/portrait_badge.gd" id="6_badge"]
+[ext_resource type="Script" path="res://scripts/ui/speed_gauge.gd" id="7_gauge"]
+[ext_resource type="Script" path="res://scripts/ui/start_lights.gd" id="8_lights"]
+[ext_resource type="Script" path="res://scripts/ui/ribbon_label.gd" id="9_ribbon"]
+[ext_resource type="Shader" path="res://shaders/ui_checker.gdshader" id="10_checker"]
+[ext_resource type="Script" path="res://scripts/ui/hint_bar.gd" id="11_hints"]
+[ext_resource type="Script" path="res://scripts/ui/place_badge.gd" id="12_place"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_map"]
+bg_color = Color(0.04, 0.07, 0.18, 0.4)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(1, 1, 1, 0.35)
+corner_radius_top_left = 28
+corner_radius_top_right = 28
+corner_radius_bottom_right = 28
+corner_radius_bottom_left = 28
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_results"]
+shader = ExtResource("10_checker")
+shader_parameter/edge = 0.56
+shader_parameter/slant = 0.1
+
+[node name="HUD" type="CanvasLayer"]
+script = ExtResource("1_hud")
+
+[node name="Root" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Badge" type="Control" parent="Root"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 26.0
+offset_top = 20.0
+offset_right = 130.0
+offset_bottom = 124.0
+mouse_filter = 2
+script = ExtResource("6_badge")
+
+[node name="DriverName" type="Label" parent="Root"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 140.0
+offset_top = 34.0
+offset_right = 460.0
+offset_bottom = 74.0
+theme_override_constants/outline_size = 12
+theme_override_fonts/font = ExtResource("3_italic")
+theme_override_font_sizes/font_size = 32
+text = "CELERINO"
+
+[node name="TrackName" type="Label" parent="Root"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 144.0
+offset_top = 72.0
+offset_right = 460.0
+offset_bottom = 98.0
+theme_override_colors/font_color = Color(1, 0.82, 0.1, 1)
+theme_override_constants/outline_size = 8
+theme_override_font_sizes/font_size = 17
+text = "Circuito Ativos"
+
+[node name="TimePanel" type="PanelContainer" parent="Root"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -340.0
+offset_top = 22.0
+offset_right = -30.0
+offset_bottom = 120.0
+grow_horizontal = 0
+mouse_filter = 2
+theme_type_variation = &"HudPanel"
+
+[node name="VBox" type="VBoxContainer" parent="Root/TimePanel"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = -2
+
+[node name="TimeTitle" type="Label" parent="Root/TimePanel/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.82, 0.1, 1)
+theme_override_font_sizes/font_size = 16
+text = "TEMPO"
+horizontal_alignment = 2
+
+[node name="TimeValue" type="Label" parent="Root/TimePanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_fonts/font = ExtResource("3_italic")
+theme_override_font_sizes/font_size = 48
+text = "0:00.000"
+horizontal_alignment = 2
+
+[node name="LapTimes" type="Label" parent="Root/TimePanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.85, 0.9, 1, 1)
+theme_override_font_sizes/font_size = 17
+horizontal_alignment = 2
+
+[node name="BestLabel" type="Label" parent="Root"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -460.0
+offset_top = 126.0
+offset_right = -34.0
+offset_bottom = 150.0
+grow_horizontal = 0
+theme_override_colors/font_color = Color(0.85, 0.9, 1, 0.9)
+theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 14
+text = "RECORDE -:--.---"
+horizontal_alignment = 2
+
+[node name="MapPanel" type="Panel" parent="Root"]
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -256.0
+offset_top = -170.0
+offset_right = -30.0
+offset_bottom = 56.0
+grow_horizontal = 0
+grow_vertical = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_map")
+
+[node name="Minimap" type="Control" parent="Root/MapPanel"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 6.0
+offset_top = 6.0
+offset_right = -6.0
+offset_bottom = -6.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("4_minimap")
+
+[node name="PlaceBadge" type="Control" parent="Root"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 30.0
+offset_top = -300.0
+offset_right = 290.0
+offset_bottom = -178.0
+grow_vertical = 0
+mouse_filter = 2
+script = ExtResource("12_place")
+
+[node name="LapBox" type="VBoxContainer" parent="Root"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 34.0
+offset_top = -176.0
+offset_right = 320.0
+offset_bottom = -24.0
+grow_vertical = 0
+mouse_filter = 2
+theme_override_constants/separation = -22
+alignment = 2
+
+[node name="LapTitle" type="Label" parent="Root/LapBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.82, 0.1, 1)
+theme_override_constants/outline_size = 12
+theme_override_fonts/font = ExtResource("3_italic")
+theme_override_font_sizes/font_size = 34
+text = "VOLTA"
+
+[node name="LapValue" type="Label" parent="Root/LapBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/outline_size = 22
+theme_override_fonts/font = ExtResource("3_italic")
+theme_override_font_sizes/font_size = 100
+text = "1/3"
+
+[node name="SpeedGauge" type="Control" parent="Root"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -250.0
+offset_top = -214.0
+offset_right = -26.0
+offset_bottom = -14.0
+grow_horizontal = 0
+grow_vertical = 0
+mouse_filter = 2
+script = ExtResource("7_gauge")
+
+[node name="StartLights" type="Control" parent="Root"]
+unique_name_in_owner = true
+modulate = Color(1, 1, 1, 0)
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -120.0
+offset_top = 30.0
+offset_right = 120.0
+offset_bottom = 104.0
+grow_horizontal = 2
+mouse_filter = 2
+script = ExtResource("8_lights")
+
+[node name="CenterLabel" type="Label" parent="Root"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 14
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_top = -170.0
+offset_bottom = 40.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 0.82, 0.1, 1)
+theme_override_colors/font_outline_color = Color(0.04, 0.06, 0.16, 1)
+theme_override_constants/outline_size = 36
+theme_override_fonts/font = ExtResource("3_italic")
+theme_override_font_sizes/font_size = 170
+text = "3"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Banner" type="Control" parent="Root"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 400.0
+offset_top = 190.0
+offset_right = 880.0
+offset_bottom = 266.0
+mouse_filter = 2
+script = ExtResource("9_ribbon")
+text = "VOLTA FINAL!"
+font_size = 56
+
+[node name="MessageLabel" type="Label" parent="Root"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 14
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_top = 40.0
+offset_bottom = 130.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 0.24, 0.24, 1)
+theme_override_colors/font_outline_color = Color(1, 1, 1, 1)
+theme_override_constants/outline_size = 18
+theme_override_fonts/font = ExtResource("3_italic")
+theme_override_font_sizes/font_size = 66
+text = "CONTRAMÃO!"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="HintPill" type="PanelContainer" parent="Root"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -300.0
+offset_top = -96.0
+offset_right = 300.0
+offset_bottom = -52.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+theme_type_variation = &"HudPanel"
+
+[node name="HintLabel" type="Label" parent="Root/HintPill"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Dica: segure ESPAÇO + direção nas curvas para derrapar e soltar um turbo!"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Results" type="Control" parent="Root"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ResultsChecker" type="ColorRect" parent="Root/Results"]
+unique_name_in_owner = true
+material = SubResource("ShaderMaterial_results")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="ResultTitle" type="Control" parent="Root/Results"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 30.0
+offset_top = 26.0
+offset_right = 420.0
+offset_bottom = 96.0
+mouse_filter = 2
+script = ExtResource("9_ribbon")
+text = "CHEGADA!"
+font_size = 52
+color = Color(0.85, 0.12, 0.18, 1)
+
+[node name="ResultRows" type="VBoxContainer" parent="Root/Results"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 50.0
+offset_top = 106.0
+offset_right = 610.0
+offset_bottom = 408.0
+mouse_filter = 2
+theme_override_constants/separation = 4
+
+[node name="ResultLaps" type="Label" parent="Root/Results"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 58.0
+offset_top = 412.0
+offset_right = 700.0
+offset_bottom = 442.0
+theme_override_colors/font_color = Color(0.149, 0.165, 0.208, 1)
+theme_override_font_sizes/font_size = 19
+text = "SUAS VOLTAS   0:37.120  •  0:36.900  •  0:37.400"
+
+[node name="ResultRecord" type="Label" parent="Root/Results"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 56.0
+offset_top = 440.0
+offset_right = 680.0
+offset_bottom = 480.0
+theme_override_colors/font_color = Color(1, 0.24, 0.24, 1)
+theme_override_colors/font_outline_color = Color(1, 1, 1, 1)
+theme_override_constants/outline_size = 12
+theme_override_fonts/font = ExtResource("3_italic")
+theme_override_font_sizes/font_size = 30
+text = "NOVO RECORDE!"
+
+[node name="ResultButtons" type="GridContainer" parent="Root/Results"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 62.0
+offset_top = 486.0
+offset_right = 640.0
+offset_bottom = 654.0
+theme_override_constants/h_separation = 34
+theme_override_constants/v_separation = 10
+columns = 2
+
+[node name="AgainButton" type="Button" parent="Root/Results/ResultButtons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(270, 46)
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Correr de novo"
+script = ExtResource("5_button")
+icon_kind = "retry"
+align_left = true
+
+[node name="ChangeTrackButton" type="Button" parent="Root/Results/ResultButtons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(270, 46)
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Trocar pista"
+script = ExtResource("5_button")
+icon_kind = "track"
+align_left = true
+
+[node name="ChangeCharacterButton" type="Button" parent="Root/Results/ResultButtons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(270, 46)
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Trocar piloto"
+script = ExtResource("5_button")
+icon_kind = "person"
+align_left = true
+
+[node name="ChangeKartButton" type="Button" parent="Root/Results/ResultButtons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(270, 46)
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Trocar kart"
+script = ExtResource("5_button")
+icon_kind = "kart"
+align_left = true
+
+[node name="MenuButton" type="Button" parent="Root/Results/ResultButtons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(270, 46)
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Menu principal"
+script = ExtResource("5_button")
+icon_kind = "home"
+align_left = true
+
+[node name="Hints" type="Control" parent="Root/Results"]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -48.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+script = ExtResource("11_hints")
+hints = PackedStringArray("↑  ↓  ←  →|Navegar", "Enter|Confirmar")
