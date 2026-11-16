@@ -15,9 +15,33 @@ Abra a pasta no Godot (Importar → `project.godot`) e aperte **F5** (ou o botã
 | Reposicionar  | R                    | Y                       |
 | Pausar        | Esc ou P             | Start                   |
 
+As teclas do kart podem ser trocadas em **Opções → Teclas** (a pausa fica fixa).
+
+Nos menus: **setas** ou analógico/direcional para navegar (segurando, repete),
+**Enter** ou **A** para confirmar, **Esc** ou **B** para voltar. A faixa de dicas no
+rodapé mostra as teclas ou os botões do controle, conforme o último que foi usado.
+
 - **Drift com mini-turbo:** aperte o drift virando numa curva e segure. As faíscas
   ficam azuis → laranjas → roxas. Solte para ganhar turbo (quanto mais tempo, maior).
-  Segurando para dentro da curva o drift fecha mais e carrega mais rápido.
+  Segurando para dentro da curva o drift fecha mais e carrega mais rápido. No drift as
+  rodas de trás deixam **marcas de pneu** no chão (somem depois de alguns segundos) e
+  levantam poeira com a cara do cenário: terra no Campo, areia na Praia, nuvens de
+  poeira vermelha no Deserto e neve fofa na Neve. Fora do asfalto a marca fica da cor do
+  chão.
+- **Atrito nas curvas:** virar custa velocidade. Quanto mais forte a curva (velocidade ×
+  giro), mais o kart perde: virando tudo na velocidade máxima ele cai uns 12% (menos com
+  boa manobrabilidade). Derrapando ele perde bem menos (uns 5%) — e ainda ganha o
+  mini-turbo —, então o drift é o jeito certo de fazer as curvas longas.
+- **Moedas Ativos:** espalhadas em fileiras pela pista, quase sempre fora da trajetória
+  ideal (dentro, fora ou no meio da curva, nas pontes, no arco dos pulos de rampa e no
+  meio dos obstáculos). Cada moeda soma 0,6% na velocidade máxima, até 10 moedas (+6%).
+  O contador fica em cima da posição; as moedas voltam a aparecer 12 s depois de pegas.
+- **Obstáculos que se mexem**, um tipo por pista (o Circuito não tem): **ondas do mar**
+  que passam por cima da mureta e varrem a pista na Ilha, **fardos de feno** rolando aos
+  trancos no Cânion e **bolas de neve** enormes descendo do lado do morro no Pico. Quem
+  é atingido roda (a onda só empurra e balança), perde velocidade e **3 moedas**. O
+  movimento segue o relógio da corrida: o padrão é o mesmo em toda corrida, dá para
+  aprender o tempo certo.
 - **Placas laranjas** na pista dão turbo.
 - **Rampas de pulo:** o kart sai do chão na borda da rampa, faz um arco e cai de volta na
   pista — quanto mais rápido, mais longe (com turbo o pulo fica bem maior). Aperte o
@@ -77,6 +101,46 @@ cor fica de fora da corrida.
 - No navegador (WebGL) 2 jogadores rodam a ~90 fps e 4 jogadores a ~70 fps num MacBook M4
   (medido sem o limite de 60 fps); numa máquina mais fraca o 4 jogadores fica perto de 30.
 
+## Música e som
+
+Cada cenário tem a sua trilha, todas originais e geradas por código como os efeitos
+sonoros (`tools/music/build_music.mjs`): uma base de fusion/funk com bateria e baixo na
+frente, e a instrumentação muda com o cenário.
+
+| Faixa | Onde toca | Estilo |
+|---|---|---|
+| `menu` | Menus | City pop / fusion tranquilo, piano elétrico e baixo com slap (108 BPM) |
+| `campo` | Circuito Ativos | Fusion-rock ensolarado, metais e lead em uníssono (144 BPM) |
+| `praia` | Ilha Ativos | Calypso/soca: tambor de aço com rufo, marimba, cavaquinho, congas (126 BPM) |
+| `deserto` | Cânion Ativos | Frígia dominante em Mi: violão com tremolo, galope, darbuka, assobio e trompetes (136 BPM) |
+| `neve` | Pico Nevado | Guizos, glockenspiel e celesta, pizzicato, vibrafone e flauta (132 BPM) |
+| `podio` | Resultado | Fanfarra de metais (112 BPM) |
+
+Na corrida a trilha começa no "VAI!". Quando o primeiro jogador chega na **volta final**,
+a música some durante a fanfarra e volta **mais rápida e um tom acima** (≈12%). Na pausa
+ela fica baixinha; na chegada entra a do pódio. Quem cuida disso é o `MusicPlayer`
+(filho do GameState).
+
+O áudio tem três canais (`default_bus_layout.tres`): **Master** (com limitador),
+**Musica** e **Efeitos** (sons do jogo, menus e motores). O volume de cada um fica em
+**Opções → Som**.
+
+Para mudar uma música: edite a partitura em `tools/music/build_music.mjs` e rode
+`node tools/music/build_music.mjs [faixa]` (precisa do ffmpeg). O script mostra o volume
+de cada instrumento e de cada faixa de frequência para ajudar na mixagem.
+
+## Opções
+
+Menu principal e pausa → **Opções** (salvas em `user://opcoes.cfg`):
+
+- **Som:** volume geral, música e efeitos.
+- **Tela:** tela cheia e resolução da janela (na web, só tela cheia).
+- **Teclas:** duas teclas para cada ação do kart. Escolha a vaga, aperte a tecla nova
+  (Esc cancela); se outra ação usava essa tecla, as duas trocam. "Restaurar padrão" volta
+  às teclas originais. A tela de controles e a dica da largada mostram as teclas atuais.
+
+LB/RB trocam de aba no controle.
+
 ## Fluxo das telas
 
 Menu principal → **Modo de jogo** (e "Quem vai jogar?" com 2+ jogadores) → **Escolha seu
@@ -95,9 +159,9 @@ traçado, extensão, voltas, curvas, dificuldade e recordes. Vagas sem pista apa
 | Pista            | Cenário | Destaques                                                                 |
 |------------------|---------|---------------------------------------------------------------------------|
 | Circuito Ativos  | Campo   | Lagos, montanhas nevadas, "S" apertado no meio                            |
-| Ilha Ativos      | Praia   | Ilha com lagoa no meio, ponte estaiada com o logo na torre, ponte sobre o mar, coqueiros, guarda-sóis, veleiros com o logo na vela e farol |
-| Cânion Ativos    | Deserto | Traçado em "8" com viaduto passando por cima da própria pista, ponte em arco azul e viaduto de pedra sobre o rio do cânion, arco de pedra sobre a pista, caixa-d'água e letreiro gigante da Ativos |
-| Pico Nevado      | Neve    | Subida até um platô, viaduto de pedra sobre o rio congelado, ponte estaiada, pinheiros nevados, chalés, bonecos de neve de cachecol azul e neve caindo |
+| Ilha Ativos      | Praia   | Ilha com lagoa no meio, ponte estaiada com o logo na torre, ponte sobre o mar, coqueiros, guarda-sóis, veleiros com o logo na vela, farol e ondas do mar invadindo a pista |
+| Cânion Ativos    | Deserto | Traçado em "8" com viaduto passando por cima da própria pista, ponte em arco azul e viaduto de pedra sobre o rio do cânion, arco de pedra sobre a pista, caixa-d'água, letreiro gigante da Ativos e fardos de feno rolando |
+| Pico Nevado      | Neve    | Subida até um platô, viaduto de pedra sobre o rio congelado, ponte estaiada, pinheiros nevados, chalés, bonecos de neve de cachecol azul, neve caindo e bolas de neve descendo o morro |
 
 Todas usam as logos da Ativos no pórtico, nas muretas, outdoors, bandeiras, balões, dirigível,
 no asfalto e nas pontes.
@@ -121,13 +185,23 @@ scenes/
 scripts/
   game_state.gd         Autoload: modo, cilindrada, jogadores (piloto e kart de cada um),
                         pista ou copa, troca de telas, recordes
+  game_settings.gd      Opções (filho do GameState): volumes, tela cheia, resolução e
+                        teclas do kart, salvas em user://opcoes.cfg
+  music_player.gd       Música de fundo (filho do GameState): troca com fade, volta final
+                        mais rápida, música baixa na pausa
+  sfx.gd                Efeitos sonoros gerados por código (canal "Efeitos")
   player_slot.gd        Um jogador: controle, piloto, kart, cor; cria as ações dele
                         ("j2_acelerar"...) só com os botões do controle dele
+  menu_input.gd         Controle nos menus: analógico vira ui_left/ui_right... um passo
+                        por vez (com repetição), e se o jogador está no controle ou teclado
   grand_prix.gd         Copa em andamento: pistas, participantes, pontos, grid da próxima
   ghost.gd              Fantasma do contra-relógio: grava/salva/lê o percurso (user://fantasmas/)
   ghost_kart.gd         Kart transparente que refaz o percurso do fantasma
   mode_select.gd        Tela de modo de jogo
-  kart.gd               Física arcade: aceleração, curva, pulo, drift, turbo
+  kart.gd               Física arcade: aceleração, curva (com atrito), pulo, drift, turbo,
+                        moedas, rodopio ao bater num obstáculo, marcas de pneu e poeira
+  skid_marks.gd         Marcas de pneu de todos os karts numa malha só (anel de trechos;
+                        só a parte nova vai para a GPU)
   kart_visual.gd        Modelo do kart + piloto: rodas, volante girando, mãos no volante
   character_rig.gd      Personagem animado: camadas de animação, pose sentada, reações
   character_mesh.gd     Junta as malhas do personagem numa superfície só (cores nos
@@ -151,6 +225,10 @@ scripts/
   track_ramps.gd        Monta as rampas de pulo (malha, colisão, turbo, paredes invisíveis)
   jump_ramp.gd          Colisão da rampa com a borda de onde o kart decola
   item_box.gd           Caixa de item (gira e flutua no shader, estoura e volta)
+  track_coins.gd        Moedas Ativos da pista (MultiMesh, giro no shader, coleta por
+                        distância, voltam depois de 12 s)
+  track_obstacles.gd    Obstáculos que se mexem (pneus, ondas, feno, bolas de neve): cada
+                        um é uma função do relógio da corrida, sem física
   track_builder.gd      Gera o visual das pistas numa thread para a tela de pistas trocar
                         de pista sem travar (fica no GameState; o jogo fecha por
                         GameState.quit(), que espera a geração em andamento)
@@ -170,10 +248,12 @@ scripts/
                         barras de atributos, retratos, velocímetro, semáforo, HUD, pausa,
                         posição na corrida (place_badge.gd), linhas da classificação,
                         tela dividida (split_screen.gd), cartões de modo, seletor de
-                        opção, etiqueta do jogador e o painel "Quem vai jogar?"
+                        opção, etiqueta do jogador, o painel "Quem vai jogar?" e a janela
+                        de opções (options_panel.gd, volume_slider.gd, key_button.gd)
 shaders/                Céu com nuvens, terreno, água (e gelo), asfalto, zebras, muretas com placas,
                         vegetação (com neve), pedra em blocos, painéis com logo, placas de curva,
-                        turbos, rampas de pulo, caixas de item e fundos da interface
+                        turbos, rampas de pulo, caixas de item, moedas, obstáculos, ondas,
+                        marcas de pneu e fundos da interface
 assets/logos/           Logos da Ativos usadas na pista e nas telas
 data/karts/standard_kart.tres        Dados do Kart Padrão
 data/karts/relampago.tres            Dados do Relâmpago (jon_arbuckles_kart_speed.glb)
@@ -186,9 +266,16 @@ data/personagens/celerino.tres       Dados do Celerino
 data/rivais/*.tres                   Adversários do computador (Celerino recolorido)
 data/pistas/*.tres                   Dados das pistas (nome, copa, descrição, dificuldade)
 assets/models/personagens/celerino.glb   Modelo do Celerino (veja RIG.md ao lado)
+assets/models/moeda/moeda.glb        Moeda Ativos (gerada por tools/moeda/build_moeda.py)
 tools/karts/                         Gera bolido/cometa/motoca/bugre.glb a partir dos
                                      modelos originais (troca os adesivos pelas logos
                                      da Ativos). O Godot ignora a pasta tools/.
+tools/moeda/                         Gera a moeda do jogo a partir de original/MOEDA.glb
+                                     (textura de 2048 → 512 px, sem os mapas de normal e
+                                     rugosidade, malha centralizada: 2,4 MB → 198 KB)
+assets/music/                        Músicas (.ogg em loop, geradas por tools/music/)
+default_bus_layout.tres              Canais de áudio: Master, Musica e Efeitos
+tools/music/build_music.mjs          Compõe e sintetiza as músicas (Node + ffmpeg)
 tools/perf/                          Medição de desempenho da versão web (probe +
                                      Chrome headless, veja tools/perf/README.md)
 web/                                 Export para o navegador (veja web/README.md)
@@ -383,6 +470,29 @@ lugar para ligar a lógica dos itens. Os adversários também estouram as caixas
 enquanto só o sinal do kart do jogador está ligado — quando os itens existirem, ligue o
 sinal de cada kart (`racers` em `race.gd`) e ensine o `KartAI` a usar o item.
 
+### Moedas
+
+No nó raiz, em **Moedas**: `coin_lines` são as fileiras, cada uma um `Vector3` com
+x = meio da fileira (fração da volta), y = deslocamento lateral em metros (+ = direita;
+até ~±5,5 m para ficar dentro das zebras) e z = quantidade de moedas; `coin_spacing` é a
+distância entre elas. Com `coins_on_ramps` cada rampa ganha um arco de três moedas no ar,
+na altura do pulo de quem chega rápido (a conta é a mesma do `Kart._launch`). Moedas em
+cima da subida de uma rampa são puladas. Para a moeda pedir uma linha diferente, ponha a
+fileira a uns 4 m ou mais da trajetória ideal (`RacingLine.lateral_at`): na trajetória
+o piloto do computador pega todas.
+
+### Obstáculos
+
+No nó raiz, em **Obstáculos**: `obstacle_zones` são os trechos (frações da volta). O tipo
+vem do cenário (pneus gigantes quicando no Campo, ondas na Praia, feno no Deserto, neve
+na Neve; o Circuito está sem trechos, mas os pneus continuam prontos para usar) e os
+ajustes de cada tipo ficam em `track_obstacles.gd` (`ROLLERS`, constantes `WAVE_*`).
+Ponha os trechos em lugares sem ponte, rampa, caixas nem turbo, com ~30 m de chão livre
+dos dois lados (os obstáculos vêm de fora da mureta). As bolas de neve descem do lado
+mais alto e as ondas vêm do lado mais baixo (o mar), escolhidos sozinhos pelo terreno.
+O piloto do computador desvia (`TrackObstacles.lane_danger`); os mais fracos às vezes
+não veem o obstáculo.
+
 ### Rios
 
 Crie nós **Path3D** filhos da pista com nome começando por "Rio" e desenhe a linha do rio.
@@ -426,3 +536,4 @@ passo, o que muda na web e as medições de desempenho estão em `web/README.md`
 - Celerino: mascote da Ativos (`assets/models/personagens/`).
 - Logos da Ativos (ícone "at" e marca "ativos"): `assets/logos/`.
 - Fontes Lilita One e Nunito — SIL Open Font License (`assets/fonts/`).
+- Músicas e efeitos sonoros: originais, gerados por código (`tools/music/`, `scripts/sfx.gd`).
