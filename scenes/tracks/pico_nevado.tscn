@@ -115,6 +115,8 @@ hill_bias = 3.0
 mountain_height = 230.0
 ramps = Array[ExtResource("4_ramp")]([SubResource("Resource_rampa0"), SubResource("Resource_rampa1")])
 item_rows = PackedFloat32Array(0.12, 0.4, 0.813)
+coin_lines = PackedVector3Array(0.055, -1, 4, 0.1, 5.3, 5, 0.171, -3, 5, 0.28, 4, 5, 0.36, 1, 4, 0.44, 1, 4, 0.545, -5.3, 4, 0.665, 1, 5, 0.73, -3.5, 5, 0.83, -4, 5, 0.93, -2, 5)
+obstacle_zones = PackedFloat32Array(0.171, 0.73)
 
 [node name="Tracado" type="Path3D" parent="."]
 curve = SubResource("Curve3D_tracado")

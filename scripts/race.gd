@@ -7,6 +7,13 @@ extends Node3D
 ## (GameState.mode): Grand Prix (copa de 4 corridas com pontos), Corrida (avulsa,
 ## com ou sem adversários) e Contra-relógio (sem adversários, com o fantasma do
 ## recorde da pista). A classe de velocidade (50/100/150cc) vale para todos os karts.
+##
+## A pista traz as moedas Ativos (Track.coins) e os obstáculos que se mexem
+## (Track.obstacles, com o relógio acertado pela largada: o padrão é o mesmo em toda
+## corrida). Aqui ficam as marcas de pneu (SkidMarks) e os sons/avisos de cada jogador.
+##
+## Música (GameState.music): a trilha do cenário da pista entra no "VAI!", acelera
+## quando o primeiro jogador chega na volta final e vira a do pódio no fim.
 
 enum State { COUNTDOWN, RACING, FINISHED }
 
@@ -107,6 +114,8 @@ var split: SplitScreen
 ## Contra-relógio: o fantasma do recorde (null se ainda não tem).
 var ghost: Ghost
 var ghost_kart: GhostKart
+## Marcas de pneu de todos os karts.
+var skid_marks: SkidMarks
 
 var _karts: Array[Kart] = []
 ## Compilando os shaders atrás da tela de carregamento (a contagem ainda não começou).
@@ -128,6 +137,12 @@ func _ready() -> void:
 	add_child(track)
 	move_child(track, 0)
 	laps = GameState.laps
+	skid_marks = SkidMarks.new()
+	add_child(skid_marks)
+	if track.obstacles:
+		# O relógio dos obstáculos segue a corrida (contagem + tempo de prova).
+		track.obstacles.external_clock = true
+		track.obstacles.clock = 0.0
 	_tune_shadows()
 	if GameState.is_multiplayer():
 		_setup_split_screen()
@@ -136,6 +151,9 @@ func _ready() -> void:
 	if mode == GameState.Mode.TIME_TRIAL:
 		_load_ghost()
 	_update_places()
+	# Carrega as músicas agora, atrás da tela de carregamento (na web prepará-las trava).
+	GameState.music.prepare(_music_id())
+	GameState.music.prepare(&"podio")
 
 	hud.restart_requested.connect(_restart)
 	hud.next_requested.connect(_next_race)
@@ -274,6 +292,9 @@ func _add_racer(character: CharacterData, kart_data: KartData, slot_index: int, 
 	else:
 		k.name = character.display_name if character else "Adversario"
 	karts_root.add_child(k)
+	k.set_skid_marks(skid_marks)
+	k.set_ground_theme(track.scenery)
+	k.obstacle_hit.connect(_on_obstacle_hit.bind(k))
 	var row := slot_index >> 1
 	var column := slot_index % 2
 	var dist := GRID_OFFSET + row * GRID_ROW + column * GRID_ROW * 0.5
@@ -318,6 +339,9 @@ func _connect_human(r: Racer) -> void:
 	k.landed.connect(_on_kart_landed.bind(r))
 	k.trick_performed.connect(_on_kart_trick)
 	k.item_box_collected.connect(_on_item_box_collected.bind(r))
+	k.coin_collected.connect(_on_coin_collected.bind(r))
+	k.coins_changed.connect(_on_coins_changed.bind(r))
+	k.obstacle_hit.connect(_on_human_hit.bind(r))
 
 
 ## Câmera e HUD de cada jogador. Sozinho: a câmera e o HUD da cena, como sempre. Na
@@ -474,6 +498,9 @@ func warm_up() -> void:
 		r.camera.set_physics_process(false)
 	for k in _karts:
 		k.prewarm_effects(true)
+	# Moedas voando (pegas) na frente do J1.
+	if track.coins:
+		track.coins.prewarm(true, humans[0].kart.global_position + humans[0].kart.get_forward() * 6.0)
 	# A câmera de sempre (atrás do J1): o grid inteiro com os efeitos ligados.
 	cam.global_transform = _chase_view(humans[0])
 	cam.reset_physics_interpolation()
@@ -481,6 +508,18 @@ func warm_up() -> void:
 		await RenderingServer.frame_post_draw
 	for k in _karts:
 		k.prewarm_effects(false)
+	if track.coins:
+		track.coins.prewarm(false)
+	# Obstáculos: todos à vista em cima da pista, olhando cada trecho.
+	if track.obstacles:
+		track.obstacles.prewarm(true)
+		for xf in track.obstacles.zone_points():
+			# 16 m antes do trecho, na altura da câmera, olhando para a frente.
+			cam.global_transform = Transform3D(xf.basis, xf.origin + xf.basis.z * 16.0 + Vector3.UP * 3.0)
+			cam.reset_physics_interpolation()
+			for i in 2:
+				await RenderingServer.frame_post_draw
+		track.obstacles.prewarm(false)
 	# Volta inteira olhando para a frente, na altura da câmera.
 	for i in WARM_UP_VIEWS:
 		var along := track.length * (float(i) + 0.5) / WARM_UP_VIEWS
@@ -507,6 +546,8 @@ func _chase_view(r: Racer) -> Transform3D:
 func _physics_process(delta: float) -> void:
 	if _warming:
 		return
+	if track.obstacles:
+		track.obstacles.clock = _clock + race_time
 	match state:
 		State.COUNTDOWN:
 			_update_countdown(delta)
@@ -578,6 +619,7 @@ func _start_race() -> void:
 		if r.ai and randf() < lerpf(0.2, 0.85, r.ai.skill):
 			r.kart.apply_boost(1.0, 1, false)
 	Sfx.play(self, &"go", -5.0)
+	GameState.music.play(_music_id(), 0.0)
 	for r in humans:
 		r.camera.intro = 0.0
 		r.hud.show_center("VAI!", UiKit.GREEN, 0.6)
@@ -590,6 +632,11 @@ func _start_race() -> void:
 			r.kart.apply_boost(1.0, 1, false)
 		r.recording = Ghost.start_recording(track.track_id, _record_class, r.kart)
 		r.recording.capture(r.kart, 0.0)
+
+
+## Trilha do cenário desta pista.
+func _music_id() -> StringName:
+	return MusicPlayer.scenery_track(track.scenery)
 
 
 # --- Progresso, voltas e posições -------------------------------------------------
@@ -691,6 +738,8 @@ func _on_lap_completed(r: Racer) -> void:
 	if r.laps_done == laps - 1:
 		r.hud.show_banner("VOLTA FINAL!" + split_text, Color(0.85, 0.12, 0.18), 1.3)
 		Sfx.play(self, &"final_lap", -6.0)
+		# A música acelera com o primeiro jogador que chega na volta final.
+		GameState.music.start_final_lap()
 		if r.kart.driver:
 			r.kart.driver.set_face(&"face_surprised", 1.0)
 	else:
@@ -809,6 +858,8 @@ func _end_race() -> void:
 		var podium := best_human.place <= 3 or racers.size() == 1
 		player.hud.show_center("CHEGADA!", Color.WHITE, 1.2)
 		Sfx.play(self, &"finish" if podium else &"finish_low", -5.0)
+	# A trilha some, o som de chegada toca sozinho e entra a música do pódio.
+	GameState.music.play(&"podio", 0.5, 1.8)
 	if mode == GameState.Mode.GRAND_PRIX and GameState.grand_prix:
 		_show_grand_prix_results(standings)
 	else:
@@ -1061,6 +1112,34 @@ func _on_kart_landed(strength: float, r: Racer) -> void:
 
 func _on_kart_trick() -> void:
 	Sfx.play(self, &"trick", -9.0)
+
+
+## Moeda pega por um jogador.
+func _on_coin_collected(_r: Racer) -> void:
+	Sfx.play(self, &"coin", -11.0)
+
+
+func _on_coins_changed(coins: int, r: Racer) -> void:
+	if r.hud:
+		r.hud.set_coins(coins)
+
+
+## Um kart (jogador ou não) foi atingido por um obstáculo: as moedas perdidas saltam dele.
+func _on_obstacle_hit(lost: int, _splash: bool, k: Kart) -> void:
+	if lost > 0 and track.coins:
+		track.coins.burst(k.global_position, lost)
+
+
+## Um jogador foi atingido por um obstáculo (rodou ou levou uma onda).
+func _on_human_hit(lost: int, splash: bool, r: Racer) -> void:
+	r.camera.shake(0.7)
+	if splash:
+		Sfx.play(self, &"splash", -5.0)
+	else:
+		Sfx.play(self, &"bump", -4.0)
+		Sfx.play(self, &"spin", -11.0)
+	if lost > 0:
+		Sfx.play(self, &"coin_lost", -12.0)
 
 
 ## Caixa de item pega. Por enquanto só o som e a cara do piloto: a lógica dos

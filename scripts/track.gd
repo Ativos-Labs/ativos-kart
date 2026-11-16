@@ -59,6 +59,35 @@ const WORDMARK_DARK := preload("res://assets/logos/ativos_marca_branca.png")
 		item_boxes_per_row = value
 		_queue_rebuild()
 
+@export_group("Moedas")
+## Fileiras de moedas Ativos (cada moeda pega aumenta um pouco a velocidade máxima).
+## Cada item: x = meio da fileira (fração da volta), y = deslocamento lateral (m,
+## + = direita, até ~±5,5 dentro das zebras), z = quantidade de moedas.
+@export var coin_lines := PackedVector3Array():
+	set(value):
+		coin_lines = value
+		_queue_rebuild()
+## Distância entre as moedas de uma fileira (m).
+@export var coin_spacing := 4.0:
+	set(value):
+		coin_spacing = value
+		_queue_rebuild()
+## Três moedas no ar, no arco do pulo de cada rampa (pega quem chega rápido nela).
+@export var coins_on_ramps := true:
+	set(value):
+		coins_on_ramps = value
+		_queue_rebuild()
+
+@export_group("Obstáculos")
+## Trechos com obstáculos que se mexem (frações da volta). O tipo vem do cenário:
+## pneus gigantes quicando (Campo), ondas do mar (Praia), fardos de feno (Deserto) e
+## bolas de neve (Neve). Ponha em trechos sem ponte, rampa nem caixas, com uns 30 m
+## de chão livre dos dois lados da pista (veja track_obstacles.gd).
+@export var obstacle_zones := PackedFloat32Array():
+	set(value):
+		obstacle_zones = value
+		_queue_rebuild()
+
 @export_group("Rios")
 ## Rios: crie nós Path3D filhos com nome começando por "Rio" e desenhe a linha
 ## do rio. O chão é cavado ao longo dela (com água no fundo). Passe os rios por
@@ -209,6 +238,10 @@ var terrain: TrackTerrain
 var bridge_mask := PackedByteArray()
 ## Trechos de ponte: {"bridge": TrackBridge, "from": índice, "to": índice}.
 var bridge_spans: Array[Dictionary] = []
+## Moedas da pista (null se não tiver).
+var coins: TrackCoins
+## Obstáculos que se mexem (null se a pista não tiver).
+var obstacles: TrackObstacles
 
 var _generated: Node3D
 var _rebuild_queued := false
@@ -298,6 +331,8 @@ func prepare_layout() -> void:
 func build_geometry() -> void:
 	if is_instance_valid(_generated):
 		_generated.free()
+	coins = null
+	obstacles = null
 	_generated = Node3D.new()
 	_generated.name = "Gerado"
 	add_child(_generated, false, Node.INTERNAL_MODE_FRONT)
@@ -331,6 +366,8 @@ func build_geometry() -> void:
 	if not ramps.is_empty():
 		TrackRampBuilder.new(self, _generated).build()
 	_build_item_boxes()
+	_build_coins()
+	_build_obstacles()
 	if not bridge_spans.is_empty():
 		TrackBridgeBuilder.new(self, terrain, _generated).build(preview)
 	TrackScenery.new(self, terrain, _generated).build(preview)
@@ -912,6 +949,68 @@ func _build_item_boxes() -> void:
 			box.transform = Transform3D(basis, center + right * (i - (count - 1) * 0.5) * spacing)
 			box.setup(mesh, shadow, with_collision, tilt)
 			holder.add_child(box)
+
+
+## Moedas Ativos (veja track_coins.gd): as fileiras de `coin_lines` e um arco de três
+## moedas no pulo de cada rampa.
+func _build_coins() -> void:
+	var points := PackedVector3Array()
+	var dirs := PackedVector3Array()
+	for line in coin_lines:
+		var count := maxi(int(line.z), 1)
+		var center := wrapf(line.x, 0.0, 1.0) * length
+		for i in count:
+			var d := center + (i - (count - 1) * 0.5) * coin_spacing
+			if _on_ramp(d):
+				continue
+			var xf := get_transform_at(d, line.y)
+			points.append(xf.origin + Vector3.UP * TrackCoins.HEIGHT)
+			dirs.append(get_direction_at(d))
+	if coins_on_ramps:
+		var inner_half := road_width * 0.5 - curb_min_width - 0.1
+		for r in ramps:
+			if r == null:
+				continue
+			var lip := wrapf(r.at, 0.0, 1.0) * length
+			var lateral := r.offset * (inner_half - inner_half * r.width)
+			# Arco do kart saindo da borda a 27 m/s (com turbo, mais longo): altura do
+			# meio do kart = borda + subida - gravidade (como em Kart._launch).
+			var v := 27.0 * (1.35 if r.turbo else 1.0)
+			var vy := v * tan(r.lip_angle())
+			var steps: Array = [7.0, 15.0, 23.0] if r.turbo else [5.0, 10.5, 16.0]
+			for x: float in steps:
+				var t := x / v
+				var y := r.height + vy * t - 0.5 * Kart.GRAVITY * t * t + TrackCoins.KART_CENTER
+				var xf := get_transform_at(lip + x, lateral)
+				points.append(xf.origin + Vector3.UP * maxf(y, TrackCoins.HEIGHT))
+				dirs.append(get_direction_at(lip + x))
+	if points.is_empty():
+		return
+	coins = TrackCoins.new()
+	coins.name = "MoedasAtivos"
+	coins.setup(points, dirs, with_collision)
+	_generated.add_child(coins)
+
+
+## O ponto `d` (m) fica em cima da subida de alguma rampa?
+func _on_ramp(d: float) -> bool:
+	for r in ramps:
+		if r == null:
+			continue
+		var to_lip := wrapf(wrapf(r.at, 0.0, 1.0) * length - d, -length * 0.5, length * 0.5)
+		if to_lip > -2.0 and to_lip < r.length + 1.0:
+			return true
+	return false
+
+
+## Obstáculos que se mexem nos trechos de `obstacle_zones` (veja track_obstacles.gd).
+func _build_obstacles() -> void:
+	if obstacle_zones.is_empty():
+		return
+	obstacles = TrackObstacles.new()
+	obstacles.name = "Obstaculos"
+	obstacles.setup(self, terrain, obstacle_zones, with_collision)
+	_generated.add_child(obstacles)
 
 
 func _on_boost_pad_body_entered(body: Node3D) -> void:
