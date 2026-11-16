@@ -2,8 +2,9 @@ class_name KartAI
 extends RefCounted
 ## Piloto controlado pelo computador. Segue a trajetória de corrida (RacingLine),
 ## derrapa nas curvas longas para ganhar mini-turbo, passa pelas placas de turbo,
-## escolhe se pega a rampa estreita, faz manobra nos pulos, desvia dos outros karts
-## e, de vez em quando, erra. Use como `kart.autopilot = ai.drive`.
+## escolhe se pega a rampa estreita, faz manobra nos pulos, desvia dos outros karts e
+## dos obstáculos da pista (os bons pilotos veem mais) e, de vez em quando, erra.
+## Use como `kart.autopilot = ai.drive`.
 ##
 ## `skill` (0 a 1) diz o quanto ele pilota bem. `pace` multiplica a velocidade
 ## máxima do kart, e o elástico (`rubber_band`) acelera quem ficou para trás do
@@ -306,6 +307,17 @@ func _avoid_offset(k: Kart, lat: float, lat_now: float) -> float:
 	var fwd := track.global_basis * track.tangents[_index]
 	var right := track.global_basis * track.rights[_index]
 	var edge := track.road_width * 0.5 - 1.5
+	var offsets: Array[float] = [0.0, -2.6, 2.6, -5.2, 5.2]
+	# Obstáculos à frente: onde cada um vai estar quando este kart chegar.
+	var hazards := PackedFloat32Array()
+	var obstacles := track.obstacles
+	if obstacles and obstacles.has_zone_ahead(_last_along) and _decided("obstaculos", lerpf(0.35, 0.95, skill)):
+		var lanes := PackedFloat32Array()
+		for offset in offsets:
+			lanes.append(clampf(lat + offset, -edge, edge))
+		hazards = obstacles.lane_danger(_last_along, absf(k.speed), lanes)
+		if not hazards.has(1.0):
+			hazards = PackedFloat32Array()
 	var others: Array[Vector3] = [] # (lateral do outro, peso, -)
 	_blocked = false
 	for o in karts:
@@ -331,13 +343,15 @@ func _avoid_offset(k: Kart, lat: float, lat_now: float) -> float:
 		var w := 1.0 if ahead < 3.0 else clampf(1.0 - (ahead - 3.0) / 15.0, 0.0, 1.0)
 		w *= 1.0 if ahead < 3.0 else clampf(0.4 + wants / 6.0, 0.4, 1.5)
 		others.append(Vector3(lat_now + side, w, 0.0))
-	if others.is_empty():
+	if others.is_empty() and hazards.is_empty():
 		return 0.0
 	var best := 0.0
 	var best_cost := INF
-	for offset: float in [0.0, -2.6, 2.6, -5.2, 5.2]:
-		var cand := clampf(lat + offset, -edge, edge)
+	for i in offsets.size():
+		var cand := clampf(lat + offsets[i], -edge, edge)
 		var cost := absf(cand - lat) * 0.12 + absf(cand - (lat + _avoid)) * 0.08
+		if not hazards.is_empty():
+			cost += hazards[i] * 4.0
 		for o in others:
 			var gap := absf(cand - o.x)
 			if gap < 2.8:
