@@ -24,6 +24,10 @@ const GREEN := Color("3fe05a")
 const BLUE := Color("2b62ee")
 const SKY := Color("33b5ff")
 
+## Setas do teclado: desenhadas como triângulo (a fonte não tem esses símbolos e na
+## web eles viravam quadradinhos).
+const ARROW_KEYS := {"↑": Vector2.UP, "↓": Vector2.DOWN, "←": Vector2.LEFT, "→": Vector2.RIGHT}
+
 
 ## Hexágono alongado (pontas em "flecha" dos dois lados).
 static func hex_points(rect: Rect2, notch: float) -> PackedVector2Array:
@@ -163,6 +167,31 @@ static func draw_icon(ci: CanvasItem, kind: String, c: Vector2, r: float, color:
 				var o := c + Vector2((k * 2 - 1) * r * 0.42, 0.0)
 				ci.draw_circle(o + Vector2(0, -r * 0.36), r * 0.26, color)
 				ci.draw_colored_polygon(_arc_points(o + Vector2(0, r * 0.62), r * 0.48, PI, TAU, 12), color)
+		"speaker":
+			ci.draw_rect(Rect2(c + Vector2(-r * 0.8, -r * 0.28), Vector2(r * 0.4, r * 0.56)), color)
+			ci.draw_colored_polygon(PackedVector2Array([c + Vector2(-r * 0.45, -r * 0.28), c + Vector2(r * 0.05, -r * 0.7),
+					c + Vector2(r * 0.05, r * 0.7), c + Vector2(-r * 0.45, r * 0.28)]), color)
+			ci.draw_arc(c + Vector2(r * 0.1, 0), r * 0.38, -PI * 0.3, PI * 0.3, 8, color, r * 0.14, true)
+			ci.draw_arc(c + Vector2(r * 0.1, 0), r * 0.7, -PI * 0.3, PI * 0.3, 10, color, r * 0.14, true)
+		"screen":
+			ci.draw_rect(Rect2(c + Vector2(-r * 0.85, -r * 0.65), Vector2(r * 1.7, r * 1.05)), color, false, r * 0.17)
+			ci.draw_rect(Rect2(c + Vector2(-r * 0.1, r * 0.4), Vector2(r * 0.2, r * 0.25)), color)
+			ci.draw_rect(Rect2(c + Vector2(-r * 0.45, r * 0.62), Vector2(r * 0.9, r * 0.14)), color)
+		"keyboard":
+			ci.draw_rect(Rect2(c + Vector2(-r * 0.9, -r * 0.5), Vector2(r * 1.8, r * 1.0)), color, false, r * 0.15)
+			for row in 2:
+				for col in 4:
+					ci.draw_rect(Rect2(c + Vector2(-r * 0.62 + col * r * 0.36, -r * 0.3 + row * r * 0.3), Vector2(r * 0.2, r * 0.16)), color)
+			ci.draw_rect(Rect2(c + Vector2(-r * 0.45, r * 0.27), Vector2(r * 0.9, r * 0.12)), color)
+		"gear":
+			for i in 8:
+				var dir := Vector2.from_angle(TAU * i / 8.0)
+				var side := dir.orthogonal()
+				var p0 := c + dir * r * 0.5
+				var p1 := c + dir * r * 0.88
+				ci.draw_colored_polygon(PackedVector2Array([p0 - side * r * 0.2, p1 - side * r * 0.13, p1 + side * r * 0.13, p0 + side * r * 0.2]), color)
+			ci.draw_circle(c, r * 0.62, color)
+			ci.draw_circle(c, r * 0.26, Color(1, 1, 1, 0.95))
 		"trophy":
 			ci.draw_colored_polygon(PackedVector2Array([c + Vector2(-r * 0.55, -r * 0.65), c + Vector2(r * 0.55, -r * 0.65), c + Vector2(r * 0.4, r * 0.05), c + Vector2(0, r * 0.25), c + Vector2(-r * 0.4, r * 0.05)]), color)
 			ci.draw_rect(Rect2(c + Vector2(-r * 0.1, r * 0.2), Vector2(r * 0.2, r * 0.3)), color)
@@ -178,12 +207,18 @@ static func _arc_points(center: Vector2, radius: float, from: float, to: float, 
 	return pts
 
 
+## Largura da tecla desenhada por `draw_key`.
+static func key_width(label: String, height: float, font_size: int) -> float:
+	var text_w := font_size * 0.8 if ARROW_KEYS.has(label) \
+			else FONT_BODY.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+	return maxf(height, text_w + height * 0.6)
+
+
 ## Tecla desenhada (para a barra de dicas e a tela de controles). Retorna a largura usada.
 static func draw_key(ci: CanvasItem, pos: Vector2, height: float, label: String, font_size: int,
 		fill := Color(1, 1, 1), text_color := INK) -> float:
 	var font: Font = FONT_BODY
-	var text_w := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
-	var w := maxf(height, text_w + height * 0.6)
+	var w := key_width(label, height, font_size)
 	var rect := Rect2(pos, Vector2(w, height))
 	var box := StyleBoxFlat.new()
 	box.bg_color = fill
@@ -191,9 +226,21 @@ static func draw_key(ci: CanvasItem, pos: Vector2, height: float, label: String,
 	box.border_color = Color(0, 0, 0, 0.25)
 	box.border_width_bottom = 3
 	box.draw(ci.get_canvas_item(), rect)
+	if ARROW_KEYS.has(label):
+		draw_arrow(ci, rect.get_center() - Vector2(0, 1.5), font_size * 0.36, ARROW_KEYS[label], text_color)
+		return w
+	var text_w := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
 	var baseline := pos.y + height * 0.5 + (font.get_ascent(font_size) - font.get_descent(font_size)) * 0.5 - 2.0
 	ci.draw_string(font, Vector2(pos.x + (w - text_w) * 0.5, baseline), label, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, text_color)
 	return w
+
+
+## Triângulo apontando para `dir` (setas das teclas).
+static func draw_arrow(ci: CanvasItem, c: Vector2, r: float, dir: Vector2, color: Color) -> void:
+	var side := dir.orthogonal()
+	ci.draw_colored_polygon(PackedVector2Array([
+		c + dir * r, c - dir * r * 0.7 + side * r * 0.95, c - dir * r * 0.7 - side * r * 0.95,
+	]), color)
 
 
 ## Texto com contorno (para títulos sobre o 3D).

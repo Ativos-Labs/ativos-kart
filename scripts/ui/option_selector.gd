@@ -16,10 +16,14 @@ var limit := -1:
 		if limit >= 0 and index >= limit:
 			set_index(maxi(limit - 1, 0))
 		queue_redraw()
+## Desligado: aparece apagado e não troca de valor (continua recebendo o foco).
+var enabled := true:
+	set(value):
+		enabled = value
+		queue_redraw()
 
 var _flash := 0.0
 var _flash_dir := 0
-var _last_step_ms := 0
 
 
 func setup(p_caption: String, p_options: PackedStringArray, p_index := 0) -> void:
@@ -51,16 +55,17 @@ func get_value() -> String:
 
 
 func _allowed() -> int:
+	if not enabled:
+		return 0
 	return options.size() if limit < 0 else mini(limit, options.size())
 
 
 func step(dir: int) -> void:
-	_last_step_ms = Time.get_ticks_msec()
 	var next := index + dir
 	_flash = 0.2
 	_flash_dir = dir
 	set_process(true)
-	if next < 0 or next >= _allowed():
+	if not enabled or next < 0 or next >= _allowed():
 		Sfx.play(self, &"ui_back", -14.0)
 		queue_redraw()
 		return
@@ -76,10 +81,8 @@ func _process(delta: float) -> void:
 
 
 func _gui_input(event: InputEvent) -> void:
-	# O analógico manda vários eventos seguidos: um passo a cada 0,18 s.
-	if event is InputEventJoypadMotion and Time.get_ticks_msec() - _last_step_ms < 180:
-		if event.is_action("ui_left") or event.is_action("ui_right"):
-			accept_event()
+	# O analógico chega como ui_left/ui_right (MenuInput), um passo por vez.
+	if event is InputEventJoypadMotion:
 		return
 	if event.is_action_pressed("ui_left") or event.is_action_pressed("esquerda"):
 		step(-1)
@@ -118,7 +121,8 @@ func _draw() -> void:
 	var font: Font = UiKit.FONT_BODY
 	var fs := 20
 	var baseline := size.y * 0.5 + (font.get_ascent(fs) - font.get_descent(fs)) * 0.5
-	draw_string(font, Vector2(26, baseline), caption, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, UiKit.INK_SOFT)
+	draw_string(font, Vector2(26, baseline), caption, HORIZONTAL_ALIGNMENT_LEFT, -1, fs,
+			UiKit.INK_SOFT if enabled else Color(UiKit.INK_SOFT, 0.5))
 
 	var vr := _value_rect()
 	var pill := StyleBoxFlat.new()
@@ -130,7 +134,8 @@ func _draw() -> void:
 	var value := get_value()
 	var tw := tf.get_string_size(value, HORIZONTAL_ALIGNMENT_LEFT, -1, tfs).x
 	var tb := vr.position.y + vr.size.y * 0.5 + (tf.get_ascent(tfs) - tf.get_descent(tfs)) * 0.5
-	draw_string(tf, Vector2(vr.get_center().x - tw * 0.5, tb), value, HORIZONTAL_ALIGNMENT_LEFT, -1, tfs, UiKit.YELLOW)
+	draw_string(tf, Vector2(vr.get_center().x - tw * 0.5, tb), value, HORIZONTAL_ALIGNMENT_LEFT, -1, tfs,
+			UiKit.YELLOW if enabled else Color(1, 1, 1, 0.45))
 	# Setas: apagadas quando não dá para ir mais para aquele lado.
 	for dir: int in [-1, 1]:
 		var can := index + dir >= 0 and index + dir < _allowed()

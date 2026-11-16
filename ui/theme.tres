@@ -1,9 +1,31 @@
-[gd_resource type="Theme" format=3]
+[gd_resource type="Theme" format=3 uid="uid://i68xbue78t61"]
 
-[ext_resource type="FontFile" path="res://assets/fonts/Nunito-ExtraBold.woff2" id="1_body"]
-[ext_resource type="FontFile" path="res://assets/fonts/LilitaOne-Regular.woff2" id="2_title"]
+[ext_resource type="FontFile" uid="uid://b31p6q016m0gg" path="res://assets/fonts/Nunito-ExtraBold.woff2" id="1_body"]
+[ext_resource type="FontFile" uid="uid://4rrw2lv7m53d" path="res://assets/fonts/LilitaOne-Regular.woff2" id="2_title"]
 
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_focus"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_line"]
+content_margin_top = 2.0
+content_margin_bottom = 2.0
+bg_color = Color(0.15, 0.17, 0.22, 0.15)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hud"]
+content_margin_left = 24.0
+content_margin_top = 8.0
+content_margin_right = 24.0
+content_margin_bottom = 10.0
+bg_color = Color(0.04, 0.07, 0.18, 0.78)
+skew = Vector2(0.18, 0)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(1, 1, 1, 0.3)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
 content_margin_left = 34.0
@@ -23,28 +45,6 @@ corner_radius_bottom_left = 26
 shadow_color = Color(0, 0, 0, 0.35)
 shadow_size = 16
 shadow_offset = Vector2(0, 8)
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hud"]
-content_margin_left = 24.0
-content_margin_top = 8.0
-content_margin_right = 24.0
-content_margin_bottom = 10.0
-bg_color = Color(0.04, 0.07, 0.18, 0.78)
-border_width_left = 3
-border_width_top = 3
-border_width_right = 3
-border_width_bottom = 3
-border_color = Color(1, 1, 1, 0.3)
-corner_radius_top_left = 12
-corner_radius_top_right = 12
-corner_radius_bottom_right = 12
-corner_radius_bottom_left = 12
-skew = Vector2(0.18, 0)
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_line"]
-content_margin_top = 2.0
-content_margin_bottom = 2.0
-bg_color = Color(0.15, 0.17, 0.22, 0.15)
 
 [resource]
 default_font = ExtResource("1_body")

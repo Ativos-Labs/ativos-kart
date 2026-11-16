@@ -92,7 +92,8 @@ func _physics_process(delta: float) -> void:
 
 
 func _input(event: InputEvent) -> void:
-	if _confirming:
+	# O analógico chega como ui_left/ui_right (MenuInput), um passo por vez.
+	if _confirming or event is InputEventJoypadMotion:
 		return
 	if event.is_action_pressed("esquerda") or event.is_action_pressed("ui_left"):
 		_change(-1)

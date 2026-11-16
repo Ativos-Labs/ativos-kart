@@ -111,7 +111,8 @@ func _input(event: InputEvent) -> void:
 		device = PlayerSlot.DEVICE_KEYBOARD
 		join = event.keycode in [KEY_ENTER, KEY_KP_ENTER, KEY_SPACE]
 		leave = event.keycode in [KEY_ESCAPE, KEY_BACKSPACE]
-	elif event is InputEventJoypadMotion or event is InputEventKey:
+	elif event is InputEventJoypadMotion or event is InputEventKey or event is InputEventAction:
+		# Nada passa para a tela atrás do painel (InputEventAction = analógico, MenuInput).
 		get_viewport().set_input_as_handled()
 		return
 	else:
