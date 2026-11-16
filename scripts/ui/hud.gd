@@ -1,8 +1,8 @@
 class_name Hud
 extends CanvasLayer
-## Interface da corrida: retrato do piloto, posição, volta, tempo, velocímetro,
-## mini-mapa com todos os karts, semáforo de largada, mensagens e a tela de
-## resultado com a classificação.
+## Interface da corrida: retrato do piloto, posição, volta, moedas, tempo,
+## velocímetro, mini-mapa com todos os karts, semáforo de largada, mensagens e a tela
+## de resultado com a classificação.
 ##
 ## Na tela dividida cada jogador tem um HUD compacto (Layout.PLAYER, dentro da tela
 ## dele) e um HUD por cima de tudo (Layout.OVERLAY) mostra o mapa da pista e o
@@ -55,6 +55,8 @@ signal menu_requested
 
 var kart: Kart
 var layout := Layout.FULL
+## Moedas Ativos do jogador (em cima da posição).
+var coin_counter: CoinCounter
 var _next_button: FancyButton
 var _timeout_label: Label
 var _center_tween: Tween
@@ -84,6 +86,12 @@ func _ready() -> void:
 	_next_button.pressed.connect(func(): next_requested.emit())
 	result_buttons.add_child(_next_button)
 	result_buttons.move_child(_next_button, 0)
+	coin_counter = CoinCounter.new()
+	coin_counter.name = "CoinCounter"
+	$Root.add_child(coin_counter)
+	$Root.move_child(coin_counter, place_badge.get_index())
+	coin_counter.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	_set_offsets(coin_counter, 34.0, -356.0, 260.0, -300.0)
 
 
 ## `karts` = todos os karts da corrida (para o mini-mapa), incluindo `p_kart`.
@@ -95,6 +103,8 @@ func setup(track: Track, p_kart: Kart, karts: Array[Kart], laps: int, best_total
 		_setup_overlay(track, karts)
 		return
 	kart = p_kart
+	coin_counter.max_coins = Kart.MAX_COINS
+	coin_counter.set_coins(p_kart.coins, false)
 	track_name.text = track.track_name
 	place_badge.visible = karts.size() > 1
 	minimap.setup(track, karts, p_kart)
@@ -108,6 +118,11 @@ func setup(track: Track, p_kart: Kart, karts: Array[Kart], laps: int, best_total
 		else:
 			badge.hide()
 			driver_name.text = ""
+		# A dica da largada mostra a tecla de drift atual (dá para trocar nas opções).
+		var drift_keys := GameState.settings.key_labels(&"drift")
+		var hint_label := hint_pill.get_node_or_null("HintLabel") as Label
+		if hint_label and not drift_keys.is_empty():
+			hint_label.text = "Dica: segure %s + direção nas curvas para derrapar e soltar um turbo!" % drift_keys[0].to_upper()
 	set_lap(1, laps)
 	set_time(0.0)
 	lap_times_label.text = ""
@@ -132,6 +147,7 @@ func _setup_compact(slot: PlayerSlot) -> void:
 	driver_name.add_theme_font_size_override("font_size", 40)
 	driver_name.position = Vector2(24.0, 14.0)
 	_set_offsets(place_badge, 22.0, -236.0, 212.0, -146.0)
+	_set_offsets(coin_counter, 26.0, -282.0, 226.0, -240.0)
 	_set_offsets(lap_box, 26.0, -146.0, 280.0, -16.0)
 	lap_box.add_theme_constant_override("separation", -16)
 	lap_title.add_theme_font_size_override("font_size", 26)
@@ -160,6 +176,7 @@ func _setup_compact(slot: PlayerSlot) -> void:
 ## HUD por cima das telas divididas: só o mapa da pista (com todos os karts) e a tela
 ## de resultado.
 func _setup_overlay(track: Track, karts: Array[Kart]) -> void:
+	coin_counter.hide()
 	for child in $Root.get_children():
 		if child != map_panel and child != results:
 			child.hide()
@@ -228,6 +245,11 @@ func set_time(t: float) -> void:
 ## Posição do jogador (chame a cada quadro; o selo só muda quando estabiliza).
 func set_place(place: int, total: int) -> void:
 	place_badge.set_place(place, total)
+
+
+## Moedas do jogador (pula ao ganhar, pisca ao perder).
+func set_coins(value: int) -> void:
+	coin_counter.set_coins(value)
 
 
 func set_lap_times(times: Array[float]) -> void:
@@ -308,6 +330,7 @@ func show_results(standings: Array[Dictionary], place: int, total: float, lap_ti
 		record_total: bool, record_lap: bool, options := {}) -> void:
 	set_warning("")
 	place_badge.visible = false
+	coin_counter.visible = false
 	var best := INF
 	for t in lap_times:
 		best = minf(best, t)
