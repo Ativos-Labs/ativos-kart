@@ -1,16 +1,18 @@
 class_name ControlsPanel
 extends Control
 ## Janela "Controles": tabela com as teclas de cada ação e dicas de pilotagem.
-## Usada no menu principal e no menu de pausa.
+## Usada no menu principal e no menu de pausa. As teclas são as atuais (dá para
+## trocá-las na tela de opções); os botões do controle são fixos.
 
 signal closed
 
+## [nome, ações cujas teclas aparecem (ou teclas fixas), botões do controle].
 const CONTROLS := [
-	["Acelerar", ["W", "↑"], ["A", "RT"]],
-	["Frear / ré", ["S", "↓"], ["B", "LT"]],
-	["Virar", ["A", "D", "←", "→"], ["Analógico"]],
-	["Pulo / drift", ["Espaço", "Shift"], ["RB", "X"]],
-	["Reposicionar", ["R"], ["Y"]],
+	["Acelerar", [&"acelerar"], ["A", "RT"]],
+	["Frear / ré", [&"frear"], ["B", "LT"]],
+	["Virar", [&"esquerda", &"direita"], ["Analógico"]],
+	["Pulo / drift", [&"drift"], ["RB", "X"]],
+	["Reposicionar", [&"reposicionar"], ["Y"]],
 	["Pausar", ["Esc", "P"], ["Start"]],
 ]
 
@@ -26,6 +28,7 @@ func _ready() -> void:
 
 
 func open() -> void:
+	_fill()
 	show()
 	panel.pivot_offset = panel.size * 0.5
 	panel.scale = Vector2.ONE * 0.85
@@ -48,6 +51,9 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _fill() -> void:
+	for child in grid.get_children():
+		grid.remove_child(child)
+		child.queue_free()
 	for header in ["Ação", "Teclado", "Controle"]:
 		var label := Label.new()
 		label.text = header.to_upper()
@@ -60,27 +66,19 @@ func _fill() -> void:
 		action.theme_type_variation = &"PanelLabel"
 		action.add_theme_font_size_override("font_size", 21)
 		grid.add_child(action)
-		grid.add_child(_keys(row[1]))
-		grid.add_child(_keys(row[2]))
+		var keys := PackedStringArray()
+		for k in row[1]:
+			if k is StringName:
+				keys.append_array(GameState.settings.key_labels(k))
+			else:
+				keys.append(k)
+		grid.add_child(_keys(keys))
+		grid.add_child(_keys(PackedStringArray(row[2])))
 
 
-func _keys(keys: Array) -> HBoxContainer:
+func _keys(keys: PackedStringArray) -> HBoxContainer:
 	var box := HBoxContainer.new()
 	box.add_theme_constant_override("separation", 6)
 	for k in keys:
-		var key := Label.new()
-		key.text = k
-		key.add_theme_font_size_override("font_size", 17)
-		key.add_theme_color_override("font_color", Color.WHITE)
-		var style := StyleBoxFlat.new()
-		style.bg_color = UiKit.NAVY_LIGHT
-		style.set_corner_radius_all(9)
-		style.content_margin_left = 11
-		style.content_margin_right = 11
-		style.content_margin_top = 3
-		style.content_margin_bottom = 5
-		style.border_width_bottom = 4
-		style.border_color = UiKit.NAVY
-		key.add_theme_stylebox_override("normal", style)
-		box.add_child(key)
+		box.add_child(KeyCap.new(k))
 	return box

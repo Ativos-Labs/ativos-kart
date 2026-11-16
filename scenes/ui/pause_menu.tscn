@@ -6,6 +6,7 @@
 [ext_resource type="Script" path="res://scripts/ui/ribbon_label.gd" id="4_ribbon"]
 [ext_resource type="Script" path="res://scripts/ui/hint_bar.gd" id="5_hints"]
 [ext_resource type="PackedScene" path="res://scenes/ui/controls_panel.tscn" id="6_controls"]
+[ext_resource type="Script" path="res://scripts/ui/options_panel.gd" id="7_options"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_checker"]
 shader = ExtResource("3_checker")
@@ -62,8 +63,8 @@ layout_mode = 0
 offset_left = 74.0
 offset_top = 150.0
 offset_right = 454.0
-offset_bottom = 480.0
-theme_override_constants/separation = 20
+offset_bottom = 560.0
+theme_override_constants/separation = 18
 
 [node name="ContinueButton" type="Button" parent="Root/Buttons"]
 unique_name_in_owner = true
@@ -90,6 +91,15 @@ layout_mode = 2
 text = "Controles"
 script = ExtResource("2_button")
 icon_kind = "gamepad"
+align_left = true
+
+[node name="OptionsButton" type="Button" parent="Root/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 64)
+layout_mode = 2
+text = "Opções"
+script = ExtResource("2_button")
+icon_kind = "gear"
 align_left = true
 
 [node name="MenuButton" type="Button" parent="Root/Buttons"]
@@ -132,3 +142,14 @@ hints = PackedStringArray("↑  ↓|Navegar", "Enter|Confirmar", "Esc|Continuar"
 [node name="ControlsPanel" parent="Root" instance=ExtResource("6_controls")]
 unique_name_in_owner = true
 layout_mode = 1
+
+[node name="OptionsPanel" type="Control" parent="Root"]
+unique_name_in_owner = true
+process_mode = 3
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("7_options")

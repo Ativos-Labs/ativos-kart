@@ -112,6 +112,12 @@ var track_thumbnails := {}
 var track_builder: TrackBuilder
 ## Resolução do 3D na web (teto de pixels + ajuste automático). null fora da web.
 var render_scale: RenderScale
+## Analógico e direcional do controle nos menus; sabe se o jogador está no controle.
+var menu_input: MenuInput
+## Opções (volume, tela, teclas), salvas em user://opcoes.cfg.
+var settings: GameSettings
+## Música de fundo (menus, uma trilha por cenário, pódio).
+var music: MusicPlayer
 
 ## Kart e piloto do J1.
 var selected_kart_index: int:
@@ -143,6 +149,15 @@ func _ready() -> void:
 	track_builder = TrackBuilder.new()
 	track_builder.name = "TrackBuilder"
 	add_child(track_builder)
+	menu_input = MenuInput.new()
+	menu_input.name = "MenuInput"
+	add_child(menu_input)
+	settings = GameSettings.new()
+	settings.name = "Opcoes"
+	add_child(settings)
+	music = MusicPlayer.new()
+	music.name = "Musica"
+	add_child(music)
 	# Fechar a janela passa por `quit()` (espera a geração de pista em andamento).
 	get_tree().auto_accept_quit = false
 	if OS.has_feature("web"):
@@ -184,10 +199,16 @@ func _notification(what: int) -> void:
 
 func _exit_tree() -> void:
 	CharacterMesh.clear_cache()
+	TrackCoins.clear_cache()
+	TrackTheme.clear_cache()
 
 
 ## Fecha o jogo (use no lugar de `get_tree().quit()`).
 func quit() -> void:
+	# A música para antes e o servidor de áudio ganha um instante para soltá-la
+	# (senão a faixa que tocava aparece como vazamento na saída).
+	music.release()
+	await get_tree().create_timer(0.1, true, false, true).timeout
 	track_builder.quit()
 
 
@@ -388,6 +409,9 @@ func goto_scene(path: String) -> void:
 	if render_scale:
 		render_scale.hold(true)
 	_fade_rect.mouse_filter = Control.MOUSE_FILTER_STOP
+	# Nos menus toca o tema do menu (sem recomeçar de uma tela para outra); a corrida
+	# começa em silêncio e a trilha da pista entra no "VAI!".
+	music.play(&"" if path == SCENE_RACE else &"menu", 0.4)
 	var fade_out := create_tween()
 	fade_out.tween_property(_fade_rect, "color:a", 1.0, 0.22)
 	await fade_out.finished

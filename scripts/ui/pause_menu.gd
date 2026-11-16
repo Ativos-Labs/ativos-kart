@@ -1,6 +1,6 @@
 class_name PauseMenu
 extends CanvasLayer
-## Menu de pausa (Esc / P / Start).
+## Menu de pausa (Esc / P / Start). A música fica baixinha enquanto ele está aberto.
 
 signal resume_requested
 signal restart_requested
@@ -14,8 +14,10 @@ var can_pause := true
 @onready var continue_button: Button = %ContinueButton
 @onready var restart_button: Button = %RestartButton
 @onready var controls_button: Button = %ControlsButton
+@onready var options_button: Button = %OptionsButton
 @onready var menu_button: Button = %MenuButton
 @onready var controls_panel: ControlsPanel = %ControlsPanel
+@onready var options_panel: OptionsPanel = %OptionsPanel
 @onready var info_label: Label = %InfoLabel
 
 
@@ -26,6 +28,8 @@ func _ready() -> void:
 	restart_button.pressed.connect(func(): restart_requested.emit())
 	controls_button.pressed.connect(controls_panel.open)
 	controls_panel.closed.connect(controls_button.grab_focus)
+	options_button.pressed.connect(options_panel.open)
+	options_panel.closed.connect(options_button.grab_focus)
 	menu_button.pressed.connect(func(): menu_requested.emit())
 	var character := GameState.get_selected_character()
 	info_label.text = "%s  •  %s  •  %d voltas" % [
@@ -63,6 +67,7 @@ func _notification(what: int) -> void:
 func open() -> void:
 	visible = true
 	get_tree().paused = true
+	GameState.music.set_ducked(true)
 	Sfx.play(self, &"ui_accept", -12.0)
 	var mat := checker.material as ShaderMaterial
 	var tw := create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
@@ -80,6 +85,9 @@ func open() -> void:
 
 func close() -> void:
 	controls_panel.hide()
+	if options_panel.visible:
+		options_panel.close()
 	visible = false
 	get_tree().paused = false
+	GameState.music.set_ducked(false)
 	resume_requested.emit()

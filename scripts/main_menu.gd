@@ -11,8 +11,10 @@ extends Node3D
 @onready var menu_box: Control = %MenuBox
 @onready var play_button: Button = %PlayButton
 @onready var controls_button: Button = %ControlsButton
+@onready var options_button: Button = %OptionsButton
 @onready var quit_button: Button = %QuitButton
 @onready var controls_panel: ControlsPanel = %ControlsPanel
+@onready var options_panel: OptionsPanel = %OptionsPanel
 @onready var record_label: Label = %RecordLabel
 @onready var driver_label: Label = %DriverLabel
 
@@ -25,9 +27,12 @@ func _ready() -> void:
 	play_button.pressed.connect(func(): GameState.goto_scene(GameState.SCENE_MODE_SELECT))
 	controls_button.pressed.connect(controls_panel.open)
 	controls_panel.closed.connect(controls_button.grab_focus)
+	options_button.pressed.connect(options_panel.open)
+	options_panel.closed.connect(options_button.grab_focus)
 	quit_button.pressed.connect(GameState.quit)
 	if OS.has_feature("web"):
 		quit_button.hide()
+	GameState.music.play(&"menu")
 
 	# Kart com o piloto parado no grid de largada.
 	var character := GameState.get_selected_character()

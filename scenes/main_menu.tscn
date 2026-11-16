@@ -7,6 +7,7 @@
 [ext_resource type="Shader" path="res://shaders/ui_checker.gdshader" id="5_checker"]
 [ext_resource type="Script" path="res://scripts/ui/hint_bar.gd" id="6_hints"]
 [ext_resource type="PackedScene" path="res://scenes/ui/controls_panel.tscn" id="7_controls"]
+[ext_resource type="Script" path="res://scripts/ui/options_panel.gd" id="8_options"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_checker"]
 shader = ExtResource("5_checker")
@@ -130,8 +131,8 @@ layout_mode = 0
 offset_left = 74.0
 offset_top = 280.0
 offset_right = 474.0
-offset_bottom = 530.0
-theme_override_constants/separation = 20
+offset_bottom = 590.0
+theme_override_constants/separation = 16
 
 [node name="PlayButton" type="Button" parent="UI/Root/MenuBox"]
 unique_name_in_owner = true
@@ -150,6 +151,15 @@ layout_mode = 2
 text = "Controles"
 script = ExtResource("4_button")
 icon_kind = "gamepad"
+align_left = true
+
+[node name="OptionsButton" type="Button" parent="UI/Root/MenuBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 62)
+layout_mode = 2
+text = "Opções"
+script = ExtResource("4_button")
+icon_kind = "gear"
 align_left = true
 
 [node name="QuitButton" type="Button" parent="UI/Root/MenuBox"]
@@ -262,3 +272,14 @@ vertical_alignment = 1
 [node name="ControlsPanel" parent="UI/Root" instance=ExtResource("7_controls")]
 unique_name_in_owner = true
 layout_mode = 1
+
+[node name="OptionsPanel" type="Control" parent="UI/Root"]
+unique_name_in_owner = true
+process_mode = 3
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("8_options")

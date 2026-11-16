@@ -1,6 +1,7 @@
 class_name Sfx
 extends RefCounted
-## Efeitos sonoros gerados por código (não precisa de arquivos de áudio).
+## Efeitos sonoros gerados por código (não precisa de arquivos de áudio). Tocam no
+## canal "Efeitos" (volume na tela de opções), como o motor dos karts.
 
 const MIX_RATE := 22050
 ## Frequência do loop de motor (Hz): o tom muda com `pitch_scale` = frequência / esta.
@@ -17,6 +18,7 @@ static func play(owner_node: Node, sound: StringName, volume_db := -8.0, pitch :
 	player.stream = get_stream(sound)
 	player.volume_db = volume_db
 	player.pitch_scale = pitch
+	player.bus = GameSettings.BUS_SFX
 	player.process_mode = Node.PROCESS_MODE_ALWAYS
 	owner_node.add_child(player)
 	player.finished.connect(player.queue_free)
@@ -52,6 +54,14 @@ static func get_stream(sound: StringName) -> AudioStreamWAV:
 			stream = _tone([1046.5, 1318.5, 1568.0, 2093.0], 0.045, 0.3)
 		&"trick":
 			stream = _tone([987.77, 1318.5, 1975.5], 0.06, 0.32)
+		&"coin":
+			stream = _tone([1318.5, 1975.5], 0.055, 0.3)
+		&"coin_lost":
+			stream = _tone([1318.5, 987.77, 739.99, 587.33], 0.05, 0.28)
+		&"spin":
+			stream = _tone([880.0, 698.46, 587.33, 440.0, 349.23], 0.055, 0.3)
+		&"splash":
+			stream = _splash(0.7)
 		&"ui_move":
 			stream = _tone([880.0], 0.045, 0.25)
 		&"ui_accept":
@@ -126,6 +136,22 @@ static func _whoosh(length: float) -> AudioStreamWAV:
 		phase += TAU * (180.0 + t * 520.0) / MIX_RATE
 		var env := minf(t * 12.0, 1.0) * pow(1.0 - t, 2.0)
 		samples.append((low * 0.7 + sin(phase) * 0.25) * env * 0.8)
+	return _make_stream(samples)
+
+
+## Água batendo: ruído que começa forte e vai abafando (chiado de espuma no fim).
+static func _splash(length: float) -> AudioStreamWAV:
+	var samples := PackedFloat32Array()
+	var count := int(length * MIX_RATE)
+	var low := 0.0
+	var mid := 0.0
+	for i in count:
+		var t := float(i) / count
+		var noise := randf_range(-1.0, 1.0)
+		low = lerpf(low, noise, 0.05)
+		mid = lerpf(mid, noise, lerpf(0.5, 0.12, t))
+		var env := minf(t * 40.0, 1.0) * pow(1.0 - t, 1.6)
+		samples.append((low * 1.4 + mid * 0.6) * env * 0.75)
 	return _make_stream(samples)
 
 
