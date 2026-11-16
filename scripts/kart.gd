@@ -3,6 +3,10 @@ extends CharacterBody3D
 ## Kart arcade no estilo Mario Kart.
 ## Acelerar, frear/ré, virar, pulinho + drift com mini-turbo (azul, laranja, roxo),
 ## pulos de rampa (com manobra no ar que dá turbo na aterrissagem) e caixas de item.
+## Curvas têm atrito (o kart perde velocidade virando; derrapando perde menos), as
+## moedas Ativos aumentam um pouco a velocidade máxima e os obstáculos da pista fazem
+## o kart rodar e perder moedas. No drift as rodas de trás deixam marcas no chão e
+## levantam poeira (ou neve) com a cara do cenário.
 
 signal bumped(strength: float)
 signal boost_started(power: int)
@@ -17,6 +21,12 @@ signal trick_performed
 signal item_box_collected(box: Node3D)
 ## Encostou em outro kart (`strength` 0..1). Os dois karts emitem.
 signal kart_bumped(other: Kart, strength: float)
+## Pegou uma moeda (mesmo com o máximo de moedas).
+signal coin_collected
+## O número de moedas mudou.
+signal coins_changed(coins: int)
+## Foi atingido por um obstáculo da pista (rodou ou levou uma onda) e perdeu `lost` moedas.
+signal obstacle_hit(lost: int, splash: bool)
 
 const GRAVITY := 32.0
 const HOP_VELOCITY := 4.6
@@ -46,12 +56,48 @@ const RAMP_ALIGN_MAX := 0.24
 ## TRICK_EARLY s antes, ainda na rampa). Dá TRICK_BOOST s de turbo ao aterrissar.
 const TRICK_WINDOW := 0.4
 const TRICK_EARLY := 0.25
-const TRICK_TIME := 0.5
 const TRICK_BOOST := 0.9
+## Manobras no ar. A cada pulo uma é sorteada (nunca a mesma do pulo anterior).
+##   GIRO: giro completo de lado (em volta do eixo do kart), piloto com os braços para cima.
+##   MORTAL: mortal para trás (bico sobe e dá a volta), piloto gritando, agarrado no volante.
+##   PIAO: um giro completo na horizontal, meio deitado, piloto com o braço de fora no
+##         alto (rodeio).
+##   PARAFUSO: giro fora do eixo (no meio da volta o kart fica quase de lado), mãozinhas.
+##   DEITADO: o kart deita de lado, segura e volta; o piloto dá tchau com o braço de cima.
+##   SEM_MAOS: empina o bico e balança, o piloto solta o volante e abre os braços.
+## Os gestos precisam aparecer por cima do encosto (a câmera fica atrás): apontar e
+## joinha ficam escondidos atrás do banco.
+enum Trick { GIRO, MORTAL, PIAO, PARAFUSO, DEITADO, SEM_MAOS }
+## Duração (s) de cada manobra quando o pulo dá tempo; em pulo curto ela acelera para
+## terminar antes de aterrissar (mas não fica mais curta que TRICK_MIN_TIME).
+const TRICK_TIMES := [0.55, 0.62, 0.52, 0.6, 0.66, 0.62]
+const TRICK_MIN_TIME := 0.3
+## Folga (s) entre o fim da manobra e a aterrissagem prevista.
+const TRICK_LAND_MARGIN := 0.1
 ## Altura do eixo do giro da manobra (meio do kart).
 const TRICK_PIVOT := 0.55
 ## Queda livre (sem rampa) a partir deste tempo no ar também conta como pulo.
 const LONG_AIR_TIME := 0.5
+## --- Moedas ---
+## Máximo de moedas e quanto cada uma soma na velocidade máxima (fração).
+const MAX_COINS := 10
+const COIN_SPEED_BONUS := 0.006
+## Empurrãozinho (m/s) ao pegar uma moeda.
+const COIN_PUSH := 0.6
+## Moedas perdidas ao ser atingido por um obstáculo.
+const COIN_LOSS := 3
+## --- Obstáculos ---
+## Duração do rodopio (s), parte dele sem controle, e tempo protegido depois de um
+## acerto (o mesmo obstáculo não acerta duas vezes seguidas).
+const SPIN_TIME := 0.9
+const SPIN_LOCK := 0.65
+const HIT_COOLDOWN := 1.6
+## --- Atrito nas curvas ---
+## Desaceleração (m/s²) quando a curva segura o kart abaixo da velocidade dele.
+const CORNER_SCRUB := 4.5
+## --- Marcas de pneu ---
+const MARK_WIDTH := 0.27
+const ROAD_MARK := Color(0.04, 0.04, 0.05, 0.62)
 const DRIFT_COLORS := [
 	Color(1.0, 0.95, 0.8, 0.55),
 	Color(0.25, 0.65, 1.0),
@@ -93,6 +139,10 @@ const DRIFT_COLORS := [
 @export var offroad_factor := 0.5
 ## Multiplicador de velocidade máxima durante o turbo.
 @export var boost_factor := 1.35
+## Atrito nas curvas: fração da velocidade máxima perdida virando tudo na velocidade
+## máxima (a perda cresce com a força da curva). Derrapando perde bem menos.
+@export var corner_slowdown := 0.12
+@export var drift_corner_slowdown := 0.05
 
 @export_group("Sensibilidade")
 ## Quão rápido o volante vai até o fim (por segundo). Menor = mais suave.
@@ -125,6 +175,16 @@ var weight_stat := 3
 ## Tela dividida: cada tela é menor e o kart aparece menor de longe, então o detalhe do
 ## piloto cai mais perto da câmera (as distâncias contam multiplicadas por isto).
 var lod_scale := 1.0
+## Moedas Ativos (0 a MAX_COINS): cada uma soma COIN_SPEED_BONUS na velocidade máxima.
+var coins := 0
+## Marcas de pneu da corrida (null = sem marcas, como nas telas de seleção).
+var skid_marks: SkidMarks
+## Caixa de batida em uso (largura, altura, comprimento em m; KartData.hitbox_size).
+var hitbox_size := Vector3.ZERO
+## Quanto a caixa de batida é menor que a padrão dos karts, de cada lado (m): x = na
+## largura, y = no comprimento. 0 nos karts comuns; obstáculos e moedas descontam isso
+## do alcance deles (a moto, mais estreita, passa mais perto sem bater nem pegar).
+var hitbox_shrink := Vector2.ZERO
 
 var _vertical := 0.0
 var _steer := 0.0
@@ -148,10 +208,16 @@ var _air_time := 0.0
 var _ground_vy := 0.0
 var _trick_buffer := 0.0
 var _trick_window := 0.0
-## Progresso da manobra em segundos (-1 = sem manobra).
+## Manobra em andamento (Trick) ou -1.
+var trick := -1
+## Progresso da manobra em segundos (-1 = sem manobra) e a duração dela.
 var _trick_t := -1.0
+var _trick_len := 0.5
 var _trick_dir := 1.0
 var _trick_boost := false
+## Última manobra feita (o sorteio não repete) e tempo no ar previsto na decolagem.
+var _last_trick := -1
+var _air_expected := 0.0
 ## Mola da suspensão (aterrissagem): deslocamento vertical do modelo e velocidade.
 var _squash := 0.0
 var _squash_vel := 0.0
@@ -164,6 +230,25 @@ var _engine_3d: AudioStreamPlayer3D
 ## Rampas de pulo da pista (relidas de vez em quando, veja _current_ramp).
 var _ramps: Array[Node] = []
 var _ramps_frame := -1
+## Rodopio de um obstáculo: progresso (s, -1 = sem), voltas (0 = só balança, onda) e lado.
+var _spin_t := -1.0
+var _spin_turns := 1.0
+var _spin_dir := 1.0
+var _hit_cooldown := 0.0
+## Perda de velocidade (fração) pela curva neste quadro.
+var _corner_loss := 0.0
+## Rodas de trás (espaço do kart, no chão): uma trilha de marca e uma poeira por roda.
+var _rear_points := PackedVector3Array()
+var _skid_trails := PackedInt32Array()
+var _marking := false
+var _offroad_mark := Color(0.2, 0.24, 0.08, 0.5)
+var _dust_emitters: Array[GPUParticles3D] = []
+## Formas de colisão e posições das faíscas como vêm da cena (a caixa padrão dos karts).
+var _scene_body_shape: BoxShape3D
+var _scene_floor_shape: CapsuleShape3D
+var _scene_body_bottom := 0.0
+var _scene_spark_points := PackedVector3Array()
+var _dust_ratio := -1.0
 
 @onready var visual: Node3D = $Visual
 @onready var model_slot: Node3D = $Visual/ModelSlot
@@ -183,11 +268,18 @@ var driver: CharacterRig:
 
 
 func _ready() -> void:
+	add_to_group(&"kart")
 	# O material das faíscas é da cena: cada kart precisa do seu, senão a cor do
 	# drift de um kart muda as faíscas de todos.
 	var spark_mat := sparks_left.process_material.duplicate() as ParticleProcessMaterial
 	sparks_left.process_material = spark_mat
 	sparks_right.process_material = spark_mat
+	# Uma poeira por roda de trás (a da cena vira a da esquerda).
+	_dust_emitters = [dust]
+	var dust_right := dust.duplicate() as GPUParticles3D
+	dust_right.name = "DustR"
+	visual.add_child(dust_right)
+	_dust_emitters.append(dust_right)
 	if data:
 		apply_data(data, character)
 	_set_sparks(-1)
@@ -221,6 +313,86 @@ func apply_data(d: KartData, c: CharacterData = null) -> void:
 	drift_grip = 6.5 + stats.handling * 0.25
 	offroad_factor = 0.44 + stats.weight * 0.02
 	weight_stat = stats.weight
+	# Quem tem mais manobrabilidade perde menos velocidade nas curvas.
+	corner_slowdown = 0.155 - stats.handling * 0.012
+	drift_corner_slowdown = corner_slowdown * 0.4
+	_rear_points = kart_visual.rear_contact_points()
+	for i in _rear_points.size():
+		_rear_points[i] *= d.race_scale
+	for i in _dust_emitters.size():
+		var p := _dust_emitters[i]
+		p.visible = i < _rear_points.size()
+		if p.visible:
+			p.position = _rear_points[i] + Vector3(0.0, 0.08, 0.15)
+	_apply_hitbox(d.hitbox_size)
+	_place_sparks()
+	if skid_marks:
+		set_skid_marks(skid_marks)
+
+
+## Troca a caixa de batida pela do veículo (zero = a padrão da cena). As formas da cena
+## são as mesmas para todos os karts, então quem tem caixa própria ganha cópias suas.
+## A base da caixa fica na mesma altura; o apoio no chão (cápsula) encurta junto.
+func _apply_hitbox(size: Vector3) -> void:
+	var body := $ColisaoCorpo as CollisionShape3D
+	var floor_col := $ColisaoChao as CollisionShape3D
+	if _scene_body_shape == null:
+		_scene_body_shape = body.shape as BoxShape3D
+		_scene_floor_shape = floor_col.shape as CapsuleShape3D
+		_scene_body_bottom = body.position.y - _scene_body_shape.size.y * 0.5
+	var base := _scene_body_shape.size
+	if size == Vector3.ZERO or size.is_equal_approx(base):
+		hitbox_size = base
+		hitbox_shrink = Vector2.ZERO
+		body.shape = _scene_body_shape
+		body.position.y = _scene_body_bottom + base.y * 0.5
+		floor_col.shape = _scene_floor_shape
+		return
+	hitbox_size = size
+	hitbox_shrink = Vector2(base.x - size.x, base.z - size.z) * 0.5
+	var box := BoxShape3D.new()
+	box.size = size
+	body.shape = box
+	body.position.y = _scene_body_bottom + size.y * 0.5
+	var capsule := _scene_floor_shape.duplicate() as CapsuleShape3D
+	capsule.radius = minf(capsule.radius, size.x * 0.5)
+	capsule.height = maxf(_scene_floor_shape.height - hitbox_shrink.y * 2.0, capsule.radius * 2.0)
+	floor_col.shape = capsule
+
+
+## Faíscas do drift: nos karts ficam nas laterais da traseira (posição da cena); na moto
+## (uma roda atrás) saem dos dois lados do pneu, senão brotariam no ar ao lado dela.
+func _place_sparks() -> void:
+	if _scene_spark_points.is_empty():
+		_scene_spark_points = PackedVector3Array([sparks_left.position, sparks_right.position])
+	sparks_left.position = _scene_spark_points[0]
+	sparks_right.position = _scene_spark_points[1]
+	if _rear_points.size() == 1:
+		var p := _rear_points[0]
+		sparks_left.position = Vector3(p.x - 0.1, _scene_spark_points[0].y, p.z)
+		sparks_right.position = Vector3(p.x + 0.1, _scene_spark_points[1].y, p.z)
+
+
+## Liga as marcas de pneu (uma trilha por roda de trás).
+func set_skid_marks(marks: SkidMarks) -> void:
+	skid_marks = marks
+	_skid_trails.clear()
+	_marking = false
+	if marks == null:
+		return
+	for i in _rear_points.size():
+		_skid_trails.append(marks.new_trail())
+
+
+## Poeira e marcas com a cara do cenário da pista (TrackTheme.Scenery).
+func set_ground_theme(scenery: int) -> void:
+	_offroad_mark = TrackTheme.offroad_mark_color(scenery)
+	var mat := TrackTheme.dust_material(scenery)
+	var life := TrackTheme.dust_lifetime(scenery)
+	for p in _dust_emitters:
+		p.process_material = mat
+		p.lifetime = life
+		p.amount = 20
 
 
 func get_forward() -> Vector3:
@@ -269,9 +441,13 @@ func teleport(xform: Transform3D) -> void:
 	_air_time = 0.0
 	_ground_vy = 0.0
 	_trick_t = -1.0
+	trick = -1
 	_trick_boost = false
 	_trick_window = 0.0
 	_trick_buffer = 0.0
+	_spin_t = -1.0
+	_corner_loss = 0.0
+	_break_skid_marks()
 	reset_physics_interpolation()
 
 
@@ -282,6 +458,14 @@ func _physics_process(delta: float) -> void:
 	var raw_steer: float = input.steer
 	var drift_held: bool = input.drift
 	var drift_pressed: bool = input.drift_pressed
+	_hit_cooldown = maxf(_hit_cooldown - delta, 0.0)
+	if _spin_t >= 0.0 and _spin_t < SPIN_LOCK:
+		# Rodando depois de um obstáculo: sem controle por um instante.
+		throttle = 0.0
+		brake = 0.0
+		raw_steer = 0.0
+		drift_held = false
+		drift_pressed = false
 	var steer := _smooth_steer(raw_steer, delta)
 	steer_input = steer
 	throttle_input = throttle
@@ -316,11 +500,19 @@ func _physics_process(delta: float) -> void:
 		_start_drift(1 if raw_steer > 0.0 else -1)
 
 	# --- Velocidade ----------------------------------------------------------
-	var top := max_speed * speed_multiplier * (offroad_factor if is_offroad and on_floor else 1.0)
+	# Moedas somam na velocidade máxima; a curva (atrito) tira.
+	var coin_bonus := 1.0 + coins * COIN_SPEED_BONUS
+	_corner_loss = _corner_slowdown() if on_floor else 0.0
+	var top := max_speed * speed_multiplier * coin_bonus * (offroad_factor if is_offroad and on_floor else 1.0)
+	top *= 1.0 - _corner_loss
 	if boost_time > 0.0:
 		boost_time -= delta
-		top = max_speed * boost_factor * speed_multiplier
-		speed = move_toward(speed, top, acceleration * 3.0 * delta)
+		# No turbo a curva pesa a metade (o mini-turbo sai ainda virando).
+		top = max_speed * boost_factor * speed_multiplier * coin_bonus * (1.0 - _corner_loss * 0.5)
+		if speed < top:
+			speed = move_toward(speed, top, acceleration * 3.0 * delta)
+		else:
+			speed = move_toward(speed, top, (coast_drag + CORNER_SCRUB) * delta)
 	elif not on_floor:
 		pass # No ar não há chão para acelerar nem frear: a velocidade se mantém.
 	elif throttle > 0.05 and brake < 0.5:
@@ -331,7 +523,9 @@ func _physics_process(delta: float) -> void:
 			var ratio := clampf(speed / max_speed, 0.0, 1.0)
 			speed = move_toward(speed, target, acceleration * lerpf(1.5, 0.45, ratio) * delta)
 		else:
-			speed = move_toward(speed, target, (16.0 if is_offroad else coast_drag) * delta)
+			# Acima do alvo: na grama freia forte; na curva o atrito segura aos poucos.
+			var drag := 16.0 if is_offroad else coast_drag + (CORNER_SCRUB if _corner_loss > 0.005 else 0.0)
+			speed = move_toward(speed, target, drag * delta)
 	elif brake > 0.05:
 		if speed > 0.5:
 			speed = move_toward(speed, 0.0, brake_force * brake * delta)
@@ -398,6 +592,7 @@ func _physics_process(delta: float) -> void:
 		_air_time += delta
 	_was_on_floor = now_on_floor
 	_handle_walls(fwd, delta)
+	_update_skid_marks(now_on_floor)
 
 	_update_visuals(delta, steer)
 	_prev_speed = speed
@@ -519,6 +714,115 @@ func collect_item_box(box: Node3D) -> void:
 	item_box_collected.emit(box)
 
 
+# --- Atrito nas curvas -------------------------------------------------------------
+
+## Fração da velocidade máxima que a curva tira agora. Cresce com a força lateral
+## (velocidade × giro), comparada à de uma curva com o volante todo na velocidade
+## máxima. Derrapando a perda é bem menor (e o drift ainda dá mini-turbo).
+func _corner_slowdown() -> float:
+	var full := turn_rate * high_speed_turn * max_speed
+	var load := clampf(absf(_yaw_rate * speed) / maxf(full, 0.1), 0.0, 1.25)
+	return load * (drift_corner_slowdown if drifting else corner_slowdown)
+
+
+## Perda de velocidade (fração) pela curva no último quadro (0 = reta).
+func get_corner_loss() -> float:
+	return _corner_loss
+
+
+# --- Moedas ---------------------------------------------------------------------
+
+## Pegou uma moeda da pista (chamado por TrackCoins).
+func add_coin() -> void:
+	if coins < MAX_COINS:
+		coins += 1
+		coins_changed.emit(coins)
+	if is_on_floor() and speed > 0.0:
+		speed += COIN_PUSH
+	coin_collected.emit()
+
+
+## Perde até `count` moedas. Devolve quantas perdeu.
+func lose_coins(count: int) -> int:
+	var lost := mini(count, coins)
+	if lost > 0:
+		coins -= lost
+		coins_changed.emit(coins)
+	return lost
+
+
+# --- Obstáculos ------------------------------------------------------------------
+
+## Atingido por um obstáculo da pista (TrackObstacles). `push` = empurrão (m/s, no
+## plano), `slow` = fração da velocidade que sobra e `spin` = roda uma volta inteira
+## (pneu, fardo, bola de neve); sem `spin` o kart só balança (onda). Perde moedas.
+## Devolve false se o kart ainda estava protegido do acerto anterior.
+func hit_by_obstacle(push: Vector3, slow := 0.35, spin := true) -> bool:
+	if _hit_cooldown > 0.0:
+		return false
+	_hit_cooldown = HIT_COOLDOWN
+	_want_drift = false
+	_cancel_drift()
+	boost_time = 0.0
+	_trick_boost = false
+	speed *= slow
+	push.y = 0.0
+	velocity += push
+	_spin_t = 0.0
+	_spin_turns = 1.0 if spin else 0.0
+	# Gira para o lado do empurrão.
+	_spin_dir = -1.0 if push.dot(global_basis.x) > 0.0 else 1.0
+	var lost := lose_coins(COIN_LOSS)
+	obstacle_hit.emit(lost, not spin)
+	if driver:
+		driver.react_bump(1.0)
+		driver.set_face(&"face_surprised", 1.4)
+	return true
+
+
+## Está rodando depois de um obstáculo?
+func is_spinning() -> bool:
+	return _spin_t >= 0.0
+
+
+# --- Marcas de pneu ----------------------------------------------------------------
+
+## No drift, cada roda de trás risca o chão: borracha escura no asfalto e a cor do
+## cenário fora dele (grama, areia, terra ou neve).
+func _update_skid_marks(on_floor: bool) -> void:
+	if skid_marks == null or _skid_trails.is_empty():
+		return
+	var marking := drifting and on_floor and absf(speed) > 4.0
+	if not marking:
+		if _marking:
+			_break_skid_marks()
+		return
+	_marking = true
+	var n := get_floor_normal()
+	var color := _offroad_mark if is_offroad else ROAD_MARK
+	# Mais forte com o drift carregado.
+	color.a *= 0.75 + 0.1 * drift_level
+	var origin := global_position
+	# As rodas acompanham o modelo, que aponta para dentro da curva no drift.
+	var xf := global_transform * Transform3D(Basis(Vector3.UP, _visual_yaw), Vector3.ZERO)
+	var side := xf.basis.x
+	side.y = 0.0
+	side = side.normalized()
+	for i in _skid_trails.size():
+		var p := xf * _rear_points[i]
+		# No plano do chão (rampas e pontes inclinadas).
+		p.y = origin.y - (n.x * (p.x - origin.x) + n.z * (p.z - origin.z)) / maxf(n.y, 0.3)
+		skid_marks.add_point(_skid_trails[i], p, side, MARK_WIDTH, color)
+
+
+func _break_skid_marks() -> void:
+	_marking = false
+	if skid_marks == null:
+		return
+	for t in _skid_trails:
+		skid_marks.break_trail(t)
+
+
 # --- Rampas e manobras -----------------------------------------------------------
 
 ## A rampa embaixo do kart (só vale com o kart no chão), ou null.
@@ -554,6 +858,11 @@ func _launch(ramp: JumpRamp, horizontal: Vector3) -> Vector3:
 	_vertical = horizontal.dot(dir) * tan(ramp.launch_angle) / maxf(speed_class, 0.1)
 	ramp_jump = true
 	_air_time = 0.0
+	# Tempo até voltar ao asfalto (o kart decola um pouco antes da borda, mais baixo
+	# que ela): dá a duração das manobras. Se a pista cair ou subir depois da rampa,
+	# a manobra termina rápido ao aterrissar (veja _update_visuals).
+	var h := maxf(ramp.to_lip_space(global_position).y, 0.0)
+	_air_expected = (_vertical + sqrt(_vertical * _vertical + 2.0 * GRAVITY * h)) / GRAVITY
 	_trick_window = TRICK_WINDOW
 	jumped.emit()
 	if _trick_buffer > 0.0:
@@ -562,7 +871,11 @@ func _launch(ramp: JumpRamp, horizontal: Vector3) -> Vector3:
 
 
 func _start_trick(steer: float) -> void:
+	trick = _pick_trick()
+	_last_trick = trick
 	_trick_t = 0.0
+	var air_left := _air_expected - _air_time - TRICK_LAND_MARGIN
+	_trick_len = clampf(air_left, TRICK_MIN_TIME, TRICK_TIMES[trick])
 	# Gira para o lado do direcional (ou alterna, com o direcional no meio).
 	_trick_dir = signf(steer) if absf(steer) > 0.2 else -_trick_dir
 	_trick_boost = true
@@ -570,8 +883,79 @@ func _start_trick(steer: float) -> void:
 	_trick_buffer = 0.0
 	trick_performed.emit()
 	if driver:
-		driver.set_face(&"face_happy", 1.0)
-		driver.play_gesture(&"gesture_cheer", 0.55)
+		_trick_reaction()
+
+
+## Sorteia a manobra do pulo (qualquer uma menos a do pulo anterior).
+func _pick_trick() -> int:
+	var count := Trick.size()
+	if _last_trick < 0:
+		return randi() % count
+	return (_last_trick + 1 + randi() % (count - 1)) % count
+
+
+## Cara, braços e corpo do piloto em cada manobra. Os lados são do kart: com
+## _trick_dir > 0 o kart gira/deita para a esquerda, e o braço de fora (ou de cima)
+## é o direito do piloto (play_gesture: 1 = braço esquerdo, 2 = direito).
+func _trick_reaction() -> void:
+	var hold := _trick_len + 0.05
+	var outer_arm := 2 if _trick_dir > 0.0 else 1
+	driver.bounce(0.5)
+	match trick:
+		Trick.GIRO:
+			driver.set_face(&"face_happy", hold + 0.4)
+			driver.play_gesture(&"gesture_cheer", hold)
+			driver.strike_pose(Vector3(0.3, 0.0, 0.0), hold)
+		Trick.MORTAL:
+			# Agarrado no volante, jogando o corpo para trás junto com o mortal.
+			driver.set_face(&"face_screaming", hold + 0.3)
+			driver.strike_pose(Vector3(1.0, 0.0, 0.0), hold)
+		Trick.PIAO:
+			driver.set_face(&"face_happy", hold + 0.4)
+			driver.play_gesture(&"gesture_cheer", hold, outer_arm)
+			driver.strike_pose(Vector3(0.2, 0.0, 0.9 * _trick_dir), hold)
+		Trick.PARAFUSO:
+			driver.set_face(&"face_surprised", hold + 0.3)
+			driver.play_gesture(&"gesture_jazz_hands", hold)
+			driver.strike_pose(Vector3(0.4, -0.6 * _trick_dir, 0.0), hold)
+		Trick.DEITADO:
+			# O corpo fica mais em pé que o kart (dobra para o lado de cima).
+			driver.set_face(&"face_smiling", hold + 0.4)
+			driver.play_gesture(&"gesture_wave", hold, outer_arm)
+			driver.strike_pose(Vector3(0.1, -1.0 * _trick_dir, 0.3 * _trick_dir), hold)
+		Trick.SEM_MAOS:
+			driver.set_face(&"face_happy", hold + 0.4)
+			driver.play_gesture(&"gesture_shrug", hold)
+			driver.strike_pose(Vector3(0.9, 0.0, 0.0), hold)
+
+
+## Posição do modelo durante a manobra (`k` = progresso 0..1), no espaço do kart.
+func _trick_transform(k: float) -> Transform3D:
+	var d := _trick_dir
+	var e := k * k * (3.0 - 2.0 * k)
+	# Sobe rápido, segura e volta (manobras de pose).
+	var hold := smoothstep(0.0, 0.3, k) * (1.0 - smoothstep(0.72, 1.0, k))
+	var spin := Basis.IDENTITY
+	match trick:
+		Trick.GIRO:
+			spin = Basis(Vector3.BACK, TAU * e * d)
+		Trick.MORTAL:
+			# Positivo em X = bico para cima: dá a volta por trás.
+			spin = Basis(Vector3.RIGHT, TAU * e)
+		Trick.PIAO:
+			spin = Basis(Vector3.UP, TAU * e * d) * Basis(Vector3.BACK, sin(PI * k) * 0.35 * d)
+		Trick.PARAFUSO:
+			# Eixo de giro inclinado para o lado: na meia-volta o kart fica quase de lado.
+			var axis := Basis(Vector3.BACK, 0.7 * d) * Vector3.UP
+			spin = Basis(axis, TAU * e * d)
+		Trick.DEITADO:
+			spin = Basis(Vector3.UP, 0.4 * hold * d) * Basis(Vector3.BACK, 1.2 * hold * d) \
+					* Basis(Vector3.RIGHT, 0.15 * hold)
+		Trick.SEM_MAOS:
+			var rock := sin(k * TAU * 1.5) * 0.12 * hold
+			spin = Basis(Vector3.RIGHT, 0.55 * hold) * Basis(Vector3.BACK, rock * d)
+	var pivot := Vector3(0.0, TRICK_PIVOT, 0.0)
+	return Transform3D(spin, pivot - spin * pivot)
 
 
 ## Tocou o chão. `fall_speed` = velocidade de queda (m/s) no toque.
@@ -641,7 +1025,9 @@ func _cancel_drift() -> void:
 func prewarm_effects(on: bool) -> void:
 	if boost_fx:
 		boost_fx.prewarm(on)
-	for p: GPUParticles3D in [sparks_left, sparks_right, dust]:
+	var emitters: Array[GPUParticles3D] = [sparks_left, sparks_right]
+	emitters.append_array(_dust_emitters)
+	for p in emitters:
 		if on:
 			p.emitting = true
 		else:
@@ -702,17 +1088,23 @@ func _update_visuals(delta: float, steer: float) -> void:
 	_squash = clampf(_squash + _squash_vel * delta, -0.16, 0.08)
 	var xf := Transform3D(Basis.from_euler(Vector3(_visual_pitch + _ground_pitch, _visual_yaw, _visual_roll + _ground_roll)),
 			Vector3(0.0, _squash, 0.0))
-	# Manobra: um giro completo em volta do eixo do kart (termina rápido se ele
-	# aterrissar antes).
+	# Rodopio de um obstáculo: uma volta inteira freando no fim (ou só um balanço).
+	if _spin_t >= 0.0:
+		_spin_t += delta
+		var k := clampf(_spin_t / SPIN_TIME, 0.0, 1.0)
+		var turn := _spin_dir * (TAU * _spin_turns * (1.0 - pow(1.0 - k, 3.0)) + sin(k * PI * 3.0) * 0.32 * (1.0 - k))
+		xf.basis = Basis(Vector3.UP, turn) * xf.basis
+		if k >= 1.0:
+			_spin_t = -1.0
+	# Manobra sorteada no pulo (termina rápido se o kart aterrissar antes).
 	if _trick_t >= 0.0:
 		_trick_t += delta * (3.0 if is_on_floor() else 1.0)
-		var k := clampf(_trick_t / TRICK_TIME, 0.0, 1.0)
+		var k := clampf(_trick_t / _trick_len, 0.0, 1.0)
 		if k >= 1.0:
 			_trick_t = -1.0
+			trick = -1
 		else:
-			var pivot := Vector3(0.0, TRICK_PIVOT, 0.0)
-			var spin := Basis(Vector3.BACK, TAU * k * k * (3.0 - 2.0 * k) * _trick_dir)
-			xf = xf * Transform3D(spin, pivot - spin * pivot)
+			xf = xf * _trick_transform(k)
 	visual.transform = xf
 
 	# Rodas, guidão/volante e piloto.
@@ -722,9 +1114,20 @@ func _update_visuals(delta: float, steer: float) -> void:
 	if boost_fx:
 		boost_fx.update(delta, boost_time > 0.0)
 	_land_dust = maxf(_land_dust - delta, 0.0)
-	var dusty := (is_offroad and absf(speed) > 4.0 and is_on_floor()) or _land_dust > 0.0
-	if dust.emitting != dusty:
-		dust.emitting = dusty
+	# Poeira (ou neve) das rodas de trás: fora do asfalto, no drift e na aterrissagem.
+	var grounded := is_on_floor()
+	var offroad_dust := is_offroad and absf(speed) > 4.0 and grounded
+	var drift_dust := drifting and absf(speed) > 6.0 and grounded
+	var dusty := offroad_dust or drift_dust or _land_dust > 0.0
+	var ratio := 1.0 if offroad_dust or _land_dust > 0.0 else 0.45 + 0.18 * drift_level
+	if dusty and not is_equal_approx(ratio, _dust_ratio):
+		_dust_ratio = ratio
+		for p in _dust_emitters:
+			p.amount_ratio = ratio
+	for i in mini(_dust_emitters.size(), maxi(_rear_points.size(), 1)):
+		var p := _dust_emitters[i]
+		if p.emitting != dusty:
+			p.emitting = dusty
 
 
 ## Inclinação de moto (rad, positivo = deita para a esquerda): para dentro da curva,
@@ -753,6 +1156,7 @@ func _setup_engine_audio() -> void:
 		_engine_3d = AudioStreamPlayer3D.new()
 		_engine_3d.name = "Motor3D"
 		_engine_3d.stream = Sfx.get_engine_loop()
+		_engine_3d.bus = GameSettings.BUS_SFX
 		_engine_3d.volume_db = -8.0 if is_player else -12.0
 		_engine_3d.unit_size = 5.0
 		_engine_3d.max_distance = 60.0
@@ -764,6 +1168,7 @@ func _setup_engine_audio() -> void:
 	generator.mix_rate = 22050.0
 	generator.buffer_length = 0.1
 	engine_audio.stream = generator
+	engine_audio.bus = GameSettings.BUS_SFX
 	# Na web o padrão é tocar como "sample" (Web Audio), que não aceita stream gerado
 	# em tempo real; o motor precisa passar pelo mixer do Godot.
 	engine_audio.playback_type = AudioServer.PLAYBACK_TYPE_STREAM

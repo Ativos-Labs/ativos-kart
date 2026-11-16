@@ -1,8 +1,8 @@
-[gd_resource type="Resource" script_class="KartData" format=3]
+[gd_resource type="Resource" script_class="KartData" format=3 uid="uid://d3blsudlwo7ag"]
 
-[ext_resource type="Script" path="res://scripts/kart_data.gd" id="1_data"]
-[ext_resource type="PackedScene" path="res://assets/models/karts/motoca.glb" id="2_model"]
-[ext_resource type="Script" path="res://scripts/kart_exhaust.gd" id="3_exhaust"]
+[ext_resource type="Script" uid="uid://c7186i4qbddfl" path="res://scripts/kart_data.gd" id="1_data"]
+[ext_resource type="PackedScene" uid="uid://mpabcxxae120" path="res://assets/models/karts/motoca.glb" id="2_model"]
+[ext_resource type="Script" uid="uid://bl5648dbxwnp0" path="res://scripts/kart_exhaust.gd" id="3_exhaust"]
 
 [sub_resource type="Resource" id="Resource_saida1"]
 script = ExtResource("3_exhaust")
@@ -29,7 +29,7 @@ model_rotation_degrees = Vector3(0, -90, 0)
 model_offset = Vector3(0, 0.064, 0.377)
 race_scale = 0.8
 turn_lean_degrees = 28.0
-speed = 3
+hitbox_size = Vector3(0.75, 0.5, 1.6)
 acceleration = 4
 handling = 5
 weight = 1
@@ -38,8 +38,10 @@ rear_wheels = PackedStringArray("RodaTras")
 front_wheel_radius = 0.294
 rear_wheel_radius = 0.298
 seat_position = Vector3(0, 0.9, 0.44)
-steering_wheel_center = Vector3(0, 1.12, -0.155)
+steering_wheel_center = Vector3(0.01, 1.086, -0.13)
 steering_wheel_axis = Vector3(0, 0.3, 0.95)
-steering_wheel_radius = 0.36
+steering_wheel_radius = 0.415
 hand_angle = 90.0
+hand_grip_point = Vector3(0.425, 1.086, -0.129)
+hand_grip_axis = Vector3(-0.96, 0.17, -0.223)
 exhausts = Array[ExtResource("3_exhaust")]([SubResource("Resource_saida1"), SubResource("Resource_saida2")])

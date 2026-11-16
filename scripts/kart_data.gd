@@ -28,6 +28,11 @@ const STAT_KEYS := ["speed", "acceleration", "handling", "weight"]
 ## deitam juntos para o lado da curva. 0 = kart comum (a carroceria balança um
 ## pouco para fora).
 @export_range(0.0, 45.0, 0.5) var turn_lean_degrees := 0.0
+## Caixa de batida (largura, altura, comprimento em m, já na escala da corrida, centrada
+## no kart): paredes, outros karts, caixas de item, obstáculos e moedas. Zero = a caixa
+## padrão dos karts (a de res://scenes/kart.tscn). Veículos bem mais estreitos ou curtos
+## que um kart (como a moto) precisam da sua.
+@export var hitbox_size := Vector3.ZERO
 
 @export_group("Atributos (1 a 5)")
 @export_range(1, 5) var speed := 3
@@ -49,14 +54,23 @@ const STAT_KEYS := ["speed", "acceleration", "handling", "weight"]
 @export var seat_position := Vector3(0, 0.33, 0.3)
 ## Nós do volante dentro do modelo (giram quando o kart vira).
 @export var steering_wheel_nodes: PackedStringArray = []
-## Centro do volante (espaço do kart).
+## Centro do volante (espaço do kart). É o pivô do giro e o centro do aro.
 @export var steering_wheel_center := Vector3(0, 0.665, -0.16)
 ## Eixo do volante, apontando para o piloto.
 @export var steering_wheel_axis := Vector3(0, 0.545, 0.839)
-## Raio do aro do volante (onde as mãos seguram).
+## Raio da linha central do aro na altura das mãos (onde a barra passa pelo punho).
+## Em volantes retangulares (manche), é a distância até a barra lateral.
 @export var steering_wheel_radius := 0.24
-## Posição das mãos no aro, em graus a partir do topo (70 ≈ "10 e 2").
+## Posição das mãos no aro, em graus a partir do topo (70 ≈ "10 e 2", 90 = "9 e 3",
+## nas barras laterais de um manche).
 @export var hand_angle := 70.0
+## Pegada que não fica num aro (guidão de moto): ponto da manopla onde a mão DIREITA
+## segura, no espaço do kart. A esquerda é o espelho em volta do centro do volante.
+## Zero = as mãos seguram o aro (raio + ângulo acima).
+@export var hand_grip_point := Vector3.ZERO
+## Direção da manopla nesse ponto, para onde aponta o polegar da mão direita (num
+## guidão: para dentro, em direção ao meio da moto).
+@export var hand_grip_axis := Vector3.ZERO
 
 @export_group("Turbo")
 ## Saídas de escapamento/turbinas na traseira, de onde sai o fogo do turbo
