@@ -1,8 +1,8 @@
-[gd_resource type="Resource" script_class="KartData" format=3]
+[gd_resource type="Resource" script_class="KartData" format=3 uid="uid://bgo0l785uf13a"]
 
-[ext_resource type="Script" path="res://scripts/kart_data.gd" id="1_data"]
-[ext_resource type="PackedScene" path="res://assets/models/karts/standard_kart.glb" id="2_model"]
-[ext_resource type="Script" path="res://scripts/kart_exhaust.gd" id="3_exhaust"]
+[ext_resource type="Script" uid="uid://c7186i4qbddfl" path="res://scripts/kart_data.gd" id="1_data"]
+[ext_resource type="PackedScene" uid="uid://bl7ppp7mpgjxn" path="res://assets/models/karts/standard_kart.glb" id="2_model"]
+[ext_resource type="Script" uid="uid://bl5648dbxwnp0" path="res://scripts/kart_exhaust.gd" id="3_exhaust"]
 
 [sub_resource type="Resource" id="Resource_saida1"]
 script = ExtResource("3_exhaust")
@@ -25,20 +25,10 @@ description = "Equilibrado em tudo. Ótimo para aprender a pilotar e dominar o d
 credits = "Modelo: “standard kart” por amogusstrikesback2 (Sketchfab) — CC BY 4.0"
 model_scene = ExtResource("2_model")
 model_scale = 0.13
-model_rotation_degrees = Vector3(0, 180, 0)
 model_offset = Vector3(0, 0, 0.265)
-speed = 3
-acceleration = 3
-handling = 3
-weight = 3
-front_wheels = PackedStringArray("normal_kart_root_polymsh13", "normal_kart_root_polymsh_detached")
-rear_wheels = PackedStringArray("normal_kart_root_polymsh_detached9", "normal_kart_root_polymsh_detached10")
 front_wheel_radius = 0.224
 rear_wheel_radius = 0.269
-seat_position = Vector3(0, 0.33, 0.3)
-steering_wheel_nodes = PackedStringArray("normal_kart_root_torus")
-steering_wheel_center = Vector3(0, 0.665, -0.16)
-steering_wheel_axis = Vector3(0, 0.545, 0.839)
-steering_wheel_radius = 0.24
-hand_angle = 70.0
+steering_wheel_center = Vector3(0, 0.665, -0.159)
+steering_wheel_axis = Vector3(0, 0.516, 0.857)
+steering_wheel_radius = 0.235
 exhausts = Array[ExtResource("3_exhaust")]([SubResource("Resource_saida1"), SubResource("Resource_saida2")])

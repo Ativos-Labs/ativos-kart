@@ -1,13 +1,12 @@
-[gd_resource type="Resource" script_class="KartData" format=3]
+[gd_resource type="Resource" script_class="KartData" format=3 uid="uid://coqvj8tr7ifpn"]
 
-[ext_resource type="Script" path="res://scripts/kart_data.gd" id="1_data"]
-[ext_resource type="PackedScene" path="res://assets/models/karts/practice_kart.glb" id="2_model"]
-[ext_resource type="Script" path="res://scripts/kart_exhaust.gd" id="3_exhaust"]
+[ext_resource type="Script" uid="uid://c7186i4qbddfl" path="res://scripts/kart_data.gd" id="1_data"]
+[ext_resource type="PackedScene" uid="uid://by6l1pc7nycbl" path="res://assets/models/karts/practice_kart.glb" id="2_model"]
+[ext_resource type="Script" uid="uid://bl5648dbxwnp0" path="res://scripts/kart_exhaust.gd" id="3_exhaust"]
 
 [sub_resource type="Resource" id="Resource_saida1"]
 script = ExtResource("3_exhaust")
 position = Vector3(0.517, 0.795, 1.13)
-direction = Vector3(0, 0, 1)
 radius = 0.11
 length = 1
 style = 1
@@ -15,7 +14,6 @@ style = 1
 [sub_resource type="Resource" id="Resource_saida2"]
 script = ExtResource("3_exhaust")
 position = Vector3(-0.517, 0.795, 1.13)
-direction = Vector3(0, 0, 1)
 radius = 0.11
 length = 1
 style = 1
@@ -23,8 +21,6 @@ style = 1
 [sub_resource type="Resource" id="Resource_saida3"]
 script = ExtResource("3_exhaust")
 position = Vector3(-0.373, 0.339, 1.11)
-direction = Vector3(0, 0, 1)
-radius = 0.05
 length = 0.55
 
 [resource]
@@ -34,19 +30,16 @@ description = "Leve e esperto, feito para treinar. Arranca muito rápido e faz c
 credits = "Modelo: “practice kart” por amogusstrikesback2 (Sketchfab) — CC BY 4.0"
 model_scene = ExtResource("2_model")
 model_scale = 1.2
-model_rotation_degrees = Vector3(0, 180, 0)
 model_offset = Vector3(0, 0.124, 0)
 speed = 2
 acceleration = 5
 handling = 4
 weight = 2
-front_wheels = PackedStringArray("WIRE_r_0128_fl", "WIRE_r_0128_fr")
-rear_wheels = PackedStringArray("WIRE_r_0128_fl_001", "WIRE_r_0128_fr_001")
 front_wheel_radius = 0.186
 rear_wheel_radius = 0.186
 seat_position = Vector3(0, 0.45, 0.28)
-steering_wheel_center = Vector3(0, 0.714, -0.18)
-steering_wheel_axis = Vector3(0, 0.3, 0.95)
-steering_wheel_radius = 0.23
-hand_angle = 70.0
+steering_wheel_center = Vector3(0, 0.699, -0.215)
+steering_wheel_axis = Vector3(0, 0.371, 0.929)
+steering_wheel_radius = 0.28
+hand_angle = 90.0
 exhausts = Array[ExtResource("3_exhaust")]([SubResource("Resource_saida1"), SubResource("Resource_saida2"), SubResource("Resource_saida3")])

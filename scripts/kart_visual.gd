@@ -91,6 +91,22 @@ func update_motion(delta: float, speed: float, steer: float, drift_dir := 0) -> 
 		driver.drift_dir = drift_dir
 
 
+## Pontos de contato das rodas de trás com o chão (espaço deste nó, y = 0): onde
+## nascem as marcas de pneu e a poeira. Moto = uma roda; kart sem rodas mapeadas (ou
+## com o eixo inteiro num nó só) = duas rodas genéricas.
+func rear_contact_points() -> PackedVector3Array:
+	var out := PackedVector3Array()
+	for part in _rear_wheels:
+		out.append(Vector3(part.rest.origin.x, 0.0, part.rest.origin.z))
+	var bike := kart_data != null and kart_data.turn_lean_degrees > 0.0
+	if out.size() == 1 and not bike:
+		var z := out[0].z
+		out = PackedVector3Array([Vector3(-0.66, 0.0, z), Vector3(0.66, 0.0, z)])
+	elif out.is_empty():
+		out = PackedVector3Array([Vector3(-0.66, 0.0, 0.8), Vector3(0.66, 0.0, 0.8)])
+	return out
+
+
 func _update_steering(angle: float) -> void:
 	var axis := kart_data.steering_wheel_axis.normalized()
 	var pivot := _pivot(kart_data.steering_wheel_center, Basis(axis, angle))
@@ -99,24 +115,43 @@ func _update_steering(angle: float) -> void:
 	if driver:
 		# Se o volante faz parte da carroceria (não gira), as mãos ficam paradas nele.
 		var hand_turn := angle if not _steering.is_empty() else 0.0
-		driver.hand_target_l = _rim_point(-kart_data.hand_angle, hand_turn)
-		driver.hand_target_r = _rim_point(kart_data.hand_angle, hand_turn)
+		var left := hand_grip(-1, hand_turn)
+		var right := hand_grip(1, hand_turn)
+		driver.hand_target_l = left[0]
+		driver.hand_grip_l = left[1]
+		driver.hand_target_r = right[0]
+		driver.hand_grip_r = right[1]
 		driver.has_hand_targets = true
+
+
+## Pegada de uma mão (`side`: -1 = esquerda, 1 = direita) com o volante girado `turn`
+## rad, no espaço deste nó: [ponto da barra que passa por dentro do punho, direção da
+## barra para o lado do polegar (no aro: rumo ao topo do volante)].
+func hand_grip(side: int, turn := 0.0) -> PackedVector3Array:
+	var center := kart_data.steering_wheel_center
+	var axis := kart_data.steering_wheel_axis.normalized()
+	var spin := Basis(axis, turn)
+	var point: Vector3
+	var thumb: Vector3
+	if kart_data.hand_grip_point != Vector3.ZERO:
+		point = kart_data.hand_grip_point
+		thumb = kart_data.hand_grip_axis.normalized() if kart_data.hand_grip_axis != Vector3.ZERO else Vector3.UP
+		if side < 0:
+			point.x = 2.0 * center.x - point.x
+			thumb.x = -thumb.x
+	else:
+		var up := (Vector3.UP - axis * axis.dot(Vector3.UP)).normalized()
+		var right := up.cross(axis)
+		var a := deg_to_rad(kart_data.hand_angle) * side
+		point = center + (right * sin(a) + up * cos(a)) * kart_data.steering_wheel_radius
+		# Tangente do aro rumo ao topo (a → 0).
+		thumb = (up * sin(a) - right * cos(a)) * side
+	return PackedVector3Array([center + spin * (point - center), spin * thumb])
 
 
 ## Rotação `basis` em volta do ponto `center` (espaço deste nó).
 static func _pivot(center: Vector3, basis: Basis) -> Transform3D:
 	return Transform3D(basis, center) * Transform3D(Basis.IDENTITY, -center)
-
-
-## Ponto do aro do volante (espaço deste nó). `degrees` a partir do topo, positivo = direita.
-func _rim_point(degrees: float, turn: float) -> Vector3:
-	var axis := kart_data.steering_wheel_axis.normalized()
-	var up := (Vector3.UP - axis * axis.dot(Vector3.UP)).normalized()
-	var right := up.cross(axis)
-	var a := deg_to_rad(degrees) - turn
-	return kart_data.steering_wheel_center + (right * sin(a) + up * cos(a)) * kart_data.steering_wheel_radius \
-			+ axis * 0.015
 
 
 ## Procura cada nome entre os nós do modelo e, se não achar, entre os ossos.

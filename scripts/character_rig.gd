@@ -35,8 +35,6 @@ const ORDER := {
 
 ## Pálpebra: deslocamento em Y que fecha o olho (veja RIG.md).
 const EYELID_CLOSED := -0.332
-## Comprimento braço + antebraço no modelo (m).
-const ARM_LENGTH := 0.455
 
 
 class Layer:
@@ -62,12 +60,15 @@ var mode := Mode.STAND
 var default_face := &"face_happy"
 
 @export_group("Pose de piloto")
-## Distância (no modelo) da origem da mão até o centro da palma.
-@export var grip_offset := 0.1
-## Quanto o braço pode esticar (1 = tamanho normal).
-@export var max_arm_stretch := 2.4
-## Giro do braço em volta do próprio eixo (graus), para acertar a pegada no volante.
-@export var arm_roll_degrees := 0.0
+## Ponto da mão esquerda fechada (espaço do osso hand.L) por onde passa a barra do
+## volante: o vão entre a palma (+X) e os dedos dobrados, perto dos nós dos dedos (+Y).
+## O eixo Z do osso vai do mindinho para o polegar. A mão direita usa o espelho em X.
+@export var grip_point := Vector3(0.03, 0.18, 0.0)
+## Quanto o braço todo pode esticar (1 = tamanho normal).
+@export var max_arm_stretch := 2.6
+## Quanto o punho pode dobrar (graus) para a mão acompanhar a barra. Se precisar de
+## mais, a mão fica um pouco atravessada na barra em vez de quebrar o punho.
+@export var max_wrist_bend_degrees := 35.0
 ## Direção das coxas e canelas (espaço do personagem: +Z = frente).
 @export var thigh_direction := Vector3(0.12, -0.12, 1.0)
 @export var shin_direction := Vector3(0.05, -1.0, 0.45)
@@ -79,9 +80,12 @@ var default_face := &"face_happy"
 var steer := 0.0
 ## -1, 0 ou 1 durante o drift.
 var drift_dir := 0
-## Alvos das mãos no espaço do nó pai do personagem (o kart).
+## Alvos das mãos no espaço do nó pai do personagem (o kart): o ponto da barra que
+## passa por dentro do punho e a direção da barra para o lado do polegar.
 var hand_target_l := Vector3.ZERO
 var hand_target_r := Vector3.ZERO
+var hand_grip_l := Vector3.UP
+var hand_grip_r := Vector3.UP
 var has_hand_targets := false
 
 var skeleton: Skeleton3D
@@ -115,6 +119,10 @@ var _ik_r := 1.0
 var _steer_s := 0.0
 var _drift_s := 0.0
 var _boost_lean := 0.0
+## Pose de manobra (strike_pose): alvo, valor suavizado e quanto tempo ainda segura.
+var _pose_target := Vector3.ZERO
+var _pose := Vector3.ZERO
+var _pose_hold := 0.0
 var _bounce := 0.0
 var _bounce_vel := 0.0
 var _glance_timer := 3.0
@@ -470,6 +478,14 @@ func react_boost(power := 1) -> void:
 	bounce(0.6)
 
 
+## Joga o corpo numa pose (manobras no pulo) e volta sozinho depois de `hold` s.
+## `pose`: x = para trás (+) ou para a frente (-), y = dobra para a esquerda (+) ou
+## direita (-), z = torce para a esquerda (+) ou direita (-). Lados do piloto. De -1 a 1.
+func strike_pose(pose: Vector3, hold: float) -> void:
+	_pose_target = pose.clampf(-1.0, 1.0)
+	_pose_hold = hold
+
+
 func react_bump(strength := 0.5) -> void:
 	set_face(&"face_surprised", 0.8)
 	bounce(0.8 + strength)
@@ -514,6 +530,11 @@ func _process(delta: float) -> void:
 	_steer_s = lerpf(_steer_s, steer, 1.0 - exp(-7.0 * delta))
 	_drift_s = lerpf(_drift_s, float(drift_dir), 1.0 - exp(-6.0 * delta))
 	_boost_lean = move_toward(_boost_lean, 0.0, delta * 1.6)
+	if _pose_hold > 0.0:
+		_pose_hold -= delta
+		if _pose_hold <= 0.0:
+			_pose_target = Vector3.ZERO
+	_pose = _pose.lerp(_pose_target, 1.0 - exp(-10.0 * delta))
 	_update_manual_layers()
 
 	# Pose base = repouso + camadas.
@@ -569,13 +590,16 @@ func _update_manual_layers() -> void:
 	_set_weight(_look, &"eyes_look_down", maxf(-look.y, 0.0))
 	if mode != Mode.DRIVE:
 		return
-	var bend := _steer_s * 0.55 + _drift_s * 0.35
-	_set_weight(_body_add, &"body_lean_forward", lean_forward * (1.0 - _boost_lean))
-	_set_weight(_body_add, &"body_lean_back", _boost_lean * 0.7)
+	# A pose de manobra soma por cima (e tira a curvada para a frente ao ir para trás).
+	var bend := _steer_s * 0.55 + _drift_s * 0.35 + _pose.y
+	var twist := _drift_s * 0.35 + _pose.z
+	var back := maxf(_pose.x, 0.0)
+	_set_weight(_body_add, &"body_lean_forward", lean_forward * (1.0 - _boost_lean) * (1.0 - back) + maxf(-_pose.x, 0.0))
+	_set_weight(_body_add, &"body_lean_back", _boost_lean * 0.7 + back)
 	_set_weight(_body_add, &"body_bend_left", maxf(bend, 0.0))
 	_set_weight(_body_add, &"body_bend_right", maxf(-bend, 0.0))
-	_set_weight(_body_add, &"body_twist_left", maxf(_drift_s, 0.0) * 0.35)
-	_set_weight(_body_add, &"body_twist_right", maxf(-_drift_s, 0.0) * 0.35)
+	_set_weight(_body_add, &"body_twist_left", maxf(twist, 0.0))
+	_set_weight(_body_add, &"body_twist_right", maxf(-twist, 0.0))
 
 
 func _set_weight(dict: Dictionary, key: StringName, value: float) -> void:
@@ -604,18 +628,23 @@ func _update_bounce(delta: float) -> void:
 
 # --- Pose de piloto ------------------------------------------------------------------------
 
-## Transformação global (espaço do esqueleto) de um osso a partir da pose atual.
+## Transformação global (espaço do esqueleto) de um osso a partir da pose atual. A
+## escala é local, como no Skeleton3D (gira depois de escalar).
 func _global(i: int) -> Transform3D:
-	var t := Transform3D(Basis(_rot[i]).scaled(_scl[i]), _pos[i])
+	var t := _local(i)
 	var p := _parent[i]
 	while p >= 0:
-		t = Transform3D(Basis(_rot[p]).scaled(_scl[p]), _pos[p]) * t
+		t = _local(p) * t
 		p = _parent[p]
 	return t
 
 
+func _local(i: int) -> Transform3D:
+	return Transform3D(Basis(_rot[i]) * Basis.from_scale(_scl[i]), _pos[i])
+
+
 ## Gira o osso para que o eixo Y dele aponte para `dir` (espaço do esqueleto).
-func _aim(i: int, dir: Vector3, weight := 1.0, roll := 0.0) -> void:
+func _aim(i: int, dir: Vector3, weight := 1.0) -> void:
 	var parent_basis := Basis.IDENTITY
 	if _parent[i] >= 0:
 		parent_basis = _global(_parent[i]).basis.orthonormalized()
@@ -625,8 +654,6 @@ func _aim(i: int, dir: Vector3, weight := 1.0, roll := 0.0) -> void:
 	if from.dot(to) > 0.99999:
 		return
 	var aimed := Basis(Quaternion(from, to)) * current
-	if roll != 0.0:
-		aimed = Basis(to, roll) * aimed
 	var local := (parent_basis.inverse() * aimed).get_rotation_quaternion()
 	_rot[i] = _rot[i].slerp(local, weight)
 
@@ -650,13 +677,22 @@ func _pose_arms(delta: float) -> void:
 	if not has_hand_targets:
 		return
 	var to_skel := _parent_to_skeleton()
-	var roll := deg_to_rad(arm_roll_degrees)
-	_arm_ik(&"upper_arm.L", &"forearm.L", &"hand.L", to_skel * hand_target_l, _ik_l, roll)
-	_arm_ik(&"upper_arm.R", &"forearm.R", &"hand.R", to_skel * hand_target_r, _ik_r, -roll)
+	var grip_r := Vector3(-grip_point.x, grip_point.y, grip_point.z)
+	_arm_ik(&"upper_arm.L", &"forearm.L", &"hand.L", to_skel * hand_target_l,
+			(to_skel.basis * hand_grip_l).normalized(), grip_point, _ik_l)
+	_arm_ik(&"upper_arm.R", &"forearm.R", &"hand.R", to_skel * hand_target_r,
+			(to_skel.basis * hand_grip_r).normalized(), grip_r, _ik_r)
 
 
+## Braço reto do ombro ao punho, com a mão fechada em volta da barra: o eixo Z da mão
+## (mindinho → polegar) segue a barra (`thumb`) e o vão do punho (`grip`, espaço da mão)
+## fica em cima de `target`. Tudo no espaço do esqueleto.
+##
+## Braço elástico: só o osso do braço estica (escala em Y); o antebraço desfaz essa
+## escala e fica do tamanho normal. Escala não uniforme num osso entorta os filhos que
+## giram em relação a ele, então assim a mão pode dobrar no punho sem deformar.
 func _arm_ik(upper_name: StringName, fore_name: StringName, hand_name: StringName,
-		target: Vector3, weight: float, roll: float) -> void:
+		target: Vector3, thumb: Vector3, grip: Vector3, weight: float) -> void:
 	if weight <= 0.0:
 		return
 	var upper: int = _bone.get(upper_name, -1)
@@ -665,16 +701,52 @@ func _arm_ik(upper_name: StringName, fore_name: StringName, hand_name: StringNam
 	if upper < 0 or fore < 0 or hand < 0:
 		return
 	var shoulder := _global(upper).origin
-	var to := target - shoulder
-	var dist := to.length()
+	# A orientação da mão depende da direção do braço, que depende de onde fica o punho.
+	var hand_basis := Basis.IDENTITY
+	var wrist := target
+	for i in 2:
+		hand_basis = _grip_basis((wrist - shoulder).normalized(), thumb)
+		wrist = target - hand_basis * grip
+	var to := wrist - shoulder
+	var upper_len := _rest_pos[fore].length()
+	var fore_len := _rest_pos[hand].length()
+	var max_stretch := (max_arm_stretch * (upper_len + fore_len) - fore_len) / upper_len
+	var stretch := lerpf(1.0, clampf((to.length() - fore_len) / upper_len, 0.5, max_stretch), weight)
+
+	# Braço apontado para o punho, com o antebraço reto.
 	_rot[fore] = _rot[fore].slerp(_rest_rot[fore], weight)
-	_rot[hand] = _rot[hand].slerp(_rest_rot[hand], weight)
-	_aim(upper, to, weight, roll * weight)
-	# Braço elástico: estica o braço e o antebraço juntos, a mão mantém o tamanho.
-	var stretch := clampf((dist - grip_offset) / ARM_LENGTH, 1.0, max_arm_stretch)
-	stretch = lerpf(1.0, stretch, weight)
+	_aim(upper, to, weight)
+	# O giro que a mão precisa em volta do braço fica metade no ombro e metade no
+	# cotovelo: o tubo do braço torce pouco em cada junta.
+	var fore_rest := _global(upper).basis.orthonormalized() * Basis(_rest_rot[fore])
+	var q := ((fore_rest * Basis(_rest_rot[hand])).inverse() * hand_basis).get_rotation_quaternion()
+	if q.w < 0.0:
+		q = -q
+	var half := atan2(q.y, q.w) * weight
+	_rot[upper] = _rot[upper] * Quaternion(Vector3.UP, half)
+	_rot[fore] = _rot[fore].slerp(_rest_rot[fore] * Quaternion(Vector3.UP, half), weight)
 	_scl[upper] = Vector3(1.0, stretch, 1.0)
-	_scl[hand] = Vector3(1.0, 1.0 / stretch, 1.0)
+	_scl[fore] = Vector3(1.0, 1.0 / stretch, 1.0)
+	# A mão termina o giro e dobra no punho.
+	var local := (_global(fore).basis.orthonormalized().inverse() * hand_basis).get_rotation_quaternion()
+	_rot[hand] = _rot[hand].slerp(local, weight)
+
+
+## Base da mão fechada numa barra: Z (lado do polegar) ao longo da barra e Y (punho →
+## dedos) o mais perto possível da direção do braço, dobrando o punho no máximo
+## `max_wrist_bend_degrees` (depois disso a mão fica um pouco atravessada na barra).
+func _grip_basis(arm_dir: Vector3, thumb: Vector3) -> Basis:
+	var z := thumb
+	var y := arm_dir - z * arm_dir.dot(z)
+	if y.length_squared() < 1e-6:
+		y = z.cross(Vector3.RIGHT if absf(z.x) < 0.9 else Vector3.FORWARD)
+	y = y.normalized()
+	var bend := y.angle_to(arm_dir)
+	var max_bend := deg_to_rad(max_wrist_bend_degrees)
+	if bend > max_bend:
+		y = arm_dir.slerp(y, max_bend / bend).normalized()
+		z = (z - y * z.dot(y)).normalized()
+	return Basis(y.cross(z), y, z)
 
 
 ## Converte do espaço do nó pai deste personagem para o espaço do esqueleto.
