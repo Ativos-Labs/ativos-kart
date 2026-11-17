@@ -188,11 +188,9 @@ func _show_kart(dir: int) -> void:
 
 
 ## Chamado pelo GameState atrás do fade: mostra todos os karts juntos por um quadro
-## para os shaders deles compilarem já (na web, trocar para um kart novo travava a
-## tela na primeira vez). Nos outros renderers não precisa.
+## para os shaders deles compilarem já (trocar para um kart novo travava a tela na
+## primeira vez, na web e também no Forward+).
 func warm_up() -> void:
-	if RenderingServer.get_current_rendering_method() != "gl_compatibility":
-		return
 	var extras: Array[KartVisual] = []
 	for i in GameState.karts.size():
 		if i == index:

@@ -493,14 +493,16 @@ func _load_ghost() -> void:
 const WARM_UP_VIEWS := 12
 
 
-## No renderer Compatibility (a versão web) cada shader é compilado na primeira vez em
-## que aparece na tela, e isso travava a corrida de 0,1 a 1,5 s (pontes, rampas, fogo
-## do turbo, faíscas...). O GameState chama isto atrás do fade de carregamento: os
-## efeitos que só aparecem depois ficam ligados por uns quadros e a câmera passa pela
-## pista inteira, então tudo compila antes da largada. Nos outros renderers (com
-## ubershaders) não precisa.
+## Cada shader/pipeline é compilado na primeira vez em que aparece na tela. No
+## Compatibility (web) isso travava a corrida de 0,1 a 1,5 s (pontes, rampas, fogo do
+## turbo, faíscas...); no Forward+ (Windows/Vulkan/D3D12) os ubershaders seguram a
+## imagem enquanto a variante final compila em segundo plano, mas ainda dá pico de GPU
+## quando muita coisa nova aparece junta (D3D12 é o que mais custa para criar
+## pipelines). O GameState chama isto atrás do fade de carregamento: os efeitos que só
+## aparecem depois ficam ligados por uns quadros e a câmera passa pela pista inteira,
+## então tudo compila antes da largada.
 func warm_up() -> void:
-	if RenderingServer.get_current_rendering_method() != "gl_compatibility" or humans.is_empty():
+	if humans.is_empty():
 		return
 	_warming = true
 	var cam: Camera3D = humans[0].camera

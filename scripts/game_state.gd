@@ -160,10 +160,10 @@ func _ready() -> void:
 	add_child(music)
 	# Fechar a janela passa por `quit()` (espera a geração de pista em andamento).
 	get_tree().auto_accept_quit = false
-	if OS.has_feature("web"):
-		render_scale = RenderScale.new()
-		render_scale.name = "RenderScale"
-		add_child(render_scale)
+	# Resolução do 3D automática (web e desktop): evita picos de GPU em telas grandes.
+	render_scale = RenderScale.new()
+	render_scale.name = "RenderScale"
+	add_child(render_scale)
 
 	var layer := CanvasLayer.new()
 	layer.layer = 128
@@ -423,10 +423,19 @@ func goto_scene(path: String) -> void:
 	get_tree().change_scene_to_file(path)
 	await get_tree().process_frame
 	await get_tree().process_frame
-	# A tela nova pode compilar os shaders dela ainda atrás do fade (web: sem isso cada
-	# coisa que aparece pela primeira vez trava o jogo por um instante).
+	# Resolução do 3D desta tela escolhida ainda no escuro: trocar a escala realoca os
+	# buffers do 3D (pico de 30-150 ms), e o warm_up abaixo já compila nela.
+	if render_scale:
+		if path == SCENE_RACE:
+			render_scale.reset("race:%d:%d" % [selected_track_index, players.size()], "race:%d" % players.size())
+		else:
+			render_scale.reset(path, "menu")
+		await render_scale.prewarm()
+	# A tela nova pode compilar os shaders dela ainda atrás do fade (sem isso cada coisa
+	# que aparece pela primeira vez trava o jogo por um instante: web e Forward+). Em
+	# --headless não há quadros desenhados (frame_post_draw nunca dispara): pula.
 	var scene := get_tree().current_scene
-	if scene and scene.has_method(&"warm_up"):
+	if scene and scene.has_method(&"warm_up") and DisplayServer.get_name() != "headless":
 		await scene.warm_up()
 	if _loading_label:
 		_loading_label.hide()
@@ -436,7 +445,6 @@ func goto_scene(path: String) -> void:
 	_fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_changing_scene = false
 	if render_scale:
-		render_scale.reset()
 		render_scale.hold(false)
 
 

@@ -47,7 +47,7 @@ func setup(p_count: int) -> void:
 		vp.use_debanding = main.use_debanding
 		vp.scaling_3d_mode = main.scaling_3d_mode
 		vp.scaling_3d_scale = main.scaling_3d_scale
-		# Na web a resolução do 3D muda com o desempenho (RenderScale).
+		# A resolução do 3D muda com o desempenho (RenderScale).
 		vp.add_to_group(RenderScale.GROUP)
 		vp.anisotropic_filtering_level = main.anisotropic_filtering_level
 		vp.mesh_lod_threshold = main.mesh_lod_threshold
