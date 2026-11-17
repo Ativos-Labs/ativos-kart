@@ -160,7 +160,7 @@ func _select(i: int, first: bool) -> void:
 	name_ribbon.text = data.display_name.to_upper()
 	name_ribbon.color = data.color if unlocked else Color(0.3, 0.34, 0.45)
 	tagline_label.text = data.tagline
-	description_label.text = data.description if unlocked else "Novos pilotos chegam em breve. Por enquanto, o Celerino está pronto para correr!"
+	description_label.text = data.description if unlocked else "Novos pilotos chegam em breve. Por enquanto, escolha um dos pilotos liberados!"
 	stats.set_stats({"speed": data.speed, "acceleration": data.acceleration, "handling": data.handling, "weight": data.weight}
 			if unlocked else {}, not first)
 	confirm_button.disabled = not unlocked

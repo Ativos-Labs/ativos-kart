@@ -273,15 +273,22 @@ data/karts/cometa.tres               Cometa (cometa.glb, kart futurista)
 data/karts/motoca.tres               Motoca (motoca.glb, moto)
 data/karts/bugre.tres                Bugre (bugre.glb, buggy)
 data/personagens/celerino.tres       Dados do Celerino
+data/personagens/jarbas.tres         Dados do Jarbas (+ jarbas_esqueleto.tres: ossos,
+                                     animações e jeito de pilotar)
 data/rivais/*.tres                   Adversários do computador (Celerino recolorido)
 data/pistas/*.tres                   Dados das pistas (nome, copa, descrição, dificuldade)
 assets/pistas/                       Imagens da tela de pistas: vista aérea (fundo) e foto
                                      da largada (cartão), geradas por tools/track_shots/
 assets/models/personagens/celerino.glb   Modelo do Celerino (veja RIG.md ao lado)
+assets/models/personagens/jarbas.glb     Modelo do Jarbas (+ jarbas_atlas.png e
+                                     jarbas_animacoes.res), gerados por tools/personagens/
 assets/models/moeda/moeda.glb        Moeda Ativos (gerada por tools/moeda/build_moeda.py)
 tools/karts/                         Gera bolido/cometa/motoca/bugre.glb a partir dos
                                      modelos originais (troca os adesivos pelas logos
                                      da Ativos). O Godot ignora a pasta tools/.
+tools/personagens/                   Prepara o Jarbas: limpa o modelo e junta as texturas
+                                     num atlas (build_jarbas.py) e monta as animações
+                                     (gerar_animacoes.gd). Veja o README.md de lá.
 tools/moeda/                         Gera a moeda do jogo a partir de original/MOEDA.glb
                                      (textura de 2048 → 512 px, sem os mapas de normal e
                                      rugosidade, malha centralizada: 2,4 MB → 198 KB)
@@ -298,7 +305,15 @@ windows/                             Export do executável Windows (veja windows
 macos/                               Export do aplicativo macOS (veja macos/README.md)
 ```
 
-## O piloto (Celerino)
+## Os pilotos
+
+São dois pilotos jogáveis: o **Celerino** (folha de papel, mascote da Ativos) e o
+**Jarbas** (piloto de macacão e luva). Os dois usam o mesmo `CharacterRig`; o que muda de
+um para o outro (nomes dos ossos, animações extras, jeito de pilotar) fica no
+`CharacterSkeleton` de cada um (`scripts/character_skeleton.gd`: os valores padrão são
+os do Celerino; o do Jarbas é `data/personagens/jarbas_esqueleto.tres`).
+
+### Celerino
 
 O Celerino vem de `assets/models/personagens/celerino.glb` (esqueleto de 65 ossos e
 48 animações). O `CharacterRig` mistura as animações por código, em camadas com
@@ -321,13 +336,38 @@ arquivo trazem trilhas para quase todos os ossos.
   por um com texturas ou transparência, o jogo volta sozinho às malhas originais
   (`CharacterMesh.enabled = false` também força isso).
 
+### Jarbas
+
+O Jarbas vem de `assets/models/personagens/jarbas.glb`, preparado a partir do modelo
+original por `tools/personagens/` (README lá, com todos os números).
+
+- **No kart:** a pose sentada é montada para cada kart a partir das medidas do cockpit
+  (banco, encosto, assoalho e pedais, no grupo "Cockpit" de cada `data/karts/*.tres`): o
+  bumbum apoia no estofado com as costas no encosto, as pernas esticam por IK até o
+  calcanhar apoiar no assoalho (ou nos pedais, se alcança) e os braços, com cotovelo,
+  fecham as mãos no aro com a pegada medida no volante de referência do arquivo. Como os
+  volantes ficam longe do banco, ele inclina a partir do quadril e desliza um pouco no
+  estofado — o mínimo para alcançar, calculado por veículo. Na moto a pose vem da
+  `POSE_Moto` do modelo, com o quadril no selim.
+- **Expressões e piscada:** as do próprio modelo (alegria, surpresa, raiva, tristeza...).
+  **Gestos, respiração, olhar e formatos de mão:** transferidos das animações do Celerino
+  (`tools/personagens/gerar_animacoes.gd`).
+- **Uma malha só, com textura:** as 27 texturas da Tripo e os logos viram um atlas, e o
+  `CharacterMesh` junta tudo numa superfície (`shaders/character_textured.gdshader`). No
+  multijogador, o jogador que repete o Jarbas corre com o azul do macacão na cor dele.
+
 ### Ajustar o piloto no kart
 
 - Altura/posição no banco: `seat_position` em `data/karts/standard_kart.tres`.
-- Tamanho do personagem no kart: `kart_scale` em `data/personagens/celerino.tres`.
+- Tamanho do personagem no kart: `kart_scale` no `.tres` do personagem (`seat_forward`
+  adianta o corpo no banco).
 - Volante: `steering_wheel_center`, `steering_wheel_axis`, `steering_wheel_radius` e
   `hand_angle` (posição das mãos no aro) no `.tres` do kart.
-- Pernas, inclinação e pegada: propriedades do grupo "Pose de piloto" em `character_rig.gd`.
+- Pernas, inclinação e pegada: grupo "Pose de piloto" do `CharacterSkeleton` (Celerino:
+  padrão em `character_skeleton.gd`; Jarbas: `jarbas_esqueleto.tres`, grupos "Pose de
+  piloto" e "Sentar no kart").
+- Banco, encosto, assoalho e pedais (pilotos que sentam de verdade, como o Jarbas): grupo
+  "Cockpit" no `.tres` do kart; `tools/personagens/medir_cockpit.gd` mede e sugere.
 
 ## Os adversários
 
@@ -371,14 +411,21 @@ Como eles pilotam (`kart_ai.gd`):
 
 ## Adicionar um personagem novo
 
-1. Coloque o modelo (`.glb`) em `assets/models/personagens/`. Ele precisa usar o mesmo
-   esqueleto do Celerino (mesmos nomes de ossos e animações).
+1. Coloque o modelo (`.glb`) em `assets/models/personagens/`.
 2. Duplique `data/personagens/celerino.tres` e troque o modelo, o nome, a frase, as cores
    e os atributos (1 a 5; os atributos do piloto somam com os do kart, 3 = neutro).
 3. Acrescente o novo `.tres` na lista `characters` em `scripts/game_state.gd`.
 4. Em `tint_materials`, liste os materiais do modelo que podem ser recoloridos (no
    Celerino, os azuis). No multijogador, quem escolhe um piloto que outro jogador já pegou
    corre com ele nessa cor do jogador; sem a lista, o piloto repetido fica igual ao original.
+   Modelo com textura: deixe a lista vazia e ponha em `tint_reference` a cor que deve
+   trocar (só os pontos de matiz parecida mudam).
+5. **Esqueleto diferente do do Celerino:** crie um `CharacterSkeleton` (como
+   `data/personagens/jarbas_esqueleto.tres`) com os ossos de cada grupo, uma
+   `AnimationLibrary` com as animações que faltarem (mesmos nomes das do Celerino) e o
+   jeito de pilotar, e aponte `skeleton` do personagem para ele. O caminho do Jarbas
+   (atlas de texturas, animações transferidas do Celerino, pegada medida) está em
+   `tools/personagens/README.md`.
 
 Ele aparece no lugar de um dos "?" da grade de seleção.
 
@@ -393,12 +440,15 @@ Ele aparece no lugar de um dos "?" da grade de seleção.
 4. Em **Piloto e volante**, ajuste o banco e o volante. Se o volante for uma peça
    separada (nó ou osso), coloque o nome dela para ele girar; se fizer parte da
    carroceria (como no Kart de Treino), deixe vazio e as mãos ficam paradas nele.
-5. Em **Turbo**, cadastre as saídas de escapamento (ou turbinas) da traseira: para cada
+5. Em **Cockpit**, coloque as medidas do banco, encosto, assoalho e pedais (o Jarbas
+   senta a partir delas): rode `tools/personagens/medir_cockpit.gd` e confira os valores
+   no mapa que ele grava (veja `tools/personagens/README.md`).
+6. Em **Turbo**, cadastre as saídas de escapamento (ou turbinas) da traseira: para cada
    uma, a **posição** do centro da boca e a **direção** em que a chama sai (espaço do kart,
    frente = -Z), o **raio** da boca, o **comprimento** da chama e o **estilo** (Fogo, Jato
    ou Plasma). É delas que sai o fogo do turbo. Sem nenhuma, o turbo usa uma saída genérica
    no meio da traseira.
-6. Acrescente o novo `.tres` na lista `karts` em `scripts/game_state.gd`.
+7. Acrescente o novo `.tres` na lista `karts` em `scripts/game_state.gd`.
 
 Ele aparece automaticamente na tela de seleção e no sorteio dos karts dos adversários.
 
@@ -603,6 +653,8 @@ sem certificado (veja os READMEs de cada pasta).
   CC BY-SA 4.0 — os quatro últimos modificados (adesivos da Ativos). Veja
   `assets/models/karts/CREDITOS.txt`.
 - Celerino: mascote da Ativos (`assets/models/personagens/`).
+- Jarbas: piloto da Ativos (`assets/models/personagens/jarbas.glb`, preparado a partir de
+  `tools/personagens/originais/jarbas-piloto.glb`).
 - Logos da Ativos (ícone "at" e marca "ativos"): `assets/logos/`.
 - Fontes Lilita One e Nunito — SIL Open Font License (`assets/fonts/`).
 - Músicas e efeitos sonoros: originais, gerados por código (`tools/music/`, `scripts/sfx.gd`).

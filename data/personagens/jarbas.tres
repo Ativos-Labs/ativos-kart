@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="CharacterData" format=3]
+
+[ext_resource type="Script" path="res://scripts/character_data.gd" id="1_data"]
+[ext_resource type="PackedScene" path="res://assets/models/personagens/jarbas.glb" id="2_model"]
+[ext_resource type="Resource" path="res://data/personagens/jarbas_esqueleto.tres" id="3_skel"]
+
+[resource]
+script = ExtResource("1_data")
+display_name = "Jarbas"
+tagline = "Piloto de macacão e luva"
+description = "Piloto das antigas, com o logo da Ativos no peito. Pesado e veloz: dispara na reta e não sai da linha quando levam uma fechada, mas pede braço firme nas curvas."
+model_scene = ExtResource("2_model")
+skeleton = ExtResource("3_skel")
+kart_scale = 1.1
+showcase_scale = 1.6
+portrait_scale = 2.2
+portrait_offset = Vector3(0, -0.75, 0)
+seat_height = 0.335
+seat_forward = 0.04
+color = Color(0.2, 0.24, 0.72, 1)
+color_dark = Color(0.04, 0.06, 0.24, 1)
+tint_reference = Color(0.173, 0.197, 0.49, 1)
+speed = 4
+acceleration = 3
+handling = 2
+weight = 4

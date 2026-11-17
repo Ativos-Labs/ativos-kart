@@ -57,6 +57,7 @@ var karts: Array[KartData] = [
 ## res://data/personagens/ e acrescente-o nesta lista.
 var characters: Array[CharacterData] = [
 	preload("res://data/personagens/celerino.tres"),
+	preload("res://data/personagens/jarbas.tres"),
 ]
 ## Quantas vagas "?" (em breve) aparecem na grade de personagens.
 var character_slots := 8

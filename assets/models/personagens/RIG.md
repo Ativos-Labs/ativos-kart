@@ -9,6 +9,9 @@ back from the file, not assumed from Blender.
 > - No import, todos os clipes trazem trilhas para ~54 ossos (não só os que animam). Por isso o
 >   jogo mistura as animações por código, com máscaras de ossos — veja `scripts/character_rig.gd`.
 > - Os arquivos `.blend` e o vídeo citados abaixo não estão neste projeto, só o `celerino.glb`.
+> - O Jarbas (`jarbas.glb`, outro esqueleto) não segue este guia: veja `tools/personagens/README.md`.
+>   Os gestos dele são transferidos destas animações do Celerino; mudou alguma aqui, rode de novo
+>   `tools/personagens/gerar_animacoes.gd`.
 
 ## Files
 
