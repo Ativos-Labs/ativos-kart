@@ -124,6 +124,9 @@ func setup(p_positions: PackedVector3Array, directions: PackedVector3Array, with
 	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	# O balanço do shader passa um pouco da caixa das moedas.
 	mmi.extra_cull_margin = 0.5
+	# As moedas que voltam crescem no _process: sem interpolação da física (senão o
+	# Godot avisa e mantém um buffer de interpolação da MultiMesh inteira à toa).
+	mmi.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	add_child(mmi)
 	var live := with_collision and not Engine.is_editor_hint()
 	set_physics_process(live)

@@ -95,6 +95,11 @@ const HIT_COOLDOWN := 1.6
 ## --- Atrito nas curvas ---
 ## Desaceleração (m/s²) quando a curva segura o kart abaixo da velocidade dele.
 const CORNER_SCRUB := 4.5
+## --- Som do motor ---
+## Amostras da forma de onda do motor sintetizado (uma volta inteira da fase, 0 a 4π).
+const ENGINE_TABLE_SIZE := 4096
+## Alcance (m) do som 3D do motor dos adversários: mais longe que isso ele não se ouve.
+const ENGINE_3D_RANGE := 60.0
 ## --- Marcas de pneu ---
 const MARK_WIDTH := 0.27
 const ROAD_MARK := Color(0.04, 0.04, 0.05, 0.62)
@@ -249,6 +254,16 @@ var _scene_floor_shape: CapsuleShape3D
 var _scene_body_bottom := 0.0
 var _scene_spark_points := PackedVector3Array()
 var _dust_ratio := -1.0
+## Rodas e volante longe da câmera: refeitos a cada N passos (acumulando o tempo).
+var _motion_every := 1
+var _motion_skipped := 0
+var _motion_delta := 0.0
+var _engine_buffer := PackedVector2Array()
+## Forma de onda do motor sintetizado (veja _engine_wave).
+static var _engine_table := PackedFloat32Array()
+## Câmeras de corrida deste quadro (lidas uma vez por quadro, não uma vez por kart).
+static var _cams: Array[Node] = []
+static var _cams_frame := -1
 
 @onready var visual: Node3D = $Visual
 @onready var model_slot: Node3D = $Visual/ModelSlot
@@ -600,10 +615,32 @@ func _physics_process(delta: float) -> void:
 
 func _process(_delta: float) -> void:
 	if _engine_3d:
-		_engine_3d.pitch_scale = _engine_frequency() / Sfx.ENGINE_BASE_FREQ
 		_update_driver_detail()
+		if _engine_3d.playing:
+			# Só muda o tom quando a diferença é perceptível: na web cada troca vai para o
+			# áudio do navegador.
+			var pitch := _engine_frequency() / Sfx.ENGINE_BASE_FREQ
+			if absf(pitch - _engine_3d.pitch_scale) > _engine_3d.pitch_scale * 0.004:
+				_engine_3d.pitch_scale = pitch
 	else:
 		_fill_engine_audio()
+
+
+## Liga ou desliga o som 3D do motor (adversários e tela dividida). Cada som 3D tocando
+## recalcula volume e direção a cada passo de física, mesmo longe demais para ser ouvido;
+## a corrida deixa tocar só os mais perto da câmera (Race._update_engine_voices).
+func set_engine_audible(on: bool) -> void:
+	if _engine_3d == null or _engine_3d.playing == on:
+		return
+	if on:
+		_engine_3d.pitch_scale = _engine_frequency() / Sfx.ENGINE_BASE_FREQ
+		_engine_3d.play()
+	else:
+		_engine_3d.stop()
+
+
+func is_engine_audible() -> bool:
+	return _engine_3d != null and _engine_3d.playing
 
 
 func _exit_tree() -> void:
@@ -1107,9 +1144,15 @@ func _update_visuals(delta: float, steer: float) -> void:
 			xf = xf * _trick_transform(k)
 	visual.transform = xf
 
-	# Rodas, guidão/volante e piloto.
+	# Rodas, guidão/volante e piloto. Longe da câmera (veja _update_driver_detail) é
+	# refeito a cada poucos passos, com o tempo acumulado: de longe ninguém vê a roda.
 	if kart_visual:
-		kart_visual.update_motion(delta, speed, steer, drift_dir)
+		_motion_delta += delta
+		_motion_skipped += 1
+		if _motion_skipped >= _motion_every:
+			kart_visual.update_motion(_motion_delta, speed, steer, drift_dir)
+			_motion_skipped = 0
+			_motion_delta = 0.0
 
 	if boost_fx:
 		boost_fx.update(delta, boost_time > 0.0)
@@ -1185,12 +1228,34 @@ func _fill_engine_audio() -> void:
 	var freq := _engine_frequency()
 	var volume := 0.16 + maxf(throttle_input, _engine_rev) * 0.08
 	var step := TAU * freq / 22050.0
+	# A forma de onda vem de uma tabela pronta (4 senos por amostra em GDScript eram
+	# ~0,2 µs cada, ~370 amostras por quadro) e vai para o gerador num bloco só.
+	var table := _engine_wave()
+	var period := TAU * 2.0
+	var to_index := ENGINE_TABLE_SIZE / period
+	var phase := _engine_phase
+	_engine_buffer.resize(frames)
 	for i in frames:
-		_engine_phase = fmod(_engine_phase + step, TAU * 2.0)
-		var p := _engine_phase
-		var s := sin(p) * 0.55 + sin(p * 2.0) * 0.3 + sin(p * 3.0 + 0.4) * 0.12 + sin(p * 0.5) * 0.3
-		s = clampf(s * 1.3, -1.0, 1.0) * volume
-		_engine.push_frame(Vector2(s, s))
+		phase += step
+		if phase >= period:
+			phase -= period
+		var s := table[int(phase * to_index)] * volume
+		_engine_buffer[i] = Vector2(s, s)
+	_engine_phase = phase
+	_engine.push_buffer(_engine_buffer)
+
+
+## Uma volta da forma de onda do motor (fase de 0 a 4π, por causa do sen(p/2)), já com
+## a saturação. Tem uma amostra a mais no fim (igual à primeira) para o índice nunca
+## passar do tamanho.
+static func _engine_wave() -> PackedFloat32Array:
+	if _engine_table.is_empty():
+		_engine_table.resize(ENGINE_TABLE_SIZE + 1)
+		for i in ENGINE_TABLE_SIZE + 1:
+			var p := TAU * 2.0 * float(i % ENGINE_TABLE_SIZE) / ENGINE_TABLE_SIZE
+			var s := sin(p) * 0.55 + sin(p * 2.0) * 0.3 + sin(p * 3.0 + 0.4) * 0.12 + sin(p * 0.5) * 0.3
+			_engine_table[i] = clampf(s * 1.3, -1.0, 1.0)
+	return _engine_table
 
 
 ## Frequência do ronco do motor (Hz) pela velocidade (e pelo acelerador na largada).
@@ -1204,22 +1269,26 @@ func _engine_frequency() -> float:
 ## personagem é a parte mais cara de cada kart: cada pose nova também deforma a malha
 ## na GPU). Na tela dividida vale a câmera mais perto (grupo "race_camera").
 func _update_driver_detail() -> void:
-	var rig := driver
-	if rig == null:
-		return
-	var cams := get_tree().get_nodes_in_group(&"race_camera")
+	var frame := Engine.get_process_frames()
+	if frame != _cams_frame:
+		_cams_frame = frame
+		_cams = get_tree().get_nodes_in_group(&"race_camera")
+	var cams := _cams
 	if cams.is_empty():
 		var main_cam := get_viewport().get_camera_3d()
 		if main_cam == null:
 			return
 		cams = [main_cam]
 	var every := 6
+	var pos := global_position
 	for node in cams:
+		if not is_instance_valid(node):
+			continue
 		var cam := node as Camera3D
 		if cam == null or not cam.is_inside_tree():
 			continue
-		var d2 := cam.global_position.distance_squared_to(global_position) * lod_scale * lod_scale
-		if cam.is_position_behind(global_position):
+		var d2 := cam.global_position.distance_squared_to(pos) * lod_scale * lod_scale
+		if cam.is_position_behind(pos):
 			every = mini(every, 6)
 		elif d2 < 15.0 * 15.0:
 			every = 1
@@ -1229,4 +1298,8 @@ func _update_driver_detail() -> void:
 			every = mini(every, 3)
 		else:
 			every = mini(every, 5)
-	rig.update_every = every
+	# Rodas e volante: até 35 m em todo passo; mais longe, junto com a pose do piloto.
+	_motion_every = 1 if every <= 2 else every
+	var rig := driver
+	if rig:
+		rig.update_every = every

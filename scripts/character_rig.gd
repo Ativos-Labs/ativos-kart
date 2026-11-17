@@ -52,6 +52,13 @@ class Layer:
 	var additive := false
 	## Camadas controladas diretamente (peso definido a cada quadro).
 	var manual := false
+	## Pose parada (todas as trilhas usadas são constantes, ex.: punho fechado, rosto):
+	## os valores são lidos uma vez só (s_*) em vez de interpolados a cada quadro. Nas
+	## camadas aditivas s_rot e s_pos já guardam a diferença para a pose de repouso.
+	var static_pose := false
+	var s_pos := PackedVector3Array()
+	var s_rot: Array[Quaternion] = []
+	var s_scl := PackedVector3Array()
 
 
 var data: CharacterData
@@ -130,9 +137,13 @@ var _glance := Vector2.ZERO
 var _time := 0.0
 var _skipped := 0
 var _skipped_delta := 0.0
+## Coxa e canela de cada lado (L, L, R, R) para _pose_legs (-1 = osso não existe).
+var _leg_bones := PackedInt32Array([-1, -1, -1, -1])
 
 ## Trilhas de cada animação por osso (id da animação -> {osso: Vector3i(pos, rot, escala)}).
 static var _track_cache := {}
+## Trilhas constantes de cada animação (id da animação -> PackedByteArray, 1 = constante).
+static var _constant_cache := {}
 
 
 func _ready() -> void:
@@ -197,6 +208,9 @@ func _setup_skeleton() -> void:
 	_pos = _rest_pos.duplicate()
 	_rot = _rest_rot.duplicate()
 	_scl = _rest_scl.duplicate()
+	var legs := [&"thigh.L", &"shin.L", &"thigh.R", &"shin.R"]
+	for i in legs.size():
+		_leg_bones[i] = _bone.get(legs[i], -1)
 
 	var fingers_l: Array = []
 	var fingers_r: Array = []
@@ -335,6 +349,69 @@ static func _track_map(anim: Animation) -> Dictionary:
 	return map
 
 
+## Quais trilhas da animação têm o mesmo valor em todas as chaves (1 = constante).
+static func _constant_tracks(anim: Animation) -> PackedByteArray:
+	var key := anim.get_instance_id()
+	if _constant_cache.has(key):
+		return _constant_cache[key]
+	var out := PackedByteArray()
+	out.resize(anim.get_track_count())
+	for t in anim.get_track_count():
+		var type := anim.track_get_type(t)
+		var count := anim.track_get_key_count(t)
+		var same := true
+		if count > 1:
+			match type:
+				Animation.TYPE_POSITION_3D:
+					var first := anim.position_track_interpolate(t, anim.track_get_key_time(t, 0))
+					for k in range(1, count):
+						if not anim.position_track_interpolate(t, anim.track_get_key_time(t, k)).is_equal_approx(first):
+							same = false
+							break
+				Animation.TYPE_ROTATION_3D:
+					var first := anim.rotation_track_interpolate(t, anim.track_get_key_time(t, 0))
+					for k in range(1, count):
+						if not anim.rotation_track_interpolate(t, anim.track_get_key_time(t, k)).is_equal_approx(first):
+							same = false
+							break
+				Animation.TYPE_SCALE_3D:
+					var first := anim.scale_track_interpolate(t, anim.track_get_key_time(t, 0))
+					for k in range(1, count):
+						if not anim.scale_track_interpolate(t, anim.track_get_key_time(t, k)).is_equal_approx(first):
+							same = false
+							break
+				_:
+					same = false
+		out[t] = 1 if same else 0
+	_constant_cache[key] = out
+	return out
+
+
+## Se todas as trilhas usadas pela camada são constantes, guarda a pose de uma vez.
+func _bake_static(layer: Layer) -> void:
+	var constant := _constant_tracks(layer.anim)
+	for tr in layer.tracks:
+		for t in [tr.x, tr.y, tr.z]:
+			if t >= 0 and constant[t] == 0:
+				return
+	var count := layer.bones.size()
+	layer.s_pos.resize(count)
+	layer.s_rot.resize(count)
+	layer.s_scl.resize(count)
+	for k in count:
+		var tr := layer.tracks[k]
+		var b := layer.bones[k]
+		var p := layer.anim.position_track_interpolate(tr.x, 0.0) if tr.x >= 0 else Vector3.ZERO
+		var q := layer.anim.rotation_track_interpolate(tr.y, 0.0) if tr.y >= 0 else Quaternion.IDENTITY
+		if layer.additive:
+			p -= _rest_pos[b]
+			q = _rest_rot[b].inverse() * q
+		layer.s_pos[k] = p
+		layer.s_rot[k] = q
+		layer.s_scl[k] = layer.anim.scale_track_interpolate(tr.z, 0.0) if tr.z >= 0 else Vector3.ONE
+	layer.static_pose = true
+
+
 func _add_layer(anim_name: StringName, mask: StringName, group: StringName, additive := false) -> Layer:
 	var anim: Animation = _anims.get(anim_name)
 	if anim == null:
@@ -352,6 +429,7 @@ func _add_layer(anim_name: StringName, mask: StringName, group: StringName, addi
 		if map.has(key):
 			layer.bones.append(b)
 			layer.tracks.append(map[key])
+	_bake_static(layer)
 	# Insere depois da última camada de mesma ordem (ou menor).
 	var order: int = ORDER.get(group, 99)
 	var at := _layers.size()
@@ -395,21 +473,26 @@ func _update_layers(delta: float) -> void:
 		if not l.manual:
 			l.weight = move_toward(l.weight, l.target, l.fade_speed * delta)
 	# Remove camadas que sumiram ou que ficaram escondidas embaixo de outra completa.
-	var covered := {}
+	# `covered` = um bit por grupo (ORDER).
+	var covered := 0
 	for i in range(_layers.size() - 1, -1, -1):
 		var l := _layers[i]
 		if l.manual:
 			continue
-		if (l.target <= 0.0 and l.weight <= 0.0) or covered.has(l.group):
+		var bit := 1 << int(ORDER.get(l.group, 30))
+		if (l.target <= 0.0 and l.weight <= 0.0) or (covered & bit) != 0:
 			_layers.remove_at(i)
 			continue
 		if l.weight >= 1.0 and l.target >= 1.0 and l.group != &"hands":
-			covered[l.group] = true
+			covered |= bit
 
 
 func _apply_layer(l: Layer) -> void:
 	var w := l.weight
 	if w <= 0.001:
+		return
+	if l.static_pose:
+		_apply_static_layer(l, w)
 		return
 	var t := l.time
 	for k in l.bones.size():
@@ -430,6 +513,28 @@ func _apply_layer(l: Layer) -> void:
 				_pos[b] = _pos[b].lerp(p, w)
 		if tr.z >= 0 and not l.additive:
 			_scl[b] = _scl[b].lerp(l.anim.scale_track_interpolate(tr.z, t), w)
+
+
+## Mesmo que _apply_layer, com a pose parada já lida (Layer.static_pose).
+func _apply_static_layer(l: Layer, w: float) -> void:
+	var full := w >= 1.0
+	for k in l.bones.size():
+		var b := l.bones[k]
+		var tr := l.tracks[k]
+		if tr.y >= 0:
+			var q := l.s_rot[k]
+			if l.additive:
+				_rot[b] = _rot[b] * Quaternion.IDENTITY.slerp(q, w)
+			else:
+				_rot[b] = q if full else _rot[b].slerp(q, w)
+		if tr.x >= 0:
+			var p := l.s_pos[k]
+			if l.additive:
+				_pos[b] += p * w
+			else:
+				_pos[b] = p if full else _pos[b].lerp(p, w)
+		if tr.z >= 0 and not l.additive:
+			_scl[b] = l.s_scl[k] if full else _scl[b].lerp(l.s_scl[k], w)
 
 
 # --- API: expressões e gestos -----------------------------------------------------------
@@ -659,12 +764,12 @@ func _aim(i: int, dir: Vector3, weight := 1.0) -> void:
 
 
 func _pose_legs() -> void:
-	for side in [["thigh.L", "shin.L", 1.0], ["thigh.R", "shin.R", -1.0]]:
-		var thigh: int = _bone.get(StringName(side[0]), -1)
-		var shin: int = _bone.get(StringName(side[1]), -1)
+	for side in 2:
+		var thigh := _leg_bones[side * 2]
+		var shin := _leg_bones[side * 2 + 1]
 		if thigh < 0 or shin < 0:
 			continue
-		var s: float = side[2]
+		var s := 1.0 if side == 0 else -1.0
 		_aim(thigh, Vector3(thigh_direction.x * s, thigh_direction.y, thigh_direction.z))
 		_aim(shin, Vector3(shin_direction.x * s, shin_direction.y, shin_direction.z))
 

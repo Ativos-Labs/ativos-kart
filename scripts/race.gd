@@ -41,6 +41,15 @@ const REFERENCE_SPEED := 27.1
 const AI_RESCUE_TIME := 4.0
 ## Multijogador: depois que o primeiro jogador chega, os outros têm esse tempo (s).
 const FINISH_TIMEOUT := 30.0
+## Motores dos adversários tocando ao mesmo tempo: os mais perto de alguma câmera,
+## dentro do alcance do som (Kart.ENGINE_3D_RANGE). Cada som 3D tocando custa um
+## cálculo de volume e direção por passo de física (era ~1/3 do passo na web com 7).
+const ENGINE_VOICES := 3
+## De quanto em quanto tempo (s) a escolha é refeita.
+const ENGINE_VOICE_INTERVAL := 0.25
+## Quem já está tocando conta como esse tanto (m) mais perto: dois karts lado a lado
+## não ficam trocando de lugar (liga/desliga) a cada escolha.
+const ENGINE_VOICE_KEEP := 4.0
 ## Camada de desenho (1..20) da etiqueta "J1" em cima do kart do J1; a do J2 é a
 ## seguinte, e assim por diante. A câmera de cada jogador não vê a etiqueta dele.
 const TAG_LAYER := 11
@@ -125,6 +134,7 @@ var _count_step := 0
 ## Multijogador: tempo até acabar a corrida para quem não chegou (-1 = sem prazo).
 var _finish_timer := -1.0
 var _record_class := ""
+var _engine_voice_timer := 0.0
 
 
 func _ready() -> void:
@@ -546,6 +556,7 @@ func _chase_view(r: Racer) -> Transform3D:
 func _physics_process(delta: float) -> void:
 	if _warming:
 		return
+	_update_engine_voices(delta)
 	if track.obstacles:
 		track.obstacles.clock = _clock + race_time
 	match state:
@@ -572,6 +583,38 @@ func _physics_process(delta: float) -> void:
 		for r in humans:
 			if not r.finished:
 				_update_wrong_way(r, delta)
+
+
+## Escolhe quais motores 3D tocam: os dos jogadores sempre (tela dividida) e os
+## ENGINE_VOICES adversários mais perto de uma câmera de jogador, se estiverem ao
+## alcance do som. Os outros ficam parados (longe, ninguém os ouviria mesmo).
+func _update_engine_voices(delta: float) -> void:
+	_engine_voice_timer -= delta
+	if _engine_voice_timer > 0.0:
+		return
+	_engine_voice_timer = ENGINE_VOICE_INTERVAL
+	var cams := PackedVector3Array()
+	for r in humans:
+		if r.camera and r.camera.is_inside_tree():
+			cams.append(r.camera.global_position)
+	var rivals: Array[Kart] = []
+	var keys := {}
+	for k in _karts:
+		if not is_instance_valid(k):
+			continue
+		if k.is_player:
+			k.set_engine_audible(true)
+			continue
+		var d2 := INF
+		for c in cams:
+			d2 = minf(d2, c.distance_squared_to(k.global_position))
+		var d := sqrt(d2)
+		keys[k] = d - (ENGINE_VOICE_KEEP if k.is_engine_audible() else 0.0)
+		rivals.append(k)
+	rivals.sort_custom(func(a: Kart, b: Kart) -> bool: return keys[a] < keys[b])
+	for i in rivals.size():
+		var k := rivals[i]
+		k.set_engine_audible(i < ENGINE_VOICES and keys[k] < Kart.ENGINE_3D_RANGE)
 
 
 func _unhandled_input(event: InputEvent) -> void:
