@@ -135,6 +135,14 @@ Menu principal e pausa → **Opções** (salvas em `user://opcoes.cfg`):
 
 - **Som:** volume geral, música e efeitos.
 - **Tela:** tela cheia e resolução da janela (na web, só tela cheia).
+- **Gráficos:** qualidade **Baixa / Média / Alta** para o jogo rodar liso num PC fraco,
+  e cada parte separada: sombras (desligadas, simples, completas), luz e efeitos (SSAO
+  e brilho), antisserrilhado (FXAA só no desktop, MSAA 2x/4x), resolução do 3D (fixa
+  de 50% a 100% ou automática) e cenário (reduzido: sem grama e flores, menos neve,
+  modelos simplificam mais cedo). Mostrar FPS liga um contador no topo da tela. Na
+  primeira vez o nível vem da placa de vídeo (integrada → Média, renderização por
+  software → Baixa). No desktop a troca vale na hora; na web, a partir da próxima tela
+  (ligar/desligar sombras lá recompila todos os shaders e travaria o jogo).
 - **Teclas:** duas teclas para cada ação do kart. Escolha a vaga, aperte a tecla nova
   (Esc cancela); se outra ação usava essa tecla, as duas trocam. "Restaurar padrão" volta
   às teclas originais. A tela de controles e a dica da largada mostram as teclas atuais.
@@ -150,7 +158,8 @@ trocar pista, trocar piloto, trocar kart ou voltar ao menu). No Grand Prix o res
 mostra a classificação geral com os pontos e o botão "Próxima corrida" (na última, "Nova
 copa").
 
-Na tela de pistas a pista escolhida aparece ao fundo num sobrevoo de câmera. À esquerda ficam
+Na tela de pistas a vista aérea da pista escolhida aparece ao fundo (uma imagem pronta, sem
+gerar a pista em 3D: a tela fica leve e troca de pista sem travar). À esquerda ficam
 as copas (a **Copa Ativos** usa o logo "at") e os cartões das pistas; à direita, o mapa do
 traçado, extensão, voltas, curvas, dificuldade e recordes. Vagas sem pista aparecem como "?".
 
@@ -174,7 +183,7 @@ scenes/
   mode_select.tscn       Modo de jogo, jogadores, cilindrada, dificuldade + "Quem vai jogar?"
   character_select.tscn  Seleção de piloto (grade de retratos + personagem 3D)
   kart_select.tscn       Seleção de kart (kart com o piloto girando + atributos)
-  track_select.tscn      Seleção de pista (sobrevoo da pista, copas, cartões, mapa e recordes)
+  track_select.tscn      Seleção de pista (vista aérea ao fundo, copas, cartões, mapa e recordes)
   race.tscn              Corrida (carrega a pista escolhida + kart + câmera + HUD + pausa)
   kart.tscn              O kart (física, faíscas, turbo, som do motor)
   tracks/circuito_ativos.tscn   Circuito Ativos (campo)
@@ -187,6 +196,8 @@ scripts/
                         pista ou copa, troca de telas, recordes
   game_settings.gd      Opções (filho do GameState): volumes, tela cheia, resolução e
                         teclas do kart, salvas em user://opcoes.cfg
+  graphics_quality.gd   Qualidade gráfica (filho do GameSettings): níveis e partes,
+                        aplicados em cada luz/ambiente/grama quando a tela entra
   music_player.gd       Música de fundo (filho do GameState): troca com fade, volta final
                         mais rápida, música baixa na pausa
   sfx.gd                Efeitos sonoros gerados por código (canal "Efeitos")
@@ -229,13 +240,12 @@ scripts/
                         distância, voltam depois de 12 s)
   track_obstacles.gd    Obstáculos que se mexem (pneus, ondas, feno, bolas de neve): cada
                         um é uma função do relógio da corrida, sem física
-  track_builder.gd      Gera o visual das pistas numa thread para a tela de pistas trocar
-                        de pista sem travar (fica no GameState; o jogo fecha por
-                        GameState.quit(), que espera a geração em andamento)
   mesh_merge.gd         Junta malhas primitivas numa só sem ler a malha de volta da GPU
                         (use no lugar de SurfaceTool.append_from); gera LODs se pedir
-  render_scale.gd       Web: resolução do 3D (teto de pixels em telas Retina e ajuste
-                        automático quando o jogo não segura 60 fps)
+  render_scale.gd       Resolução do 3D: teto de pixels na web (telas Retina) e ajuste
+                        automático quando o jogo não segura ~55 fps (web e desktop, com
+                        FSR no desktop): no máximo uma queda por tela, escala guardada
+                        por pista e aplicada atrás do fade
   snowfall.gd           Neve caindo em volta da câmera
   drifting_prop.gd      Movimento do dirigível e dos balões
   track_select.gd       Tela de seleção de pista
@@ -265,6 +275,8 @@ data/karts/bugre.tres                Bugre (bugre.glb, buggy)
 data/personagens/celerino.tres       Dados do Celerino
 data/rivais/*.tres                   Adversários do computador (Celerino recolorido)
 data/pistas/*.tres                   Dados das pistas (nome, copa, descrição, dificuldade)
+assets/pistas/                       Imagens da tela de pistas: vista aérea (fundo) e foto
+                                     da largada (cartão), geradas por tools/track_shots/
 assets/models/personagens/celerino.glb   Modelo do Celerino (veja RIG.md ao lado)
 assets/models/moeda/moeda.glb        Moeda Ativos (gerada por tools/moeda/build_moeda.py)
 tools/karts/                         Gera bolido/cometa/motoca/bugre.glb a partir dos
@@ -278,8 +290,12 @@ default_bus_layout.tres              Canais de áudio: Master, Musica e Efeitos
 tools/music/build_music.mjs          Compõe e sintetiza as músicas (Node + ffmpeg)
 tools/perf/                          Medição de desempenho da versão web (probe +
                                      Chrome headless, veja tools/perf/README.md)
+tools/track_shots/                   Gera as imagens de assets/pistas/ (gerar.sh, veja o
+                                     README.md de lá)
 web/                                 Export para o navegador (veja web/README.md)
 linux/                               Export do executável Linux (veja linux/README.md)
+windows/                             Export do executável Windows (veja windows/README.md)
+macos/                               Export do aplicativo macOS (veja macos/README.md)
 ```
 
 ## O piloto (Celerino)
@@ -429,6 +445,10 @@ O céu, a luz do sol e a névoa ficam nos nós **WorldEnvironment** e **Sol** da
 As placas das muretas, o pórtico de largada, os outdoors, as bandeiras, o dirigível, os
 balões e o logo pintado no asfalto usam as imagens de `assets/logos/`.
 
+Depois de mudar o traçado ou o cenário, gere de novo as imagens da tela de pistas
+(`tools/track_shots/gerar.sh`, veja `tools/track_shots/README.md`): elas são fotos prontas
+e não mudam sozinhas.
+
 ### Pontes
 
 No nó raiz, em **Pontes**, acrescente itens (`TrackBridge`) com:
@@ -508,6 +528,10 @@ não cavam perto da pista. No nó raiz, em **Rios**: largura, profundidade, marg
 2. Duplique `data/pistas/circuito_ativos.tres` e troque a cena, o `id` (igual ao
    `track_id`), o nome, a copa, a descrição, a dificuldade e as voltas.
 3. Acrescente o novo `.tres` na lista `tracks` em `scripts/game_state.gd`.
+4. Gere as imagens da tela de pistas (vista aérea e foto da largada) com
+   `tools/track_shots/gerar.sh` e aponte `background`/`thumbnail` do `.tres` para elas
+   (passo a passo em `tools/track_shots/README.md`). Sem imagem, o cartão mostra o logo
+   "at" e o fundo fica liso.
 
 Ela aparece no lugar de um dos "?" da tela de pistas. Pistas com outro nome de copa
 ganham um emblema próprio na fileira de copas.
@@ -525,6 +549,19 @@ passo, o que muda na web e as medições de desempenho estão em `web/README.md`
 `.pck` embutido) e um `.tar.gz` com ele para mandar para outra máquina. No Linux:
 `tar xzf AtivosKart-linux-x86_64.tar.gz && ./AtivosKart.x86_64`. Detalhes em
 `linux/README.md`.
+
+## Versão Windows (executável)
+
+`windows/export.sh` gera `windows/dist/AtivosKart.exe` (o jogo inteiro num arquivo, com o
+`.pck` embutido) e um `.zip` com ele para mandar para outra máquina. No Windows, descompacte
+e dê dois cliques em `AtivosKart.exe` (sem assinatura: o SmartScreen pede para confirmar na
+primeira vez). Detalhes em `windows/README.md`.
+
+## Versão macOS (aplicativo)
+
+`macos/export.sh` gera `macos/dist/AtivosKart-macos-universal.zip` com o `Ativos Kart.app`
+(binário universal: Apple Silicon e Intel). Em outro Mac o app, com assinatura ad-hoc,
+precisa ser liberado na primeira vez (botão direito → Abrir). Detalhes em `macos/README.md`.
 
 ## Créditos
 
