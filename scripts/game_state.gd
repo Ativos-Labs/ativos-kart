@@ -105,11 +105,6 @@ var tracks: Array[TrackData] = [
 ## sobram ficam como "?", em breve).
 var track_slots := 4
 var cup_slots := 4
-## Fotos das pistas para os cartões da tela de pistas (id → textura), tiradas
-## na primeira vez que cada pista aparece.
-var track_thumbnails := {}
-## Gera as pistas da tela de pistas em segundo plano (sem travar ao trocar de pista).
-var track_builder: TrackBuilder
 ## Resolução do 3D na web (teto de pixels + ajuste automático). null fora da web.
 var render_scale: RenderScale
 ## Analógico e direcional do controle nos menus; sabe se o jogador está no controle.
@@ -146,9 +141,6 @@ var _changing_scene := false
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_records.load(RECORDS_PATH)
-	track_builder = TrackBuilder.new()
-	track_builder.name = "TrackBuilder"
-	add_child(track_builder)
 	menu_input = MenuInput.new()
 	menu_input.name = "MenuInput"
 	add_child(menu_input)
@@ -158,7 +150,7 @@ func _ready() -> void:
 	music = MusicPlayer.new()
 	music.name = "Musica"
 	add_child(music)
-	# Fechar a janela passa por `quit()` (espera a geração de pista em andamento).
+	# Fechar a janela passa por `quit()` (solta a música antes de sair).
 	get_tree().auto_accept_quit = false
 	# Resolução do 3D automática (web e desktop): evita picos de GPU em telas grandes.
 	render_scale = RenderScale.new()
@@ -209,7 +201,7 @@ func quit() -> void:
 	# (senão a faixa que tocava aparece como vazamento na saída).
 	music.release()
 	await get_tree().create_timer(0.1, true, false, true).timeout
-	track_builder.quit()
+	get_tree().quit()
 
 
 func get_selected_kart() -> KartData:

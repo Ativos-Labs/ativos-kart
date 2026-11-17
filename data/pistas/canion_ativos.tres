@@ -14,3 +14,5 @@ difficulty = 3
 laps = 3
 color = Color(0.86, 0.42, 0.14, 1)
 color_dark = Color(0.3, 0.12, 0.05, 1)
+background = "res://assets/pistas/canion_ativos_fundo.jpg"
+thumbnail = "res://assets/pistas/canion_ativos_cartao.jpg"

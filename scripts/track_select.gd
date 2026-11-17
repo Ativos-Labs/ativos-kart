@@ -1,10 +1,14 @@
-extends Node3D
-## Tela de seleção de pista: a pista escolhida aparece ao fundo num sobrevoo de
-## câmera, com as copas (a Copa Ativos traz o logo "at"), os cartões das pistas,
+extends Node
+## Tela de seleção de pista: ao fundo, a vista aérea da pista escolhida (uma imagem
+## pronta), com as copas (a Copa Ativos traz o logo "at"), os cartões das pistas,
 ## o mapa do traçado, os recordes e o botão para correr. Vagas sem pista ainda
 ## aparecem como "?" (em breve).
 ## No Grand Prix a escolha é da copa: dá para olhar cada pista, e "Começar copa"
 ## corre todas em sequência, a partir da primeira.
+##
+## Nada aqui é 3D: o fundo e as fotos dos cartões são imagens geradas antes por
+## tools/track_shots/gerar.sh, e o mapa e os números só precisam do traçado (~1 ms
+## por pista). Gerar a pista de verdade travava a tela a cada troca.
 
 const COLUMNS := 2
 const CAPTIONS := {
@@ -16,7 +20,12 @@ const CAPTIONS := {
 	"lap": "MELHOR VOLTA",
 }
 
-@onready var camera: Camera3D = $Camera
+## Duração da troca de uma imagem de fundo para a outra.
+const FADE := 0.25
+
+@onready var background: TextureRect = %Background
+## Imagem nova aparecendo por cima da atual.
+@onready var background_next: TextureRect = %BackgroundNext
 @onready var cups_row: HBoxContainer = %Cups
 @onready var cup_ribbon: RibbonLabel = %CupRibbon
 @onready var grid: GridContainer = %Grid
@@ -34,30 +43,20 @@ var index := 0
 var _slots: Array[TrackData] = []
 var _cards: Array[TrackCard] = []
 var _cups: Array[CupBadge] = []
-## Pista que aparece ao fundo agora e a escolhida (que pode ainda estar sendo
-## gerada; até lá a anterior continua no fundo).
-var _track: Track
-var _track_data: TrackData
-var _wanted: TrackData
-var _builder: TrackBuilder
-## Foto do cartão sendo tirada (a câmera extra vê a pista que estiver ao fundo).
-var _photo_vp: SubViewport
-var _photo_data: TrackData
-var _thumbs := {}
+## TrackData → Track fora da árvore, só com o traçado (`prepare_layout`).
+var _layouts := {}
+## Caminho → imagem de fundo já carregada; e os caminhos pedidos à thread de carga.
+var _backgrounds := {}
+var _loading := {}
+var _bg_tween: Tween
 var _stat_values := {}
 var _stars: StarRating
 var _nav_cooldown := 0.0
 var _confirming := false
 var _toast_tween: Tween
-var _fly := 0.0
-var _time := 0.0
-var _look := Vector3.ZERO
-var _snap_camera := true
 
 
 func _ready() -> void:
-	_builder = GameState.track_builder
-	_builder.track_built.connect(_on_track_built)
 	_build_slots()
 	_build_cups()
 	_build_cards()
@@ -70,6 +69,12 @@ func _ready() -> void:
 		race_button.text = "Começar copa"
 	index = clampi(GameState.selected_track_index, 0, _slots.size() - 1)
 	_select(index, true)
+	# A imagem da pista escolhida já carregou (atrás do fade); as outras vêm numa
+	# thread, para trocar de pista sem travar.
+	for data in _slots:
+		if data.is_unlocked() and data.background != "" and not _backgrounds.has(data.background):
+			if ResourceLoader.load_threaded_request(data.background) == OK:
+				_loading[data.background] = true
 	race_button.grab_focus()
 	_animate_intro()
 
@@ -79,8 +84,14 @@ func _is_cup_mode() -> bool:
 
 
 func _exit_tree() -> void:
-	# As pistas guardadas fora da árvore não são liberadas junto com a tela.
-	_builder.clear()
+	# Os traçados ficam fora da árvore: não são liberados junto com a tela.
+	for track: Track in _layouts.values():
+		track.free()
+	_layouts.clear()
+	# Carga pedida e não recolhida fica presa no ResourceLoader.
+	for path: String in _loading:
+		ResourceLoader.load_threaded_get(path)
+	_loading.clear()
 
 
 # --- Montagem ---------------------------------------------------------------------
@@ -116,11 +127,9 @@ func _build_cards() -> void:
 	for i in _slots.size():
 		var card := TrackCard.new()
 		card.setup(_slots[i])
-		# Fotos tiradas numa visita anterior a esta tela.
-		var cached: Texture2D = GameState.track_thumbnails.get(_slots[i].id)
-		if _slots[i].is_unlocked() and cached:
-			_thumbs[_slots[i]] = cached
-			card.thumbnail = cached
+		# Foto pronta da largada (448×300, carrega em poucos ms).
+		if _slots[i].is_unlocked() and _slots[i].thumbnail != "":
+			card.thumbnail = load(_slots[i].thumbnail)
 		card.pressed.connect(_on_card_pressed.bind(i))
 		grid.add_child(card)
 		_cards.append(card)
@@ -150,118 +159,60 @@ func _build_stats() -> void:
 		stats_grid.add_child(cell)
 
 
-# --- Sobrevoo da pista ao fundo -------------------------------------------------------
+# --- Fundo e traçado ---------------------------------------------------------------
 
 func _process(delta: float) -> void:
 	_nav_cooldown -= delta
-	_time += delta
-	if not is_instance_valid(_track) or _track.length <= 0.0:
+	# Recolhe as imagens de fundo que a thread terminou de carregar.
+	for path: String in _loading.keys():
+		if ResourceLoader.load_threaded_get_status(path) != ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+			_backgrounds[path] = ResourceLoader.load_threaded_get(path)
+			_loading.erase(path)
+
+
+## Vista aérea da pista (null se ela não tiver imagem). Se a thread ainda não
+## terminou de carregar, espera por ela.
+func _background(data: TrackData) -> Texture2D:
+	var path := data.background
+	if path == "":
+		return null
+	if not _backgrounds.has(path):
+		if _loading.has(path):
+			_loading.erase(path)
+			_backgrounds[path] = ResourceLoader.load_threaded_get(path)
+		else:
+			_backgrounds[path] = load(path)
+	return _backgrounds[path]
+
+
+## Troca o fundo: a imagem nova aparece por cima da atual (na primeira, na hora).
+func _show_background(texture: Texture2D, instant: bool) -> void:
+	if _bg_tween and _bg_tween.is_valid():
+		# Trocou de novo no meio da transição: a anterior termina na hora.
+		_bg_tween.kill()
+		background.texture = background_next.texture
+	background_next.modulate.a = 0.0
+	if instant or texture == background.texture:
+		background.texture = texture
 		return
-	_fly += delta * 22.0
-	var t := _track.global_transform
-	var p := t * _track.get_point_at(_fly)
-	var ahead := t * _track.get_point_at(_fly + 55.0)
-	var dir := (ahead - p).normalized()
-	var right := dir.cross(Vector3.UP).normalized()
-	var wanted := p + right * 24.0 - dir * 12.0 + Vector3.UP * (22.0 + sin(_time * 0.3) * 6.0)
-	var look := ahead + Vector3.UP * 2.0
-	if _snap_camera:
-		_snap_camera = false
-		camera.global_position = wanted
-		_look = look
-	else:
-		camera.global_position = camera.global_position.lerp(wanted, 1.0 - exp(-1.6 * delta))
-		_look = _look.lerp(look, 1.0 - exp(-2.2 * delta))
-	camera.look_at(_look, Vector3.UP)
+	background_next.texture = texture
+	_bg_tween = create_tween()
+	_bg_tween.tween_property(background_next, "modulate:a", 1.0, FADE)
+	_bg_tween.tween_callback(func() -> void:
+		background.texture = texture
+		background_next.modulate.a = 0.0)
 
 
-## Gerar uma pista trava o jogo por 0,2–0,6 s, então só a primeira é gerada aqui
-## (a tela ainda está escura, no fade). As outras são geradas numa thread
-## (TrackBuilder), começando pela escolhida e pelas vizinhas, e ficam guardadas:
-## trocar de pista só tira uma da árvore e põe a outra.
-func _show_track(data: TrackData, now := false) -> void:
-	_wanted = data
-	if now:
-		_builder.build_now(data)
-	if _builder.is_built(data):
-		_put_track(data)
-	var order: Array[TrackData] = [data]
-	for k in range(1, _slots.size()):
-		for i: int in [index + k, index - k]:
-			var other := _slots[wrapi(i, 0, _slots.size())]
-			if not order.has(other):
-				order.append(other)
-	_builder.request(order)
-
-
-func _on_track_built(data: TrackData) -> void:
-	if data == _wanted:
-		_put_track(data)
-
-
-func _put_track(data: TrackData) -> void:
-	if data == _track_data and is_instance_valid(_track):
-		return
-	_cancel_photo()
-	if is_instance_valid(_track):
-		remove_child(_track)
-	_track_data = data
-	_track = _builder.get_track(data)
-	_track.name = "Pista"
-	add_child(_track)
-	move_child(_track, 0)
-	_fly = 0.0
-	_snap_camera = true
-	if not _thumbs.has(data):
-		_make_thumbnail(data)
-
-
-## "Foto" da pista para o cartão: uma câmera extra olha a largada uma vez só.
-func _make_thumbnail(data: TrackData) -> void:
-	var vp := SubViewport.new()
-	vp.size = Vector2i(448, 300)
-	vp.msaa_3d = Viewport.MSAA_4X
-	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
-	add_child(vp)
-	var cam := Camera3D.new()
-	cam.fov = 52.0
-	vp.add_child(cam)
-	var t := _track.global_transform
-	cam.global_position = (t * _track.get_transform_at(-38.0, -4.5)).origin + Vector3.UP * 3.4
-	cam.look_at(t * _track.get_point_at(6.0) + Vector3.UP * 3.6, Vector3.UP)
-	cam.current = true
-	_set_thumbnail(data, vp.get_texture())
-	_photo_vp = vp
-	_photo_data = data
-	await get_tree().create_timer(0.8).timeout
-	if not is_instance_valid(vp) or vp != _photo_vp:
-		return
-	_photo_vp = null
-	vp.render_target_update_mode = SubViewport.UPDATE_DISABLED
-	# Guarda uma cópia para a próxima vez que a tela abrir.
-	var img := vp.get_texture().get_image()
-	if img and not img.is_empty():
-		GameState.track_thumbnails[data.id] = ImageTexture.create_from_image(img)
-
-
-## Trocou de pista antes da foto ficar pronta: a câmera extra já veria a outra
-## pista. A foto é tirada de novo na próxima vez que esta pista aparecer.
-func _cancel_photo() -> void:
-	if not is_instance_valid(_photo_vp):
-		return
-	_set_thumbnail(_photo_data, null)
-	_photo_vp.queue_free()
-	_photo_vp = null
-
-
-func _set_thumbnail(data: TrackData, texture: Texture2D) -> void:
-	if texture:
-		_thumbs[data] = texture
-	else:
-		_thumbs.erase(data)
-	for card in _cards:
-		if card.data == data:
-			card.thumbnail = texture
+## Só o traçado da pista (amostras, comprimento, curvas, turbos), para o mapa e os
+## números. A pista em si (terreno, cenário...) nunca é gerada nesta tela.
+func _layout(data: TrackData) -> Track:
+	var track: Track = _layouts.get(data)
+	if track == null:
+		track = data.scene.instantiate()
+		track.with_collision = false
+		track.prepare_layout()
+		_layouts[data] = track
+	return track
 
 
 # --- Navegação --------------------------------------------------------------------
@@ -325,8 +276,9 @@ func _select(i: int, first: bool) -> void:
 		_cards[k].selected = k == index
 	var data := _slots[index]
 	var unlocked := data.is_unlocked()
+	# Vaga "em breve" deixa ao fundo a última pista mostrada.
 	if unlocked:
-		_show_track(data, first)
+		_show_background(_background(data), first)
 	_update_info(data, unlocked, first)
 	race_button.disabled = not unlocked
 	var card := _cards[index]
@@ -340,8 +292,7 @@ func _update_info(data: TrackData, unlocked: bool, first: bool) -> void:
 	var where := "Corrida %d de %d da copa" if _is_cup_mode() else "Pista %d de %d"
 	subtitle_label.text = ("%s  •  %s  •  %s" % [data.cup_name, where % [index + 1, _slots.size()],
 			GameState.get_speed_class_name()]) if unlocked else "Em breve"
-	# O traçado fica pronto na hora, mesmo com a pista ainda sendo gerada.
-	var layout := _builder.get_track(data) if unlocked else null
+	var layout := _layout(data) if unlocked else null
 	preview.show_track(layout, UiKit.YELLOW)
 	if unlocked:
 		_stat_values["length"].text = _format_meters(layout.length)

@@ -14,3 +14,5 @@ difficulty = 2
 laps = 3
 color = Color(0.149, 0.239, 0.749, 1)
 color_dark = Color(0.059, 0.094, 0.22, 1)
+background = "res://assets/pistas/circuito_ativos_fundo.jpg"
+thumbnail = "res://assets/pistas/circuito_ativos_cartao.jpg"

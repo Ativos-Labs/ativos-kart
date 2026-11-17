@@ -17,12 +17,8 @@ gradient = SubResource("Gradient_shade")
 width = 256
 height = 4
 
-[node name="SelecaoPista" type="Node3D"]
+[node name="SelecaoPista" type="Node"]
 script = ExtResource("1_select")
-
-[node name="Camera" type="Camera3D" parent="."]
-current = true
-fov = 58.0
 
 [node name="UI" type="CanvasLayer" parent="."]
 
@@ -34,6 +30,41 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
+
+[node name="Base" type="ColorRect" parent="UI/Root"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.06, 0.09, 0.22, 1)
+
+[node name="Background" type="TextureRect" parent="UI/Root"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 6
+
+[node name="BackgroundNext" type="TextureRect" parent="UI/Root"]
+unique_name_in_owner = true
+modulate = Color(1, 1, 1, 0)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 6
 
 [node name="Shade" type="TextureRect" parent="UI/Root"]
 layout_mode = 1

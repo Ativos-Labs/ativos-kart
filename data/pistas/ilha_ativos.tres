@@ -14,3 +14,5 @@ difficulty = 2
 laps = 3
 color = Color(0.04, 0.6, 0.68, 1)
 color_dark = Color(0.02, 0.2, 0.27, 1)
+background = "res://assets/pistas/ilha_ativos_fundo.jpg"
+thumbnail = "res://assets/pistas/ilha_ativos_cartao.jpg"

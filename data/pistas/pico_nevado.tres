@@ -14,3 +14,5 @@ difficulty = 4
 laps = 3
 color = Color(0.33, 0.58, 0.86, 1)
 color_dark = Color(0.07, 0.13, 0.3, 1)
+background = "res://assets/pistas/pico_nevado_fundo.jpg"
+thumbnail = "res://assets/pistas/pico_nevado_cartao.jpg"

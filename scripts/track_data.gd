@@ -2,7 +2,8 @@ class_name TrackData
 extends Resource
 ## Dados de uma pista para a tela de seleção (nome, copa, cena, dificuldade...).
 ## Para criar uma pista nova: duplique `data/pistas/circuito_ativos.tres`, troque a
-## cena e os textos e acrescente o .tres na lista `tracks` de `scripts/game_state.gd`.
+## cena e os textos e acrescente o .tres na lista `tracks` de `scripts/game_state.gd`
+## (e gere as imagens dela, veja tools/track_shots/README.md).
 
 ## Identificador usado nos recordes (igual ao `track_id` da cena da pista).
 @export var id := "pista"
@@ -18,6 +19,11 @@ extends Resource
 @export var color_dark := Color("0f1838")
 ## Pistas bloqueadas aparecem como "?" (em breve).
 @export var locked := false
+## Imagens prontas da tela de pistas, geradas por tools/track_shots/gerar.sh: a vista
+## aérea (fundo da tela) e a foto da largada (cartão). Ficam como caminho para só
+## carregarem naquela tela, e não junto com a lista de pistas no início do jogo.
+@export_file("*.jpg", "*.png", "*.webp") var background := ""
+@export_file("*.jpg", "*.png", "*.webp") var thumbnail := ""
 
 
 func is_unlocked() -> bool:

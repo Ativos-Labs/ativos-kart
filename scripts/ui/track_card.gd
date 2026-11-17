@@ -24,6 +24,8 @@ var _time := 0.0
 func setup(d: TrackData) -> void:
 	data = d
 	custom_minimum_size = Vector2(236, 160)
+	# A foto (448×300) aparece reduzida: com mipmaps ela não serrilha.
+	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	focus_mode = Control.FOCUS_NONE
 	var empty := StyleBoxEmpty.new()
 	for style in ["normal", "hover", "pressed", "disabled", "focus", "hover_pressed"]:

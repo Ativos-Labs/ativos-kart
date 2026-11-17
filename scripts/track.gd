@@ -218,9 +218,9 @@ const WORDMARK_DARK := preload("res://assets/logos/ativos_marca_branca.png")
 
 @export_tool_button("Reconstruir pista", "Reload") var rebuild_button := rebuild
 
-## Sem colisão a pista é só o visual (prévia da tela de pistas). Assim ela pode ser
-## gerada numa thread, fora da árvore de cena (veja TrackBuilder): o servidor de
-## física não pode ser usado fora da thread principal.
+## Sem colisão a pista é só o visual. Assim ela pode ser gerada numa thread, fora da
+## árvore de cena (`build_geometry`): o servidor de física não pode ser usado fora da
+## thread principal.
 var with_collision := true
 
 ## Pontos amostrados no centro da pista (espaço local).
@@ -261,7 +261,7 @@ func _ready() -> void:
 		if not river.curve.changed.is_connected(_queue_rebuild):
 			river.curve.changed.connect(_queue_rebuild)
 	_watch_bridges()
-	# Pista gerada antes de entrar na árvore (TrackBuilder) não precisa gerar de novo.
+	# Pista gerada antes de entrar na árvore (`build_geometry`) não precisa gerar de novo.
 	if not is_instance_valid(_generated):
 		rebuild()
 
