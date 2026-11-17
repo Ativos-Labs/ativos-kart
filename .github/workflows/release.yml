@@ -116,6 +116,11 @@ jobs:
             echo "::group::$label"
             "$@" --headless --audio-driver Dummy --quit-after 300 2>&1 | tee boot.log
             echo "::endgroup::"
+            # Sem a linha de início o jogo nem abriu (ex.: biblioteca faltando no Linux).
+            if ! grep -q 'Godot Engine v' boot.log; then
+              echo "::error::O jogo não chegou a abrir: $label"
+              exit 1
+            fi
             if grep -qE 'SCRIPT ERROR|Parse Error' boot.log; then
               echo "::error::Erro de script ao abrir: $label"
               exit 1
