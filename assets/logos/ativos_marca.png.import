@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://b73sk6i5j0apm"
 path.s3tc="res://.godot/imported/ativos_marca.png-680b1c0069c4182071ea5844bdf3c581.s3tc.ctex"
+path.etc2="res://.godot/imported/ativos_marca.png-680b1c0069c4182071ea5844bdf3c581.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/logos/ativos_marca.png"
-dest_files=["res://.godot/imported/ativos_marca.png-680b1c0069c4182071ea5844bdf3c581.s3tc.ctex"]
+dest_files=["res://.godot/imported/ativos_marca.png-680b1c0069c4182071ea5844bdf3c581.s3tc.ctex", "res://.godot/imported/ativos_marca.png-680b1c0069c4182071ea5844bdf3c581.etc2.ctex"]
 
 [params]
 

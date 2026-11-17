@@ -4,8 +4,9 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://c78bxuub8n2qv"
 path.s3tc="res://.godot/imported/bugre_1.png-10f99e7b0fa79bdf7ed75bd73a35ec02.s3tc.ctex"
+path.etc2="res://.godot/imported/bugre_1.png-10f99e7b0fa79bdf7ed75bd73a35ec02.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 generator_parameters={
@@ -15,7 +16,7 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/karts/bugre_1.png"
-dest_files=["res://.godot/imported/bugre_1.png-10f99e7b0fa79bdf7ed75bd73a35ec02.s3tc.ctex"]
+dest_files=["res://.godot/imported/bugre_1.png-10f99e7b0fa79bdf7ed75bd73a35ec02.s3tc.ctex", "res://.godot/imported/bugre_1.png-10f99e7b0fa79bdf7ed75bd73a35ec02.etc2.ctex"]
 
 [params]
 

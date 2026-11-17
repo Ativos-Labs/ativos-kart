@@ -4,8 +4,9 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://1tkfpjuwqkj4"
 path.s3tc="res://.godot/imported/practice_kart_0.png-334a1f1a419be5f7edfb73839ee07b6d.s3tc.ctex"
+path.etc2="res://.godot/imported/practice_kart_0.png-334a1f1a419be5f7edfb73839ee07b6d.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 generator_parameters={
@@ -15,7 +16,7 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/karts/practice_kart_0.png"
-dest_files=["res://.godot/imported/practice_kart_0.png-334a1f1a419be5f7edfb73839ee07b6d.s3tc.ctex"]
+dest_files=["res://.godot/imported/practice_kart_0.png-334a1f1a419be5f7edfb73839ee07b6d.s3tc.ctex", "res://.godot/imported/practice_kart_0.png-334a1f1a419be5f7edfb73839ee07b6d.etc2.ctex"]
 
 [params]
 

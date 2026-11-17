@@ -4,8 +4,9 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://bjseb5ueluaa2"
 path.s3tc="res://.godot/imported/motoca_2.png-31af67075f897aa400c3216e9fbaceda.s3tc.ctex"
+path.etc2="res://.godot/imported/motoca_2.png-31af67075f897aa400c3216e9fbaceda.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 generator_parameters={
@@ -15,7 +16,7 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/karts/motoca_2.png"
-dest_files=["res://.godot/imported/motoca_2.png-31af67075f897aa400c3216e9fbaceda.s3tc.ctex"]
+dest_files=["res://.godot/imported/motoca_2.png-31af67075f897aa400c3216e9fbaceda.s3tc.ctex", "res://.godot/imported/motoca_2.png-31af67075f897aa400c3216e9fbaceda.etc2.ctex"]
 
 [params]
 

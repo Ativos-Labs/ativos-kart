@@ -4,8 +4,9 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://xf41iubskhfc"
 path.s3tc="res://.godot/imported/moeda_moeda_cor.jpg-836121008e81628cabb49ed6e7dbb6e0.s3tc.ctex"
+path.etc2="res://.godot/imported/moeda_moeda_cor.jpg-836121008e81628cabb49ed6e7dbb6e0.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 generator_parameters={
@@ -15,7 +16,7 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/moeda/moeda_moeda_cor.jpg"
-dest_files=["res://.godot/imported/moeda_moeda_cor.jpg-836121008e81628cabb49ed6e7dbb6e0.s3tc.ctex"]
+dest_files=["res://.godot/imported/moeda_moeda_cor.jpg-836121008e81628cabb49ed6e7dbb6e0.s3tc.ctex", "res://.godot/imported/moeda_moeda_cor.jpg-836121008e81628cabb49ed6e7dbb6e0.etc2.ctex"]
 
 [params]
 

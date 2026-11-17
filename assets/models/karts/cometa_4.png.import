@@ -4,8 +4,9 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://bkqkflec8ds0i"
 path.s3tc="res://.godot/imported/cometa_4.png-106e84e5ee8c354d290862e75261e9fd.s3tc.ctex"
+path.etc2="res://.godot/imported/cometa_4.png-106e84e5ee8c354d290862e75261e9fd.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 generator_parameters={
@@ -15,7 +16,7 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/karts/cometa_4.png"
-dest_files=["res://.godot/imported/cometa_4.png-106e84e5ee8c354d290862e75261e9fd.s3tc.ctex"]
+dest_files=["res://.godot/imported/cometa_4.png-106e84e5ee8c354d290862e75261e9fd.s3tc.ctex", "res://.godot/imported/cometa_4.png-106e84e5ee8c354d290862e75261e9fd.etc2.ctex"]
 
 [params]
 

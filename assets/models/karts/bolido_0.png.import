@@ -4,8 +4,9 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://bfs3w3qb1tia4"
 path.s3tc="res://.godot/imported/bolido_0.png-9cd2c093987b73415390282bfa74cd13.s3tc.ctex"
+path.etc2="res://.godot/imported/bolido_0.png-9cd2c093987b73415390282bfa74cd13.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 generator_parameters={
@@ -15,7 +16,7 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/karts/bolido_0.png"
-dest_files=["res://.godot/imported/bolido_0.png-9cd2c093987b73415390282bfa74cd13.s3tc.ctex"]
+dest_files=["res://.godot/imported/bolido_0.png-9cd2c093987b73415390282bfa74cd13.s3tc.ctex", "res://.godot/imported/bolido_0.png-9cd2c093987b73415390282bfa74cd13.etc2.ctex"]
 
 [params]
 

@@ -7,6 +7,8 @@
 /linux/dist/
 # Saída do export Windows (gerada por windows/export.sh)
 /windows/dist/
+# Saída do export macOS (gerada por macos/export.sh)
+/macos/dist/
 
 # Arquivos do sistema
 .DS_Store

@@ -4,8 +4,9 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://3tpftg0a7kh7"
 path.s3tc="res://.godot/imported/jon_arbuckles_kart_speed_1.png-58362513d8449b1e2d2db8644e12b1ab.s3tc.ctex"
+path.etc2="res://.godot/imported/jon_arbuckles_kart_speed_1.png-58362513d8449b1e2d2db8644e12b1ab.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 generator_parameters={
@@ -15,7 +16,7 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/karts/jon_arbuckles_kart_speed_1.png"
-dest_files=["res://.godot/imported/jon_arbuckles_kart_speed_1.png-58362513d8449b1e2d2db8644e12b1ab.s3tc.ctex"]
+dest_files=["res://.godot/imported/jon_arbuckles_kart_speed_1.png-58362513d8449b1e2d2db8644e12b1ab.s3tc.ctex", "res://.godot/imported/jon_arbuckles_kart_speed_1.png-58362513d8449b1e2d2db8644e12b1ab.etc2.ctex"]
 
 [params]
 
