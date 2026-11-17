@@ -563,6 +563,38 @@ primeira vez). Detalhes em `windows/README.md`.
 (binário universal: Apple Silicon e Intel). Em outro Mac o app, com assinatura ad-hoc,
 precisa ser liberado na primeira vez (botão direito → Abrir). Detalhes em `macos/README.md`.
 
+## Publicação automática (GitHub Actions)
+
+`.github/workflows/release.yml` faz no GitHub o que os scripts acima fazem nesta máquina:
+baixa o Godot 4.7.2 oficial e os templates (ficam no cache depois da primeira vez), importa
+o projeto, roda `web/export.sh`, `windows/export.sh`, `linux/export.sh` e `macos/export.sh`,
+abre o jogo sem janela para conferir que não há erro de script e então:
+
+- **numa tag `v*`**: cria a Release do GitHub com os três pacotes (Windows, macOS, Linux) e
+  um `SHA256SUMS.txt`, com as notas geradas a partir dos commits, e publica a web na Vercel
+  (produção). A versão da tag vai para o jogo (`config/version` e o `Info.plist` do macOS);
+- **em "Run workflow"** (aba *Actions*): exporta tudo, deixa os pacotes nos *artifacts* da
+  execução e, se a opção estiver marcada, publica a web na Vercel. Não cria Release.
+
+Para lançar uma versão:
+
+```sh
+git tag v0.2
+git push origin v0.2
+```
+
+Configuração (uma vez só), em *Settings → Secrets and variables → Actions* do repositório:
+
+| Segredo | De onde vem |
+| --- | --- |
+| `VERCEL_TOKEN` | Token criado em *vercel.com → Account Settings → Tokens* |
+| `VERCEL_ORG_ID` | `orgId` de `web/dist/.vercel/project.json` (criado pelo primeiro `vercel deploy` local) |
+| `VERCEL_PROJECT_ID` | `projectId` do mesmo arquivo |
+
+Sem esses segredos a Release sai normalmente e só o passo da Vercel falha. O macOS é
+exportado no Linux com a assinatura ad-hoc embutida do Godot; Windows e macOS continuam
+sem certificado (veja os READMEs de cada pasta).
+
 ## Créditos
 
 - Modelos dos karts "standard kart", "jon arbuckle's kart (speed)", "practice kart",

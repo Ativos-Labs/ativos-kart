@@ -1,0 +1,232 @@
+# Gera as versões do jogo e publica:
+#   - tag v* (ex.: `git tag v0.2 && git push origin v0.2`): exporta web, Windows, Linux e
+#     macOS, cria a Release do GitHub com os três executáveis e publica a web na Vercel;
+#   - "Run workflow" na aba Actions: exporta tudo (os arquivos ficam nos artifacts da
+#     execução) e, se marcado, publica a web na Vercel. Não cria Release.
+#
+# Usa o Godot 4.7.2 oficial (o mesmo do editor) e os scripts */export.sh do projeto.
+# Segredos necessários para a Vercel: VERCEL_TOKEN, VERCEL_ORG_ID e VERCEL_PROJECT_ID
+# (veja "Publicação automática" no README.md).
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      vercel:
+        description: "Publicar a versão web na Vercel (produção)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  GODOT_VERSION: "4.7.2"
+  GODOT_RELEASE: "4.7.2-stable"
+
+jobs:
+  build:
+    name: Exportar (web, Windows, Linux, macOS)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+
+      # O Godot (~60 MB) e os templates usados (~480 MB, de um .tpz de 1,3 GB) ficam no
+      # cache: só a primeira execução baixa.
+      - name: Cache do Godot e dos templates
+        id: godot-cache
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/godot
+            ~/.local/share/godot/export_templates/${{ env.GODOT_VERSION }}.stable
+          key: godot-${{ env.GODOT_RELEASE }}-linux-templates-v1
+
+      - name: Baixar o Godot e os templates
+        if: steps.godot-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          base="https://github.com/godotengine/godot/releases/download/${GODOT_RELEASE}"
+          mkdir -p ~/godot
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/godot.zip" "$base/Godot_v${GODOT_RELEASE}_linux.x86_64.zip"
+          unzip -q "$RUNNER_TEMP/godot.zip" -d ~/godot
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/templates.tpz" "$base/Godot_v${GODOT_RELEASE}_export_templates.tpz"
+          dest=~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          mkdir -p "$dest"
+          unzip -q -j "$RUNNER_TEMP/templates.tpz" -d "$dest" \
+            templates/version.txt \
+            templates/web_release.zip templates/web_debug.zip \
+            templates/linux_release.x86_64 templates/linux_debug.x86_64 \
+            templates/windows_release_x86_64.exe templates/windows_debug_x86_64.exe \
+            templates/windows_release_x86_64_console.exe templates/windows_debug_x86_64_console.exe \
+            templates/macos.zip
+          rm -f "$RUNNER_TEMP/godot.zip" "$RUNNER_TEMP/templates.tpz"
+          ls -lh "$dest"
+
+      - name: Preparar o Godot
+        run: |
+          godot=~/godot/Godot_v${GODOT_RELEASE}_linux.x86_64
+          chmod +x "$godot"
+          echo "GODOT=$godot" >> "$GITHUB_ENV"
+          "$godot" --version
+
+      # Numa tag, a versão do jogo (project.godot e Info.plist do macOS) vira a da tag.
+      - name: Versão da tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          short="${v%%-*}"
+          sed -i "s|^config/version=.*|config/version=\"$v\"|" project.godot
+          sed -i "s|^application/short_version=.*|application/short_version=\"$short\"|; s|^application/version=.*|application/version=\"$short\"|" export_presets.cfg
+          grep -n 'config/version' project.godot
+          grep -n 'application/.*version' export_presets.cfg
+
+      # O .godot/ não vai para o git: importa tudo do zero. Na primeira passada o tema
+      # (ui/theme.tres) é lido antes das fontes serem importadas e o Godot reclama delas;
+      # a segunda passada confere que tudo carrega.
+      - name: Importar o projeto
+        run: |
+          "$GODOT" --headless --audio-driver Dummy --path . --import > "$RUNNER_TEMP/import.log" 2>&1 || { cat "$RUNNER_TEMP/import.log"; exit 1; }
+          "$GODOT" --headless --audio-driver Dummy --path . --import
+
+      - name: Exportar web
+        run: web/export.sh
+      - name: Exportar Windows
+        run: windows/export.sh
+      - name: Exportar Linux
+        run: linux/export.sh
+      - name: Exportar macOS
+        run: macos/export.sh
+
+      # Abre o jogo sem janela: o executável Linux no menu e o pacote da web numa corrida
+      # (pelo editor, que aceita a cena na linha de comando). Erro de script = falha.
+      - name: Conferir se o jogo abre
+        run: |
+          set -uo pipefail
+          cd "$RUNNER_TEMP"
+          run_check() {
+            local label="$1"; shift
+            echo "::group::$label"
+            "$@" --headless --audio-driver Dummy --quit-after 300 2>&1 | tee boot.log
+            echo "::endgroup::"
+            if grep -qE 'SCRIPT ERROR|Parse Error' boot.log; then
+              echo "::error::Erro de script ao abrir: $label"
+              exit 1
+            fi
+          }
+          run_check "Linux (menu)" "$GITHUB_WORKSPACE/linux/dist/AtivosKart.x86_64"
+          run_check "pacote web (corrida)" "$GODOT" --main-pack "$GITHUB_WORKSPACE/web/dist/index.pck" res://scenes/race.tscn
+
+      - name: Juntar os pacotes
+        run: |
+          mkdir -p release
+          cp windows/dist/AtivosKart-windows-x86_64.zip \
+             linux/dist/AtivosKart-linux-x86_64.tar.gz \
+             macos/dist/AtivosKart-macos-universal.zip release/
+          (cd release && sha256sum * > SHA256SUMS.txt)
+          ls -lh release web/dist
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: web
+          path: web/dist
+          retention-days: 14
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: builds
+          path: release
+          retention-days: 14
+          compression-level: 0
+          if-no-files-found: error
+
+  vercel:
+    name: Publicar na Vercel
+    needs: build
+    if: github.event_name == 'push' || inputs.vercel
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment:
+      name: vercel-producao
+      url: https://ativos-kart.vercel.app
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: web
+          path: dist
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      # O vercel.json (cabeçalhos COOP/COEP da versão com threads) vem junto no dist.
+      - name: Deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          for name in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Falta o segredo $name (Settings → Secrets and variables → Actions)."
+              exit 1
+            fi
+          done
+          cd dist
+          test -f vercel.json
+          npx --yes vercel@65.16.0 deploy --prod --yes --token "$VERCEL_TOKEN"
+
+  release:
+    name: Criar a Release no GitHub
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: builds
+          path: release
+
+      - name: Publicar a Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          files=(release/*)
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            # Reexecução: troca os arquivos da Release que já existe.
+            gh release upload "$TAG" "${files[@]}" --clobber --repo "$GITHUB_REPOSITORY"
+            exit 0
+          fi
+          notes="$(cat <<'EOF'
+          ## Downloads
+
+          | Sistema | Arquivo | Como abrir |
+          | --- | --- | --- |
+          | Windows 10/11 (64 bits) | `AtivosKart-windows-x86_64.zip` | Descompacte e abra `AtivosKart.exe`. Sem assinatura: no aviso do SmartScreen, *Mais informações → Executar assim mesmo*. |
+          | macOS (Apple Silicon: 13+, Intel: 11+) | `AtivosKart-macos-universal.zip` | Descompacte e abra `Ativos Kart.app`. Assinatura ad-hoc: na primeira vez, botão direito → *Abrir* (ou `xattr -dr com.apple.quarantine "Ativos Kart.app"`). |
+          | Linux (x86_64) | `AtivosKart-linux-x86_64.tar.gz` | `tar xzf AtivosKart-linux-x86_64.tar.gz && ./AtivosKart.x86_64` |
+          | Navegador | — | https://ativos-kart.vercel.app |
+
+          `SHA256SUMS.txt` traz o hash de cada arquivo.
+          EOF
+          )"
+          gh release create "$TAG" "${files[@]}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "Ativos Kart ${TAG#v}" \
+            --notes "$notes" \
+            --generate-notes

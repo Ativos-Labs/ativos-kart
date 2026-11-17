@@ -60,6 +60,11 @@ cd web/dist && vercel deploy --prod
 No primeiro deploy a CLI pergunta em qual projeto publicar (pode criar um novo; não há
 build: são só arquivos estáticos). O `vercel.json` vai junto e configura os cabeçalhos.
 
+Também dá para não fazer nada disso à mão: uma tag `v*` enviada ao GitHub (ou o "Run
+workflow" da aba *Actions*) exporta e publica pela workflow `.github/workflows/release.yml`.
+Ela usa os segredos `VERCEL_TOKEN`, `VERCEL_ORG_ID` e `VERCEL_PROJECT_ID`; veja "Publicação
+automática" no `README.md` da raiz.
+
 Depois de publicar, vale conferir duas coisas no DevTools (aba *Network*):
 
 - `index.wasm` e `index.pck` com `Content-Encoding: br` ou `gzip` (comprimidos, o
