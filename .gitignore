@@ -5,6 +5,8 @@
 /web/dist/
 # Saída do export Linux (gerada por linux/export.sh)
 /linux/dist/
+# Saída do export Windows (gerada por windows/export.sh)
+/windows/dist/
 
 # Arquivos do sistema
 .DS_Store
