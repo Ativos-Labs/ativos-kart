@@ -101,14 +101,39 @@ class Field:
 			if d < best[k]:
 				best[k] = d
 				nearest[k] = i
-		var forward: Array[Vector2i] = [Vector2i(-1, 0), Vector2i(-1, -1), Vector2i(0, -1), Vector2i(1, -1)]
-		var backward: Array[Vector2i] = [Vector2i(1, 0), Vector2i(1, 1), Vector2i(0, 1), Vector2i(-1, 1)]
-		for cz in h:
-			for cx in w:
-				_relax(cx, cz, forward, best)
-		for cz in range(h - 1, -1, -1):
-			for cx in range(w - 1, -1, -1):
-				_relax(cx, cz, backward, best)
+		# Duas passadas: de cima para baixo olhando os vizinhos já vistos (esquerda e
+		# linha de cima) e de baixo para cima olhando os do outro lado. As contas ficam
+		# aqui dentro (uma chamada de função por célula custava quase metade do tempo).
+		var fdx := PackedInt32Array([-1, -1, 0, 1])
+		var fdz := PackedInt32Array([0, -1, -1, -1])
+		for pass_i in 2:
+			var dir := 1 if pass_i == 0 else -1
+			var z0 := 0 if dir == 1 else h - 1
+			var x0 := 0 if dir == 1 else w - 1
+			for zi in h:
+				var cz := z0 + zi * dir
+				var cy := origin.y + (cz + 0.5) * cell
+				for xi in w:
+					var cx := x0 + xi * dir
+					var k := cz * w + cx
+					var c := Vector2(origin.x + (cx + 0.5) * cell, cy)
+					var bk := best[k]
+					var bi := nearest[k]
+					for o in 4:
+						var nx := cx + fdx[o] * dir
+						var nz := cz + fdz[o] * dir
+						if nx < 0 or nz < 0 or nx >= w or nz >= h:
+							continue
+						var i := nearest[nz * w + nx]
+						if i < 0:
+							continue
+						var d := c.distance_squared_to(pts[i])
+						if d < bk:
+							# Lido de volta do array (32 bits), como antes: dá o mesmo vizinho.
+							best[k] = d
+							bk = best[k]
+							bi = i
+					nearest[k] = bi
 
 	## Índice (em `pts`) do ponto mais perto, ou -1 fora da grade.
 	func find(x: float, z: float) -> int:
@@ -118,22 +143,33 @@ class Field:
 		var cz := int(floor(fz))
 		if cx < 0 or cz < 0 or cx >= w or cz >= h:
 			return -1
-		# Confere a célula e as vizinhas mais próximas do ponto.
-		var ox := 1 if fx - cx > 0.5 else -1
-		var oz := 1 if fz - cz > 0.5 else -1
+		# Confere a célula e as vizinhas mais próximas do ponto (sem montar lista: é
+		# chamado de 1 a 3 vezes por vértice do terreno).
+		var ox := cx + (1 if fx - cx > 0.5 else -1)
+		var oz := cz + (1 if fz - cz > 0.5 else -1)
 		var p := Vector2(x, z)
-		var best := INF
-		var best_i := -1
-		for c: Vector2i in [Vector2i(cx, cz), Vector2i(cx + ox, cz), Vector2i(cx, cz + oz), Vector2i(cx + ox, cz + oz)]:
-			if c.x < 0 or c.y < 0 or c.x >= w or c.y >= h:
-				continue
-			var i := nearest[c.y * w + c.x]
-			if i < 0:
-				continue
-			var d := p.distance_squared_to(pts[i])
-			if d < best:
-				best = d
-				best_i = i
+		var best_i := nearest[cz * w + cx]
+		var best := p.distance_squared_to(pts[best_i]) if best_i >= 0 else INF
+		var x_ok := ox >= 0 and ox < w
+		var z_ok := oz >= 0 and oz < h
+		if x_ok:
+			var i := nearest[cz * w + ox]
+			if i >= 0:
+				var d := p.distance_squared_to(pts[i])
+				if d < best:
+					best = d
+					best_i = i
+		if z_ok:
+			var i := nearest[oz * w + cx]
+			if i >= 0:
+				var d := p.distance_squared_to(pts[i])
+				if d < best:
+					best = d
+					best_i = i
+			if x_ok:
+				i = nearest[oz * w + ox]
+				if i >= 0 and p.distance_squared_to(pts[i]) < best:
+					best_i = i
 		return best_i
 
 	## Distância (m) do ponto até a borda da grade (negativa fora dela).
@@ -141,22 +177,6 @@ class Field:
 		var lx := x - origin.x
 		var lz := z - origin.y
 		return minf(minf(lx, w * cell - lx), minf(lz, h * cell - lz))
-
-	func _relax(cx: int, cz: int, offsets: Array[Vector2i], best: PackedFloat32Array) -> void:
-		var k := cz * w + cx
-		var c := _cell_center(cx, cz)
-		for o in offsets:
-			var nx := cx + o.x
-			var nz := cz + o.y
-			if nx < 0 or nz < 0 or nx >= w or nz >= h:
-				continue
-			var i := nearest[nz * w + nx]
-			if i < 0:
-				continue
-			var d := c.distance_squared_to(pts[i])
-			if d < best[k]:
-				best[k] = d
-				nearest[k] = i
 
 	func _cell_center(cx: int, cz: int) -> Vector2:
 		return origin + Vector2(cx + 0.5, cz + 0.5) * cell

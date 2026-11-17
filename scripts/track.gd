@@ -246,6 +246,12 @@ var obstacles: TrackObstacles
 var _generated: Node3D
 var _rebuild_queued := false
 
+## Terreno da última pista gerada no jogo (o objeto TrackTerrain e a malha do chão):
+## reiniciar a corrida, ou voltar a ela depois de trocar de kart, não refaz o terreno,
+## a parte mais pesada da carga (0,1 a 0,4 s no desktop, ~1 s na web). Guarda só um,
+## para não segurar memória; no editor não guarda (a pista muda a toda hora).
+static var _terrain_cache := {}
+
 
 func _ready() -> void:
 	var path := _get_path()
@@ -339,24 +345,33 @@ func build_geometry() -> void:
 	if samples.size() < 8:
 		return
 	var preview := Engine.is_editor_hint()
-	terrain = TrackTerrain.new()
-	terrain.water_level = water_level
-	terrain.hill_height = hill_height
-	terrain.hill_bias = hill_bias
-	terrain.mountain_height = mountain_height
-	terrain.terrace_step = terrace_step
-	terrain.sea_distance = sea_distance
-	terrain.river_width = river_width
-	terrain.river_depth = river_depth
-	terrain.river_bank = river_bank
-	terrain.river_valley = river_valley
-	terrain.deck_half = road_width * 0.5 + shoulder_width + wall_thickness
-	terrain.flat_distance = road_width * 0.5 + shoulder_width + wall_thickness + 2.5
-	terrain.setup(samples, decoration_seed, bridge_mask, _river_lines())
-	# A largada (arquibancada) fica num terreno plano.
-	var start := get_point_at(0.0)
-	terrain.flat_spots.append(Vector3(start.x, start.z, 55.0))
-	_build_ground(preview)
+	var rivers := _river_lines()
+	var cache_key := "" if preview else _terrain_key(rivers)
+	var cached: Dictionary = _terrain_cache.get(cache_key, {})
+	if cached.is_empty():
+		terrain = TrackTerrain.new()
+		terrain.water_level = water_level
+		terrain.hill_height = hill_height
+		terrain.hill_bias = hill_bias
+		terrain.mountain_height = mountain_height
+		terrain.terrace_step = terrace_step
+		terrain.sea_distance = sea_distance
+		terrain.river_width = river_width
+		terrain.river_depth = river_depth
+		terrain.river_bank = river_bank
+		terrain.river_valley = river_valley
+		terrain.deck_half = road_width * 0.5 + shoulder_width + wall_thickness
+		terrain.flat_distance = road_width * 0.5 + shoulder_width + wall_thickness + 2.5
+		terrain.setup(samples, decoration_seed, bridge_mask, rivers)
+		# A largada (arquibancada) fica num terreno plano.
+		var start := get_point_at(0.0)
+		terrain.flat_spots.append(Vector3(start.x, start.z, 55.0))
+		var ground_mesh := _build_ground(preview)
+		if cache_key != "":
+			_terrain_cache = {cache_key: {"terrain": terrain, "mesh": ground_mesh}}
+	else:
+		terrain = cached.terrain
+		_build_ground(preview, cached.mesh)
 	_build_water()
 	_build_road()
 	_build_curbs()
@@ -676,30 +691,52 @@ func _is_flat() -> bool:
 	return true
 
 
-func _build_ground(preview: bool) -> void:
-	var mat := ShaderMaterial.new()
-	mat.shader = TERRAIN_SHADER
-	mat.set_shader_parameter("water_level", water_level)
-	var params := TrackTheme.terrain_params(scenery)
-	for key: String in params:
-		mat.set_shader_parameter(key, params[key])
-	# Grade com células de ~2,8 m perto da pista (pistas compridas ganham mais linhas).
-	var inner_half := terrain.half_extent + Vector2(120.0, 120.0)
-	var cell := 5.6 if preview else 2.8
-	var res := Vector2i(int(inner_half.x / (0.36 * cell)), int(inner_half.y / (0.36 * cell)))
-	var mesh := terrain.build_mesh(res, inner_half, 1250.0, mat)
+## Chave do terreno no cache: tudo o que muda o resultado de TrackTerrain e da malha.
+func _terrain_key(rivers: Array[PackedVector2Array]) -> String:
+	var sum := Vector3.ZERO
+	for p in samples:
+		sum += p
+	var river_sum := Vector2.ZERO
+	var river_points := 0
+	for line in rivers:
+		river_points += line.size()
+		for p in line:
+			river_sum += p
+	var bridged := 0
+	for b in bridge_mask:
+		bridged += b
+	return var_to_str([track_id, scenery, samples.size(), length, sum, bridged, river_points, river_sum,
+			decoration_seed, water_level, hill_height, hill_bias, mountain_height, terrace_step,
+			sea_distance, river_width, river_depth, river_bank, river_valley, road_width,
+			shoulder_width, wall_thickness])
+
+
+## Chão em volta da pista. Devolve a malha (gerada aqui ou a `mesh` do cache).
+func _build_ground(preview: bool, mesh: Mesh = null) -> Mesh:
+	if mesh == null:
+		var mat := ShaderMaterial.new()
+		mat.shader = TERRAIN_SHADER
+		mat.set_shader_parameter("water_level", water_level)
+		var params := TrackTheme.terrain_params(scenery)
+		for key: String in params:
+			mat.set_shader_parameter(key, params[key])
+		# Grade com células de ~2,8 m perto da pista (pistas compridas ganham mais linhas).
+		var inner_half := terrain.half_extent + Vector2(120.0, 120.0)
+		var cell := 5.6 if preview else 2.8
+		var res := Vector2i(int(inner_half.x / (0.36 * cell)), int(inner_half.y / (0.36 * cell)))
+		mesh = terrain.build_mesh(res, inner_half, 1250.0, mat)
 	var ground := _add_mesh(mesh)
 	ground.name = "Terreno"
 	# O chão não projeta sombra: a malha inteira entraria em todas as cascatas de
 	# sombra do sol (centenas de milhares de triângulos) quase sem efeito visível.
 	ground.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	if not with_collision:
-		return
-	# O kart nunca sai das muretas: o chão de colisão é só um plano (grama = "offroad").
-	var center := terrain.center
-	var shape := BoxShape3D.new()
-	shape.size = Vector3(1800.0, 2.0, 1800.0)
-	_add_static_body(shape, Transform3D(Basis(), Vector3(center.x, -1.0, center.y)), "offroad")
+	if with_collision:
+		# O kart nunca sai das muretas: o chão de colisão é só um plano (grama = "offroad").
+		var center := terrain.center
+		var shape := BoxShape3D.new()
+		shape.size = Vector3(1800.0, 2.0, 1800.0)
+		_add_static_body(shape, Transform3D(Basis(), Vector3(center.x, -1.0, center.y)), "offroad")
+	return mesh
 
 
 func _build_water() -> void:
