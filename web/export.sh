@@ -33,6 +33,10 @@ mkdir -p "$DIST"
 find "$DIST" -maxdepth 1 -type f -delete
 
 echo "Exportando \"$PRESET\" ($MODE) para $DIST ..."
+# O export guarda os .tres/.tscn já convertidos para binário em .godot/exported e só
+# refaz um deles quando o arquivo muda, não quando o script dele muda (assim um
+# conserto em KartData não chegava ao jogo exportado). Limpa para converter tudo de novo.
+rm -rf .godot/exported
 "$GODOT" --headless --path . "$MODE" "$PRESET" "$DIST/index.html"
 
 if [ ! -f "$DIST/index.wasm" ] || [ ! -f "$DIST/index.pck" ]; then
