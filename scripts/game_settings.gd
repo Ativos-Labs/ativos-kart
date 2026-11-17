@@ -1,8 +1,8 @@
 class_name GameSettings
 extends Node
 ## Opções do jogo (tela "Opções", filho do GameState): volume de cada canal de áudio,
-## tela cheia, resolução da janela e as teclas do kart. Ficam em user://opcoes.cfg e
-## valem desde a abertura do jogo.
+## tela cheia, resolução da janela, qualidade gráfica (GraphicsQuality, em `graphics`)
+## e as teclas do kart. Ficam em user://opcoes.cfg e valem desde a abertura do jogo.
 ##
 ## Os canais de áudio estão em res://default_bus_layout.tres: "Musica" (MusicPlayer) e
 ## "Efeitos" (Sfx e o motor dos karts), os dois passando pelo "Master".
@@ -50,6 +50,9 @@ const KEY_NAMES := {
 	KEY_BACKSPACE: "Apagar", KEY_CTRL: "Ctrl", KEY_CAPSLOCK: "Caps",
 }
 
+## Qualidade gráfica (sombras, efeitos, antisserrilhado, resolução do 3D, cenário).
+var graphics: GraphicsQuality
+
 var _cfg := ConfigFile.new()
 ## Teclas do project.godot (para "Restaurar padrão"): ação → PackedInt32Array de
 ## códigos físicos (0 = vaga vazia).
@@ -61,6 +64,10 @@ func _ready() -> void:
 	for action in KEY_ACTIONS:
 		_default_keys[action] = _keys_in_map(action)
 	_cfg.load(PATH)
+	graphics = GraphicsQuality.new()
+	graphics.name = "Graficos"
+	graphics.setup(_cfg, save)
+	add_child(graphics)
 	for bus in VOLUME_DEFAULTS:
 		_apply_volume(bus, get_volume(bus))
 	for action in KEY_ACTIONS:

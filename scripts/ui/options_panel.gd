@@ -1,32 +1,42 @@
 class_name OptionsPanel
 extends Control
-## Janela "Opções" (menu principal e pausa), em três abas:
+## Janela "Opções" (menu principal e pausa), em quatro abas:
 ## - Som: volume geral, da música e dos efeitos (canais de default_bus_layout.tres);
 ## - Tela: tela cheia e resolução da janela (no navegador só a tela cheia);
+## - Gráficos: qualidade (Baixa / Média / Alta, para PC fraco), e cada parte dela
+##   separada: sombras, luz e efeitos, antisserrilhado, resolução do 3D e cenário
+##   (GraphicsQuality); e o contador de FPS;
 ## - Teclas: duas teclas para cada ação do kart. Escolha a vaga e aperte a tecla nova
 ##   (Esc cancela); se outra ação usava essa tecla, as duas trocam.
 ## Tudo é salvo na hora (GameSettings, user://opcoes.cfg).
 
 signal closed
 
-const TABS := [["Som", "speaker"], ["Tela", "screen"], ["Teclas", "keyboard"]]
+enum { PAGE_SOUND, PAGE_SCREEN, PAGE_GRAPHICS, PAGE_KEYS }
+const TABS := [["Som", "speaker"], ["Tela", "screen"], ["Gráficos", "picture"], ["Teclas", "keyboard"]]
 const PAGE_HINTS := [
 	"Efeitos inclui o motor dos karts e os sons dos menus.",
 	"A resolução vale para a janela; a tela cheia usa a do monitor.",
+	"Jogo lento? Escolha a qualidade Baixa: sem sombras nem efeitos, roda bem mais leve.",
 	"Escolha uma tecla e aperte a nova. Os botões do controle não mudam.",
 ]
 const WEB_SCREEN_HINT := "No navegador o jogo ocupa a página; Esc sai da tela cheia."
+const WEB_GRAPHICS_HINT := "Jogo lento? Escolha Baixa. No navegador a mudança vale a partir da próxima tela."
 
 var _panel: PanelContainer
 var _tabs: Array[TabPill] = []
 var _pages: Array[Control] = []
 ## Controles de cada página, de cima para baixo (para o foco andar só dentro da janela).
-var _page_items: Array = [[], [], []]
+var _page_items: Array = [[], [], [], []]
 var _page := 0
 var _volumes := {}
 var _fullscreen: OptionSelector
 var _resolution: OptionSelector
 var _resolutions: Array[Vector2i] = []
+var _quality: OptionSelector
+## Opção de GraphicsQuality → OptionSelector.
+var _graphics := {}
+var _show_fps: OptionSelector
 ## Ação → [KeyButton, KeyButton].
 var _key_buttons := {}
 var _reset_button: FancyButton
@@ -75,7 +85,7 @@ func _build() -> void:
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
 	_panel = PanelContainer.new()
-	_panel.custom_minimum_size = Vector2(820, 0)
+	_panel.custom_minimum_size = Vector2(900, 0)
 	center.add_child(_panel)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 16)
@@ -97,10 +107,11 @@ func _build() -> void:
 		var tab := TabPill.new()
 		tab.text = TABS[i][0]
 		tab.icon_kind = TABS[i][1]
-		tab.custom_minimum_size = Vector2(150, 48)
 		tab.focus_entered.connect(_select_page.bind(i))
 		tab.pressed.connect(_on_tab_pressed.bind(i))
 		top.add_child(tab)
+		# Depois do add_child (o _ready da aba põe 150 de largura): 4 abas na linha.
+		tab.custom_minimum_size = Vector2(140, 48)
 		_tabs.append(tab)
 
 	var pages := Control.new()
@@ -112,9 +123,10 @@ func _build() -> void:
 		page.add_theme_constant_override("separation", 10)
 		pages.add_child(page)
 		_pages.append(page)
-	_build_sound(_pages[0])
-	_build_screen(_pages[1])
-	_build_keys(_pages[2])
+	_build_sound(_pages[PAGE_SOUND])
+	_build_screen(_pages[PAGE_SCREEN])
+	_build_graphics(_pages[PAGE_GRAPHICS])
+	_build_keys(_pages[PAGE_KEYS])
 
 	var bottom := HBoxContainer.new()
 	bottom.add_theme_constant_override("separation", 20)
@@ -146,7 +158,7 @@ func _build_sound(page: Control) -> void:
 		slider.changed.connect(func(v: float): GameState.settings.set_volume(bus, v))
 		page.add_child(slider)
 		_volumes[bus] = slider
-		_page_items[0].append(slider)
+		_page_items[PAGE_SOUND].append(slider)
 
 
 func _build_screen(page: Control) -> void:
@@ -154,15 +166,40 @@ func _build_screen(page: Control) -> void:
 	_fullscreen.setup("Tela cheia", PackedStringArray(["Desligada", "Ligada"]), 0)
 	_fullscreen.changed.connect(_on_fullscreen_changed)
 	page.add_child(_fullscreen)
-	_page_items[1].append(_fullscreen)
+	_page_items[PAGE_SCREEN].append(_fullscreen)
 	_resolution = OptionSelector.new()
 	_resolution.setup("Resolução", PackedStringArray(["-"]), 0)
 	_resolution.changed.connect(_on_resolution_changed)
 	page.add_child(_resolution)
 	if GameState.settings.can_resize():
-		_page_items[1].append(_resolution)
+		_page_items[PAGE_SCREEN].append(_resolution)
 	else:
 		_resolution.hide()
+
+
+## Qualidade (Baixa / Média / Alta) em cima e cada parte dela embaixo: mexer numa
+## parte vira "Personalizada"; escolher um nível muda todas.
+func _build_graphics(page: Control) -> void:
+	# 7 linhas: um pouco mais juntas que nas outras abas para caber na página.
+	page.add_theme_constant_override("separation", 8)
+	var gfx := GameState.settings.graphics
+	_quality = OptionSelector.new()
+	_quality.setup("Qualidade", PackedStringArray(GraphicsQuality.PRESET_NAMES), 0)
+	_quality.changed.connect(_on_quality_changed)
+	page.add_child(_quality)
+	_page_items[PAGE_GRAPHICS].append(_quality)
+	for key in GraphicsQuality.KEYS:
+		var selector := OptionSelector.new()
+		selector.setup(GraphicsQuality.CAPTIONS[key], gfx.option_names(key), 0)
+		selector.changed.connect(_on_graphics_changed.bind(key))
+		page.add_child(selector)
+		_graphics[key] = selector
+		_page_items[PAGE_GRAPHICS].append(selector)
+	_show_fps = OptionSelector.new()
+	_show_fps.setup("Mostrar FPS", PackedStringArray(["Não", "Sim"]), 0)
+	_show_fps.changed.connect(func(i: int): GameState.settings.graphics.set_show_fps(i == 1))
+	page.add_child(_show_fps)
+	_page_items[PAGE_GRAPHICS].append(_show_fps)
 
 
 func _build_keys(page: Control) -> void:
@@ -194,7 +231,7 @@ func _build_keys(page: Control) -> void:
 			grid.add_child(b)
 			buttons.append(b)
 		_key_buttons[action] = buttons
-		_page_items[2].append(buttons)
+		_page_items[PAGE_KEYS].append(buttons)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 16)
 	page.add_child(row)
@@ -205,7 +242,7 @@ func _build_keys(page: Control) -> void:
 	_reset_button.add_theme_font_size_override("font_size", 22)
 	_reset_button.pressed.connect(func(): GameState.settings.reset_keys())
 	row.add_child(_reset_button)
-	_page_items[2].append(_reset_button)
+	_page_items[PAGE_KEYS].append(_reset_button)
 
 
 # --- Abas e foco ---------------------------------------------------------------------
@@ -296,7 +333,43 @@ func _refresh_all() -> void:
 		(_volumes[bus] as VolumeSlider).set_value(GameState.settings.get_volume(bus), false)
 	_fullscreen.set_index(1 if GameState.settings.is_fullscreen() else 0, false)
 	_refresh_resolution()
+	_refresh_graphics()
 	_refresh_keys()
+
+
+func _refresh_graphics() -> void:
+	var gfx := GameState.settings.graphics
+	for key in _graphics:
+		(_graphics[key] as OptionSelector).set_index(gfx.index_of(key), false)
+	_show_fps.set_index(1 if gfx.show_fps else 0, false)
+	_refresh_quality()
+
+
+## "Personalizada" só aparece (e só dá para estar nela) quando as partes não batem
+## com nenhum nível; dela, ◀ volta para "Alta".
+func _refresh_quality() -> void:
+	var preset := GameState.settings.graphics.get_preset()
+	var names := PackedStringArray(GraphicsQuality.PRESET_NAMES)
+	if preset != GraphicsQuality.CUSTOM:
+		names.resize(GraphicsQuality.CUSTOM)
+	_quality.options = names
+	_quality.index = preset
+	_quality.queue_redraw()
+
+
+func _on_quality_changed(index: int) -> void:
+	if index >= GraphicsQuality.CUSTOM:
+		return
+	GameState.settings.graphics.set_preset(index)
+	_refresh_graphics()
+
+
+func _on_graphics_changed(index: int, key: StringName) -> void:
+	var gfx := GameState.settings.graphics
+	var list := gfx.values(key)
+	if index < list.size():
+		gfx.set_value(key, list[index])
+	_refresh_quality()
 
 
 func _refresh_resolution() -> void:
@@ -344,8 +417,10 @@ func _update_hint() -> void:
 		_hint.add_theme_color_override("font_color", UiKit.INK)
 		return
 	_hint.remove_theme_color_override("font_color")
-	if _page == 1 and not GameState.settings.can_resize():
+	if _page == PAGE_SCREEN and not GameState.settings.can_resize():
 		_hint.text = WEB_SCREEN_HINT
+	elif _page == PAGE_GRAPHICS and not GraphicsQuality.applies_live():
+		_hint.text = WEB_GRAPHICS_HINT
 	else:
 		_hint.text = PAGE_HINTS[_page]
 

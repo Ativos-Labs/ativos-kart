@@ -14,6 +14,10 @@ const LOGO_ICON := preload("res://assets/logos/ativos_icone.png")
 const WORDMARK := preload("res://assets/logos/ativos_marca.png")
 const WORDMARK_DARK := preload("res://assets/logos/ativos_marca_branca.png")
 
+## Grupo dos detalhes pequenos (grama, flores): somem com o cenário "Reduzido" das
+## opções de gráficos (GraphicsQuality).
+const DETAIL_GROUP := &"detalhe_cenario"
+
 const BRAND_BLUE := Color("263dbf")
 const BRAND_LIGHT := Color("5f72d9")
 const NAVY := Color("0f1838")
@@ -98,9 +102,9 @@ func _add_mesh(mesh: Mesh, xform: Transform3D, parent: Node3D = null, shadows :=
 
 ## Desenha muitas cópias de uma malha. As cópias são divididas em blocos de
 ## `chunk` metros para a câmera descartar o que não vê; `max_distance` > 0 some com
-## o bloco inteiro de longe (grama, flores).
+## o bloco inteiro de longe (grama, flores). `detail`: entra no DETAIL_GROUP.
 func _add_multimesh(mesh: Mesh, xforms: Array[Transform3D], colors: Array[Color], name: String,
-		shadows := true, chunk := 140.0, max_distance := 0.0) -> void:
+		shadows := true, chunk := 140.0, max_distance := 0.0, detail := false) -> void:
 	if xforms.is_empty():
 		return
 	var groups := {}
@@ -128,6 +132,8 @@ func _add_multimesh(mesh: Mesh, xforms: Array[Transform3D], colors: Array[Color]
 			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		if max_distance > 0.0:
 			mmi.visibility_range_end = max_distance + chunk * 0.7
+		if detail:
+			mmi.add_to_group(DETAIL_GROUP)
 		root.add_child(mmi)
 
 
@@ -588,7 +594,7 @@ func _build_grass(preview: bool) -> void:
 		xforms.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(s, s * rng.randf_range(0.8, 1.3), s)), p - Vector3.UP * 0.02))
 		var v := rng.randf_range(0.88, 1.12)
 		colors.append(Color(v, v * rng.randf_range(0.97, 1.03), v * 0.95))
-	_add_multimesh(tuft, xforms, colors, "Grama", false, 50.0, 80.0)
+	_add_multimesh(tuft, xforms, colors, "Grama", false, 50.0, 80.0, true)
 
 	var flower_mat := ShaderMaterial.new()
 	flower_mat.shader = TUFT_SHADER
@@ -620,7 +626,7 @@ func _build_grass(preview: bool) -> void:
 			var s := rng.randf_range(0.75, 1.25)
 			fx.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * s), Vector3(x, y - 0.02, z)))
 			fc.append(color if rng.randf() < 0.8 else palette[rng.randi() % palette.size()])
-	_add_multimesh(flower, fx, fc, "Flores", false, 50.0, 70.0)
+	_add_multimesh(flower, fx, fc, "Flores", false, 50.0, 70.0, true)
 
 
 # --- Dirigível e balões ----------------------------------------------------------------

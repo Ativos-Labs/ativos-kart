@@ -153,7 +153,8 @@ func _ready() -> void:
 		# O relógio dos obstáculos segue a corrida (contagem + tempo de prova).
 		track.obstacles.external_clock = true
 		track.obstacles.clock = 0.0
-	_tune_shadows()
+	# Sombras do sol (2 divisões na web e com 3 ou 4 telas, ou o que o jogador escolheu
+	# em Opções → Gráficos): GraphicsQuality ajusta a luz quando a pista entra.
 	if GameState.is_multiplayer():
 		_setup_split_screen()
 	_build_grid()
@@ -193,25 +194,6 @@ func _setup_split_screen() -> void:
 	split.setup(GameState.players.size())
 	# Cada jogador vê o mundo pela tela dele; a janela só mostra as telas e o HUD.
 	get_viewport().disable_3d = true
-
-
-## Sombras do sol: cada divisão (cascata) redesenha tudo o que faz sombra, e na web
-## elas eram ~40% do quadro (medido: 4 → 2 divisões economizava 0,6 a 3,9 ms num M4).
-## Na web e com 3 ou 4 telas (que desenham as sombras uma vez cada) elas usam 2
-## divisões e vão menos longe. No desktop com 1 ou 2 telas ficam como na pista.
-func _tune_shadows() -> void:
-	var players := GameState.players.size()
-	var web := OS.has_feature("web")
-	if players < 3 and not web:
-		return
-	for node in track.find_children("*", "DirectionalLight3D", true, false):
-		var light := node as DirectionalLight3D
-		if not light.shadow_enabled:
-			continue
-		light.directional_shadow_max_distance = minf(light.directional_shadow_max_distance, 110.0 if players >= 3 else 140.0)
-		light.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
-		# A 1ª divisão (a nítida) cobre os primeiros ~25 m: o kart e quem está perto.
-		light.directional_shadow_split_1 = 0.18
 
 
 ## Monta o grid. Corrida e Grand Prix (1ª corrida): os adversários na frente e os

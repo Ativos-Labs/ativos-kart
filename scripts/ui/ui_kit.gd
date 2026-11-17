@@ -177,6 +177,12 @@ static func draw_icon(ci: CanvasItem, kind: String, c: Vector2, r: float, color:
 			ci.draw_rect(Rect2(c + Vector2(-r * 0.85, -r * 0.65), Vector2(r * 1.7, r * 1.05)), color, false, r * 0.17)
 			ci.draw_rect(Rect2(c + Vector2(-r * 0.1, r * 0.4), Vector2(r * 0.2, r * 0.25)), color)
 			ci.draw_rect(Rect2(c + Vector2(-r * 0.45, r * 0.62), Vector2(r * 0.9, r * 0.14)), color)
+		"picture":
+			# Quadro com montanhas e sol (gráficos).
+			ci.draw_rect(Rect2(c + Vector2(-r * 0.85, -r * 0.65), Vector2(r * 1.7, r * 1.3)), color, false, r * 0.15)
+			ci.draw_circle(c + Vector2(r * 0.36, -r * 0.24), r * 0.16, color)
+			ci.draw_colored_polygon(PackedVector2Array([c + Vector2(-r * 0.7, r * 0.52), c + Vector2(-r * 0.22, -r * 0.1),
+					c + Vector2(r * 0.1, r * 0.24), c + Vector2(r * 0.32, r * 0.06), c + Vector2(r * 0.7, r * 0.52)]), color)
 		"keyboard":
 			ci.draw_rect(Rect2(c + Vector2(-r * 0.9, -r * 0.5), Vector2(r * 1.8, r * 1.0)), color, false, r * 0.15)
 			for row in 2:

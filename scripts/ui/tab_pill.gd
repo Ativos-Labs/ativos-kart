@@ -1,6 +1,7 @@
 class_name TabPill
 extends Button
-## Aba da tela de opções ("Som", "Tela", "Teclas"): amarela quando é a aba aberta.
+## Aba da tela de opções ("Som", "Tela", "Gráficos", "Teclas"): amarela quando é a
+## aba aberta.
 
 ## Esta é a aba aberta.
 var active := false:
