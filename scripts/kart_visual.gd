@@ -53,6 +53,10 @@ func setup(p_kart: KartData, p_character: CharacterData) -> void:
 	_front_wheels = _find_parts(p_kart.front_wheels)
 	_rear_wheels = _find_parts(p_kart.rear_wheels)
 	_steering = _find_parts(p_kart.steering_wheel_nodes)
+	# Sem nomes de rodas no .tres as rodas ficam paradas em todo lugar (já aconteceu
+	# de um ResourceSaver regravar os karts sem essas listas).
+	if _front_wheels.is_empty() and _rear_wheels.is_empty():
+		push_warning("Kart '%s' sem rodas mapeadas (front_wheels/rear_wheels): as rodas não vão girar." % p_kart.display_name)
 	driver = null
 	if p_character and p_character.model_scene:
 		driver = p_character.instantiate_rig()

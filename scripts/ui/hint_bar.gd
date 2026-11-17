@@ -14,7 +14,7 @@ const PAD_BUTTONS := {
 const ARROWS: Array[String] = ["↑", "↓", "←", "→"]
 const MOUSE_ONLY: Array[String] = ["Arraste"]
 
-@export var hints: PackedStringArray = ["Enter|Confirmar", "Esc|Voltar"]:
+@export var hints := PackedStringArray(["Enter|Confirmar", "Esc|Voltar"]):
 	set(value):
 		hints = value
 		queue_redraw()

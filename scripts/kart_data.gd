@@ -41,10 +41,13 @@ const STAT_KEYS := ["speed", "acceleration", "handling", "weight"]
 @export_range(1, 5) var weight := 3
 
 @export_group("Rodas")
+## (Arrays empacotados: declare com `:= PackedStringArray()`. Com `: PackedStringArray
+## = []` o export do Godot 4.7 grava o valor vazio no .res e as rodas ficam paradas no
+## executável e na web, mesmo girando no editor.)
 ## Nomes dos nós das rodas dianteiras dentro do modelo (giram e esterçam).
-@export var front_wheels: PackedStringArray = []
+@export var front_wheels := PackedStringArray()
 ## Nomes dos nós das rodas traseiras dentro do modelo (só giram).
-@export var rear_wheels: PackedStringArray = []
+@export var rear_wheels := PackedStringArray()
 ## Raio das rodas em metros (já na escala do jogo).
 @export var front_wheel_radius := 0.22
 @export var rear_wheel_radius := 0.27
@@ -53,7 +56,7 @@ const STAT_KEYS := ["speed", "acceleration", "handling", "weight"]
 ## Ponto do banco onde fica a base do corpo do piloto (espaço do kart, frente = -Z).
 @export var seat_position := Vector3(0, 0.33, 0.3)
 ## Nós do volante dentro do modelo (giram quando o kart vira).
-@export var steering_wheel_nodes: PackedStringArray = []
+@export var steering_wheel_nodes := PackedStringArray()
 ## Centro do volante (espaço do kart). É o pivô do giro e o centro do aro.
 @export var steering_wheel_center := Vector3(0, 0.665, -0.16)
 ## Eixo do volante, apontando para o piloto.
