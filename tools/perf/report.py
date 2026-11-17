@@ -39,6 +39,10 @@ for path in sys.argv[1:]:
             dc = [p for p in parts if p.startswith("dc ")]
             print(f"  AB {parts[1]:<6} {parts[2]:<14} base={float(kv['base_ms']):6.2f} var={float(kv['var_ms']):6.2f} "
                   f"saved={float(kv['saved_ms']):6.2f} ms  {dc[0] if dc else ''}")
+        elif kind == "LOAD":
+            print(f"  LOAD {parts[1]:<22} {parts[2]:<20} {parts[3]:<14} {parts[4]}")
+        elif kind == "CPU":
+            print(f"  CPU {parts[1]:<7} {parts[2]:<24} {' | '.join(parts[3:])}")
         elif kind == "DONE":
             print("  DONE")
     by_phase = {}

@@ -213,11 +213,17 @@ func _wait_scene(path: String, old: Node) -> Node:
 
 func _goto(path: String) -> Node:
 	var old := get_tree().current_scene
+	var t0 := Time.get_ticks_usec()
 	_gs().goto_scene(path)
 	var scene := await _wait_scene(path, old)
+	var t1 := Time.get_ticks_usec()
 	# Espera o fade terminar.
 	while _gs()._changing_scene:
 		await get_tree().process_frame
+	# Tempo até a cena nova existir (instanciar + _ready) e até o fade acabar (inclui
+	# o warm_up dos shaders e as animações do fade, ~0,5 s fixos).
+	_out("LOAD|%s|%s|ready_ms=%.0f|total_ms=%.0f" % [_phase, path.get_file(),
+			(t1 - t0) / 1000.0, (Time.get_ticks_usec() - t0) / 1000.0])
 	return scene
 
 
@@ -387,6 +393,55 @@ func _live_ab(race: Node, tag: String, secs := 2.0) -> void:
 		var mb: float = (bs[0] + bs[1]) * 0.5
 		var mv: float = (vs[0] + vs[1]) * 0.5
 		_out("AB|live_%s|%s|base_ms=%.2f|var_ms=%.2f|saved_ms=%.2f|runs b=%s v=%s" % [tag, item[0], mb, mv, mb - mv, str(bs), str(vs)])
+
+
+## A/B de CPU com a corrida andando: o que pesa no passo de física e no _process.
+## Mede o quadro (p50) e o tempo do passo de física (TIME_PHYSICS_PROCESS).
+func _cpu_ab(race: Node, tag: String, secs := 2.5) -> void:
+	var players3d: Array = race.find_children("*", "AudioStreamPlayer3D", true, false)
+	var rigs: Array = []
+	for k in race._karts:
+		if k.driver:
+			rigs.append(k.driver)
+	var lone: Array = []
+	for k in race._karts:
+		if k.is_player and k._engine_3d == null:
+			lone.append(k)
+	var set_proc := func(nodes: Array, v: bool) -> void:
+		for n in nodes:
+			n.set_process(v)
+	var stop3d := func() -> void:
+		for p in players3d:
+			p.stop()
+	var play3d := func() -> void:
+		for p in players3d:
+			p.play()
+	var toggles: Array = [
+		["engines3d_off", stop3d, play3d],
+		["rigs_frozen", set_proc.bind(rigs, false), set_proc.bind(rigs, true)],
+	]
+	if not lone.is_empty():
+		toggles.append(["engine_synth_off", set_proc.bind(lone, false), set_proc.bind(lone, true)])
+	_out("INFO|cpu_ab|%s|players3d=%d rigs=%d" % [tag, players3d.size(), rigs.size()])
+	for item in toggles:
+		var bs: Array = []
+		var vs: Array = []
+		var bp: Array = []
+		var vp: Array = []
+		for rep in 2:
+			var b := await _measure("%s|cpu_base_%s" % [tag, item[0]], secs)
+			bs.append(b.p50)
+			bp.append(b.phys)
+			(item[1] as Callable).call()
+			await _wait(0.8)
+			var v := await _measure("%s|cpu_%s" % [tag, item[0]], secs)
+			vs.append(v.p50)
+			vp.append(v.phys)
+			(item[2] as Callable).call()
+			await _wait(0.8)
+		_out("AB|cpu_%s|%s|base_ms=%.2f|var_ms=%.2f|saved_ms=%.2f|phys %.2f->%.2f ms|runs b=%s v=%s" % [
+			tag, item[0], (bs[0] + bs[1]) * 0.5, (vs[0] + vs[1]) * 0.5, (bs[0] + bs[1] - vs[0] - vs[1]) * 0.5,
+			(bp[0] + bp[1]) * 0.5, (vp[0] + vp[1]) * 0.5, str(bs), str(vs)])
 
 
 func _lod_test() -> void:
@@ -560,6 +615,13 @@ func _run() -> void:
 		_merge_bench()
 		_out("DONE")
 		return
+	if s == "cpuab":
+		for p in [1, 2]:
+			var race := await _start_race(0, p)
+			await _wait(3.0)
+			await _cpu_ab(race, "t0_%dp" % p)
+		_out("DONE")
+		return
 	await _measure("menu", 3.0)
 	if s == "full" or s == "quick":
 		_phase = "track_select"
@@ -577,6 +639,11 @@ func _run() -> void:
 			await _ab(race, "ab_t%d" % ti)
 		if s == "live" and (ti == 0 or ti == 3):
 			await _live_ab(race, "t%d" % ti)
+	if s == "full" or s == "quick":
+		# Reiniciar a mesma pista (a última): mede a carga com o que ficou guardado.
+		var again := await _start_race(tracks[tracks.size() - 1], 1)
+		await _wait(2.0)
+		await _measure("race_t%d_1p_restart" % tracks[tracks.size() - 1], 4.0)
 	if s == "full" or s == "quick":
 		for p in [2, 4]:
 			var race := await _start_race(0, p)

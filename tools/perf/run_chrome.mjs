@@ -1,5 +1,5 @@
 // Abre o probe no Chrome headless (mudo, sem vsync) e grava as linhas PERF|.
-// Uso: node --experimental-websocket run_chrome.mjs <url> <log> [--cpu=4] [--dpr=2] [--size=1280,720] [--timeout=600] [--vsync]
+// Uso: node --experimental-websocket run_chrome.mjs <url> <log> [--cpu=4] [--dpr=2] [--size=1280,720] [--viewport=1920,1080] [--timeout=600] [--vsync]
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -77,6 +77,8 @@ ws.onmessage = (ev) => {
     if (shot) {
       send("Page.captureScreenshot", { format: "png" }).then((r) => {
         if (r && r.data) { fs.writeFileSync(`${logPath}.${shot[1]}.png`, Buffer.from(r.data, "base64")); line(`shot saved ${shot[1]}`); }
+        // O probe pode esperar o print ficar pronto antes de mudar a cena (window.__shot_saved).
+        send("Runtime.evaluate", { expression: `window.__shot_saved = ${JSON.stringify(shot[1])}` });
       });
     }
   } else if (m.method === "Runtime.exceptionThrown") {
@@ -87,6 +89,11 @@ ws.onmessage = (ev) => {
 };
 await new Promise((r) => (ws.onopen = r));
 await send("Page.enable");
+if (opt.viewport) {
+  // Área da página com tamanho exato (o --window-size inclui a barra do navegador).
+  const [w, h] = opt.viewport.split(",").map(Number);
+  await send("Emulation.setDeviceMetricsOverride", { width: w, height: h, deviceScaleFactor: Number(dpr), mobile: false });
+}
 if (cpu > 1) { await send("Emulation.setCPUThrottlingRate", { rate: cpu }); line(`cpu throttle x${cpu}`); }
 await send("Page.navigate", { url });
 await sleep(300);

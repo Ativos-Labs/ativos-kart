@@ -4,6 +4,7 @@
 #
 # Uso: tools/perf/export_probe.sh <pasta_saida> [preset] [--debug]
 #      (preset padrão: "Web"; a saída deve ficar fora do projeto)
+#      PROBE=<arquivo.gd> troca o probe (ex.: tools/track_shots/zz_track_shots.gd).
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 PROJ="$(cd "$HERE/../.." && pwd)"
@@ -16,7 +17,7 @@ GS="$PROJ/scripts/game_state.gd"
 BAK="$(mktemp)"
 
 cp "$GS" "$BAK"
-cp "$HERE/zz_perf_probe.gd" "$PROJ/zz_perf_probe.gd"
+cp "${PROBE:-$HERE/zz_perf_probe.gd}" "$PROJ/zz_perf_probe.gd"
 # Gancho temporário: o GameState cria o probe se o arquivo existir.
 python3 -I - "$GS" <<'EOF'
 import sys
