@@ -16,11 +16,16 @@ extends RefCounted
 ## partes recoloríveis). Os níveis de detalhe (LOD) são refeitos por material e
 ## juntados, para uma cor não vazar na outra de longe.
 ##
+## Modelos com textura (o Jarbas) também juntam se todas as partes usarem a mesma
+## textura (um atlas; as partes de cor lisa apontam para um ponto branco dele). Aí o
+## material é `character_textured.gdshader`, com UV e recorte pela transparência.
+##
 ## A malha junta é feita uma vez por modelo e fica guardada. Se o modelo não servir
-## (texturas, transparência, esqueletos diferentes...), nada muda e o personagem usa
-## as malhas originais.
+## (texturas diferentes, transparência com mistura, esqueletos diferentes...), nada
+## muda e o personagem usa as malhas originais.
 
 const SHADER := preload("res://shaders/character.gdshader")
+const SHADER_TEXTURED := preload("res://shaders/character_textured.gdshader")
 ## Ângulo para juntar normais ao simplificar (o mesmo do importador do Godot).
 const LOD_NORMAL_MERGE_ANGLE := 60.0
 const LOD_NORMAL_SPLIT_ANGLE := 25.0
@@ -51,7 +56,7 @@ static func apply(model: Node3D, data: CharacterData) -> bool:
 		return false
 	var key := "%s|%s" % [data.model_scene.resource_path, ",".join(data.tint_materials)]
 	if not _cache.has(key):
-		_cache[key] = _build(meshes, data.tint_materials)
+		_cache[key] = _build(meshes, data.tint_materials, data.tint_reference.a > 0.0)
 	var entry: Dictionary = _cache[key]
 	if entry.is_empty():
 		return false
@@ -66,22 +71,24 @@ static func apply(model: Node3D, data: CharacterData) -> bool:
 	merged.cast_shadow = first.cast_shadow
 	merged.layers = first.layers
 	if data.model_tint.a > 0.0:
-		merged.material_override = _tint_material(key, entry, data.model_tint)
+		var ref: Color = data.tint_reference if data.tint_reference.a > 0.0 else entry.ref
+		merged.material_override = _tint_material(key, entry, data.model_tint, ref)
 	for mi in meshes:
 		mi.get_parent().remove_child(mi)
 		mi.free()
 	return true
 
 
-static func _tint_material(key: String, entry: Dictionary, tint: Color) -> ShaderMaterial:
-	var tkey := "%s|%s" % [key, tint.to_html()]
+static func _tint_material(key: String, entry: Dictionary, tint: Color, ref: Color) -> ShaderMaterial:
+	var tkey := "%s|%s|%s" % [key, tint.to_html(), ref.to_html()]
 	if _tinted.has(tkey):
 		return _tinted[tkey]
-	# A mesma conta de CharacterRig._apply_tint: a 1ª cor da lista vira a cor nova e as
-	# outras mantêm a proporção de saturação e brilho em relação a ela.
-	var ref: Color = entry.ref
+	# A mesma conta de CharacterRig._apply_tint: a cor de referência (a 1ª da lista, ou
+	# CharacterData.tint_reference) vira a cor nova e as outras mantêm a proporção de
+	# saturação e brilho em relação a ela.
 	var mat := (entry.material as ShaderMaterial).duplicate() as ShaderMaterial
 	mat.set_shader_parameter(&"tint_enabled", true)
+	mat.set_shader_parameter(&"tint_reference_hue", ref.h)
 	mat.set_shader_parameter(&"tint_hue", tint.h)
 	mat.set_shader_parameter(&"tint_saturation_ratio", tint.s / maxf(ref.s, 0.01))
 	mat.set_shader_parameter(&"tint_value_ratio", tint.v / maxf(ref.v, 0.01))
@@ -89,12 +96,17 @@ static func _tint_material(key: String, entry: Dictionary, tint: Color) -> Shade
 	return mat
 
 
-## Material de cor lisa que dá para levar para os vértices.
+## Material que dá para levar para os vértices: cor lisa, ou a mesma textura de todos
+## (`like` = o primeiro material). Transparência só recortada (alpha scissor).
 static func _plain(mat: Material, like: BaseMaterial3D) -> bool:
 	var m := mat as StandardMaterial3D
 	if m == null:
 		return false
-	if m.albedo_texture or m.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED or m.next_pass \
+	if like and m.albedo_texture != like.albedo_texture:
+		return false
+	if m.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED and m.transparency != BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR:
+		return false
+	if m.next_pass \
 			or m.emission_enabled or m.normal_enabled or m.rim_enabled or m.clearcoat_enabled \
 			or m.ao_enabled or m.vertex_color_use_as_albedo or m.grow or m.billboard_mode != BaseMaterial3D.BILLBOARD_DISABLED:
 		return false
@@ -106,7 +118,9 @@ static func _plain(mat: Material, like: BaseMaterial3D) -> bool:
 			and m.diffuse_mode == BaseMaterial3D.DIFFUSE_BURLEY and m.specular_mode == BaseMaterial3D.SPECULAR_SCHLICK_GGX
 
 
-static func _build(meshes: Array[MeshInstance3D], tint_names: PackedStringArray) -> Dictionary:
+## `tint_all`: sem lista de materiais, todos podem ser recoloridos (o shader com
+## textura escolhe pela matiz).
+static func _build(meshes: Array[MeshInstance3D], tint_names: PackedStringArray, tint_all := false) -> Dictionary:
 	var first := meshes[0]
 	var parent := first.get_parent()
 	var like: StandardMaterial3D = null
@@ -127,6 +141,7 @@ static func _build(meshes: Array[MeshInstance3D], tint_names: PackedStringArray)
 				like = mat as StandardMaterial3D
 	if like == null or first.skin == null:
 		return {}
+	var textured := like.albedo_texture != null
 
 	# Uma superfície por material (de todas as malhas), cada uma com os seus LODs. Os LODs
 	# são feitos por material: assim uma cor não vaza na outra quando a malha simplifica.
@@ -142,13 +157,18 @@ static func _build(meshes: Array[MeshInstance3D], tint_names: PackedStringArray)
 			var src_w = arrays[Mesh.ARRAY_WEIGHTS]
 			if src_b == null or src_w == null or (src_w as PackedFloat32Array).size() != src_v.size() * 4:
 				return {}
+			var src_uv = arrays[Mesh.ARRAY_TEX_UV]
+			if textured and (src_uv == null or (src_uv as PackedVector2Array).size() != src_v.size()):
+				return {}
 			if not groups.has(mat):
-				groups[mat] = {"verts": PackedVector3Array(), "normals": PackedVector3Array(),
+				groups[mat] = {"verts": PackedVector3Array(), "normals": PackedVector3Array(), "uvs": PackedVector2Array(),
 						"bones": PackedInt32Array(), "weights": PackedFloat32Array(), "indices": PackedInt32Array()}
 				order.append(mat)
 			var g: Dictionary = groups[mat]
 			var base: int = (g.verts as PackedVector3Array).size()
 			g.verts.append_array(src_v)
+			if textured:
+				g.uvs.append_array(src_uv)
 			g.normals.append_array(arrays[Mesh.ARRAY_NORMAL])
 			g.bones.append_array(src_b)
 			g.weights.append_array(src_w)
@@ -165,6 +185,8 @@ static func _build(meshes: Array[MeshInstance3D], tint_names: PackedStringArray)
 		arr.resize(Mesh.ARRAY_MAX)
 		arr[Mesh.ARRAY_VERTEX] = g.verts
 		arr[Mesh.ARRAY_NORMAL] = g.normals
+		if textured:
+			arr[Mesh.ARRAY_TEX_UV] = g.uvs
 		arr[Mesh.ARRAY_BONES] = g.bones
 		arr[Mesh.ARRAY_WEIGHTS] = g.weights
 		arr[Mesh.ARRAY_INDEX] = g.indices
@@ -182,6 +204,7 @@ static func _build(meshes: Array[MeshInstance3D], tint_names: PackedStringArray)
 	# Junta tudo: os vértices de cada material em sequência, com a cor e a rugosidade.
 	var verts := PackedVector3Array()
 	var normals := PackedVector3Array()
+	var uvs := PackedVector2Array()
 	var custom := PackedFloat32Array()
 	var bones := PackedInt32Array()
 	var weights := PackedFloat32Array()
@@ -199,9 +222,10 @@ static func _build(meshes: Array[MeshInstance3D], tint_names: PackedStringArray)
 		var base := verts.size()
 		verts.append_array(g.verts)
 		normals.append_array(g.normals)
+		uvs.append_array(g.uvs)
 		bones.append_array(g.bones)
 		weights.append_array(g.weights)
-		var tintable := tint_names.has(mat.resource_name)
+		var tintable := tint_names.has(mat.resource_name) or (tint_all and tint_names.is_empty())
 		if not tint_names.is_empty() and mat.resource_name == tint_names[0]:
 			ref = mat.albedo_color
 		var c := mat.albedo_color
@@ -227,6 +251,8 @@ static func _build(meshes: Array[MeshInstance3D], tint_names: PackedStringArray)
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = verts
 	arrays[Mesh.ARRAY_NORMAL] = normals
+	if textured:
+		arrays[Mesh.ARRAY_TEX_UV] = uvs
 	arrays[Mesh.ARRAY_CUSTOM0] = custom
 	arrays[Mesh.ARRAY_BONES] = bones
 	arrays[Mesh.ARRAY_WEIGHTS] = weights
@@ -240,7 +266,9 @@ static func _build(meshes: Array[MeshInstance3D], tint_names: PackedStringArray)
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays, [], lods,
 			Mesh.ARRAY_CUSTOM_RGBA_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT)
 	var material := ShaderMaterial.new()
-	material.shader = SHADER
+	material.shader = SHADER_TEXTURED if textured else SHADER
+	if textured:
+		material.set_shader_parameter(&"albedo_texture", like.albedo_texture)
 	material.set_shader_parameter(&"metallic_value", like.metallic)
 	material.set_shader_parameter(&"specular_value", like.metallic_specular)
 	mesh.surface_set_material(0, material)
