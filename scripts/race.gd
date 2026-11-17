@@ -657,7 +657,7 @@ func _lead_human_progress() -> float:
 func _update_racer(r: Racer, delta: float, lead: float) -> void:
 	var k := r.kart
 	var local := track.to_local(k.global_position)
-	var index := track.get_closest_index(local, r.index)
+	var index := track.get_closest_index(local, r.index, KartAI.SEARCH_WINDOW)
 	var along := track.get_along(local, index)
 	var step := along - r.along
 	if step < -track.length * 0.5:

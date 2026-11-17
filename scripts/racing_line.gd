@@ -17,12 +17,44 @@ var curvature := PackedFloat32Array()
 var limit := 0.0
 
 var _step := 2.0
+## Soma da curvatura das amostras antes de cada índice (n + 1 valores): dá a soma de
+## qualquer trecho com duas leituras (turn_between).
+var _curv_sum := PackedFloat64Array()
+## Curvatura em módulo (max_curvature).
+var _abs_curv := PackedFloat32Array()
+
+## Trajetórias já calculadas (a pista não muda durante o jogo): chave -> RacingLine.
+## Reiniciar a corrida ou voltar a uma pista não refaz a conta (~15 ms, ~60 na web).
+static var _cache := {}
 
 
 ## `margin` = distância mínima (m) entre o meio do kart e a borda do asfalto.
 static func build(p_track: Track, margin := 2.4) -> RacingLine:
+	var n := p_track.samples.size()
+	var key := "%s|%d|%.3f|%.3f|%.3f" % [p_track.track_id, n, p_track.length, p_track.road_width, margin]
+	var cached: RacingLine = _cache.get(key)
+	if cached:
+		return cached._bound_to(p_track)
+	var line := _compute(p_track, margin)
+	_cache[key] = line
+	return line._bound_to(p_track)
+
+
+## Cópia que lê a pista `p_track` (as tabelas são as mesmas, só leitura).
+func _bound_to(p_track: Track) -> RacingLine:
 	var line := RacingLine.new()
 	line.track = p_track
+	line.lateral = lateral
+	line.curvature = curvature
+	line.limit = limit
+	line._step = _step
+	line._curv_sum = _curv_sum
+	line._abs_curv = _abs_curv
+	return line
+
+
+static func _compute(p_track: Track, margin: float) -> RacingLine:
+	var line := RacingLine.new()
 	var n := p_track.samples.size()
 	line.limit = maxf(p_track.road_width * 0.5 - margin, 0.0)
 	var lat := PackedFloat32Array()
@@ -51,6 +83,7 @@ static func build(p_track: Track, margin := 2.4) -> RacingLine:
 				lat[i] = clampf(lerpf(lat[i], target, 0.5), -lim, lim)
 	line.lateral = lat
 	line._compute_curvature(center, right)
+	line._index_curvature()
 	return line
 
 
@@ -99,21 +132,73 @@ func curvature_at(dist: float) -> float:
 	return _sample(curvature, dist)
 
 
-## Maior curvatura (em módulo) entre `from` e `from + span`.
+## Tabelas para as consultas de trecho (chamadas a cada passo por cada adversário).
+func _index_curvature() -> void:
+	var n := curvature.size()
+	_curv_sum.resize(n + 1)
+	_abs_curv.resize(n)
+	var acc := 0.0
+	for i in n:
+		_curv_sum[i] = acc
+		acc += curvature[i]
+		_abs_curv[i] = absf(curvature[i])
+	_curv_sum[n] = acc
+
+
+## Maior curvatura (em módulo) entre `from` e `from + span`, olhando a cada amostra
+## (o mesmo que medir com curvature_at a cada `_step` metros, sem as contas de cada
+## leitura).
 func max_curvature(from: float, span: float) -> float:
+	var n := _abs_curv.size()
+	if n == 0:
+		return 0.0
+	var f := fposmod(from, track.length) / _step
+	var i := int(f) % n
+	var t := f - floorf(f)
+	var count := int(span / _step) + 1
 	var best := 0.0
-	var d := 0.0
-	while d <= span:
-		best = maxf(best, absf(curvature_at(from + d)))
-		d += _step
+	var a := _abs_curv[i]
+	var ca := curvature[i]
+	for k in count:
+		var j := i + 1
+		if j >= n:
+			j -= n
+		var cb := curvature[j]
+		# |lerp| só precisa da conta quando os dois lados podem passar do melhor.
+		if a > best or _abs_curv[j] > best:
+			best = maxf(best, absf(lerpf(ca, cb, t)))
+		i = j
+		ca = cb
+		a = _abs_curv[j]
 	return best
 
 
-## Quanto a trajetória vira (rad, positivo = direita) entre `from` e `from + span`.
+## Quanto a trajetória vira (rad, positivo = direita) entre `from` e `from + span`:
+## a soma da curvatura a cada `_step` metros (interpolada), vezes `_step`.
 func turn_between(from: float, span: float) -> float:
-	var total := 0.0
-	var d := 0.0
-	while d < span:
-		total += curvature_at(from + d) * _step
-		d += _step
+	var n := curvature.size()
+	if n == 0 or _curv_sum.size() != n + 1:
+		return 0.0
+	var count := ceili(span / _step)
+	if count <= 0:
+		return 0.0
+	var f := fposmod(from, track.length) / _step
+	var i := int(f) % n
+	var t := f - floorf(f)
+	# Cada leitura é lerp(c[i+k], c[i+k+1], t): somando, (1-t)·Σc[i..] + t·Σc[i+1..].
+	return ((1.0 - t) * _range_sum(i, count) + t * _range_sum(i + 1, count)) * _step
+
+
+## Soma de `count` amostras seguidas a partir de `first` (dando a volta na pista).
+func _range_sum(first: int, count: int) -> float:
+	var n := curvature.size()
+	var laps := count / n
+	var rest := count - laps * n
+	var start := first % n
+	var total := _curv_sum[n] * laps
+	var end := start + rest
+	if end <= n:
+		total += _curv_sum[end] - _curv_sum[start]
+	else:
+		total += _curv_sum[n] - _curv_sum[start] + _curv_sum[end - n]
 	return total

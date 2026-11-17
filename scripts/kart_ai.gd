@@ -12,6 +12,16 @@ extends RefCounted
 
 enum Drift { NONE, HOP, ON }
 
+## Escolhas sorteadas uma vez por volta (_decided): tipo + índice da rampa/placa.
+const CHOICE_PAD := 0
+const CHOICE_RAMP := 100
+const CHOICE_OBSTACLES := 200
+## Faixas testadas para desviar (m em relação à trajetória).
+const AVOID_OFFSETS: Array[float] = [0.0, -2.6, 2.6, -5.2, 5.2]
+## Amostras para cada lado em que o kart é procurado a partir do índice anterior. Um
+## passo de física anda menos de uma amostra (~2 m); reposicionado, o índice zera.
+const SEARCH_WINDOW := 10
+
 ## Nível do piloto: 0 = iniciante (trajetória larga, poucos drifts, erra mais),
 ## 1 = profissional.
 var skill := 0.5
@@ -65,6 +75,8 @@ var _ramps: Array[Dictionary] = []
 var _pads := PackedFloat32Array()
 ## Escolhas sorteadas uma vez por volta (pegar a rampa estreita, a placa de turbo).
 var _choices := {}
+## Controle devolvido a cada passo (o mesmo dicionário, reaproveitado).
+var _output := {"throttle": 0.0, "brake": 0.0, "steer": 0.0, "drift": false, "drift_pressed": false}
 
 # Saídas do drift (preenchidas por _update_drift).
 var _out_steer := 0.0
@@ -113,7 +125,7 @@ func drive(k: Kart) -> Dictionary:
 	_time += delta
 	var local := track.to_local(k.global_position)
 	var first := _index < 0
-	_index = track.get_closest_index(local, _index)
+	_index = track.get_closest_index(local, _index, SEARCH_WINDOW)
 	var along := track.get_along(local, _index)
 	if not first:
 		var step := along - _last_along
@@ -191,13 +203,17 @@ func drive(k: Kart) -> Dictionary:
 	else:
 		_stuck = 0.0
 
-	return {
-		"throttle": throttle,
-		"brake": brake,
-		"steer": steer,
-		"drift": drift_held,
-		"drift_pressed": drift_pressed,
-	}
+	return _set_output(throttle, brake, steer, drift_held, drift_pressed)
+
+
+## Preenche e devolve o dicionário de controle (quem lê usa na hora, não guarda).
+func _set_output(throttle: float, brake: float, steer: float, drift: bool, drift_pressed: bool) -> Dictionary:
+	_output.throttle = throttle
+	_output.brake = brake
+	_output.steer = steer
+	_output.drift = drift
+	_output.drift_pressed = drift_pressed
+	return _output
 
 
 func _drive_reverse(k: Kart, delta: float) -> Dictionary:
@@ -207,7 +223,7 @@ func _drive_reverse(k: Kart, delta: float) -> Dictionary:
 	var alpha := k.get_forward().signed_angle_to(tangent, Vector3.UP)
 	# Dando ré o volante vira ao contrário.
 	var steer := -signf(alpha) if absf(alpha) > 0.15 else 0.0
-	return {"throttle": 0.0, "brake": 1.0, "steer": steer, "drift": false, "drift_pressed": false}
+	return _set_output(0.0, 1.0, steer, false, false)
 
 
 func _right_at(dist: float) -> Vector3:
@@ -249,11 +265,14 @@ func _mistake_lateral(delta: float) -> float:
 
 
 ## Sorteia uma escolha uma vez por volta (a mesma chave dá a mesma resposta na volta).
-func _decided(key: String, chance: float) -> bool:
-	var id := "%s:%d" % [key, _lap]
-	if not _choices.has(id):
-		_choices[id] = randf() < chance
-	return _choices[id]
+## `key` = CHOICE_* + índice.
+func _decided(key: int, chance: float) -> bool:
+	var id := _lap * 1000 + key
+	var known: Variant = _choices.get(id)
+	if known == null:
+		known = randf() < chance
+		_choices[id] = known
+	return known
 
 
 func _to_ahead(dist: float, along: float) -> float:
@@ -265,7 +284,7 @@ func _aim_boost_pads(along: float, lat: float) -> float:
 		var to_pad := _to_ahead(_pads[i], along)
 		if to_pad < -3.0 or to_pad > 45.0:
 			continue
-		if not _decided("turbo%d" % i, lerpf(0.25, 0.9, skill)):
+		if not _decided(CHOICE_PAD + i, lerpf(0.25, 0.9, skill)):
 			continue
 		var w := clampf(1.0 - (to_pad - 8.0) / 37.0, 0.0, 1.0)
 		return lerpf(lat, 0.0, w)
@@ -291,7 +310,7 @@ func _ramp_lane(target_d: float, lat: float) -> float:
 			continue
 		if not r.narrow:
 			return clampf(lat, r.center - r.half + 1.4, r.center + r.half - 1.4)
-		if _decided("rampa%d" % i, lerpf(0.3, 0.9, skill)):
+		if _decided(CHOICE_RAMP + i, lerpf(0.3, 0.9, skill)):
 			var w := clampf(1.0 - (to_lip - r.length - 8.0) / 30.0, 0.0, 1.0)
 			return lerpf(lat, r.center, w)
 		var keep: float = r.half + 2.2
@@ -307,11 +326,11 @@ func _avoid_offset(k: Kart, lat: float, lat_now: float) -> float:
 	var fwd := track.global_basis * track.tangents[_index]
 	var right := track.global_basis * track.rights[_index]
 	var edge := track.road_width * 0.5 - 1.5
-	var offsets: Array[float] = [0.0, -2.6, 2.6, -5.2, 5.2]
+	var offsets := AVOID_OFFSETS
 	# Obstáculos à frente: onde cada um vai estar quando este kart chegar.
 	var hazards := PackedFloat32Array()
 	var obstacles := track.obstacles
-	if obstacles and obstacles.has_zone_ahead(_last_along) and _decided("obstaculos", lerpf(0.35, 0.95, skill)):
+	if obstacles and obstacles.has_zone_ahead(_last_along) and _decided(CHOICE_OBSTACLES, lerpf(0.35, 0.95, skill)):
 		var lanes := PackedFloat32Array()
 		for offset in offsets:
 			lanes.append(clampf(lat + offset, -edge, edge))
