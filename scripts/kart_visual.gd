@@ -60,7 +60,9 @@ func setup(p_kart: KartData, p_character: CharacterData) -> void:
 	driver = null
 	if p_character and p_character.model_scene:
 		driver = p_character.instantiate_rig()
-		driver.setup_drive(p_character.kart_scale, p_character.seat_height)
+		driver.cockpit = p_kart.cockpit()
+		driver.setup_drive(p_character.kart_scale, p_character.seat_height, p_kart.turn_lean_degrees > 0.0,
+				p_character.seat_forward)
 		driver.position = p_kart.seat_position
 		driver.rotation = Vector3(0.0, PI, 0.0)
 		add_child(driver)

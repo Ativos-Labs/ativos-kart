@@ -3,7 +3,8 @@ extends Resource
 ## Dados de um personagem (piloto): modelo 3D, cores da interface e atributos.
 ## Para criar um personagem novo: duplique res://data/personagens/celerino.tres,
 ## troque o modelo e os textos, e acrescente-o na lista `characters` em GameState.
-## O modelo precisa usar o mesmo esqueleto do Celerino (veja CharacterRig).
+## Com um esqueleto diferente do do Celerino, aponte `skeleton` para um
+## CharacterSkeleton com os ossos e as animações dele (veja o do Jarbas).
 
 @export var display_name := "Personagem"
 ## Frase curta mostrada embaixo do nome na seleção.
@@ -14,12 +15,23 @@ extends Resource
 
 @export_group("Modelo 3D")
 @export var model_scene: PackedScene
+## Ossos, animações extras e jeito de pilotar do modelo. Vazio = o esqueleto do Celerino.
+@export var skeleton: CharacterSkeleton
 ## Escala do personagem sentado no kart (o modelo do Celerino tem 2 m de altura).
 @export var kart_scale := 0.55
 ## Escala do personagem em pé nas telas de seleção.
 @export var showcase_scale := 1.0
+## Escala e deslocamento do personagem no retrato (grade de seleção, seleção de kart e
+## HUD). A câmera do retrato fica a 1,42 m de altura e enquadra ~1,5 m: o Celerino
+## (2 m) aparece da barriga para cima; personagens menores crescem e descem até o rosto
+## ficar no mesmo lugar.
+@export var portrait_scale := 1.0
+@export var portrait_offset := Vector3.ZERO
 ## Altura (no modelo, em metros) da base do corpo — é o ponto que encosta no banco.
 @export var seat_height := 0.54
+## Quanto o personagem senta à frente do ponto do banco do kart (no modelo, em
+## metros). Para personagens de corpo grosso, cujas costas passariam do encosto.
+@export var seat_forward := 0.0
 
 @export_group("Cores")
 ## Cor principal (faixa do nome, destaque do retrato).
@@ -32,6 +44,11 @@ extends Resource
 @export var model_tint := Color(0, 0, 0, 0)
 ## Materiais do modelo que a `model_tint` recolore (no Celerino: os azuis).
 @export var tint_materials := PackedStringArray()
+## Modelos com textura: cor de referência das partes recoloridas. Só os pontos da
+## textura com matiz parecida com a dela trocam de cor (o azul do macacão, não a pele);
+## ela vira a `model_tint` e o resto mantém a proporção. Transparente = recolore o
+## material inteiro pela cor do primeiro de `tint_materials` (modelos de cor lisa).
+@export var tint_reference := Color(0, 0, 0, 0)
 
 @export_group("Atributos (1 a 5)")
 ## Os atributos do personagem se somam aos do kart (3 = neutro).

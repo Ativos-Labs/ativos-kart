@@ -7,34 +7,24 @@ extends Node3D
 ## corpo → pernas → mãos → gestos → rosto → olhos → piscada.
 ##
 ## Modo STAND (telas de seleção): em pé, respirando, acenando, com expressões.
-## Modo DRIVE (no kart): sentado no banco, mãos no volante (IK com braço "elástico" de
-## desenho animado), inclina nas curvas, reage a turbo, batidas e chegada.
+## Modo DRIVE (no kart): sentado no banco, mãos no volante, inclina nas curvas, reage a
+## turbo, batidas e chegada. As mãos seguem o volante por IK: braço reto e "elástico" de
+## desenho animado (Celerino) ou braço com cotovelo, com o tronco inclinando para
+## alcançar o volante (personagens de proporção humana, como o Jarbas).
+##
+## Os nomes dos ossos e o jeito de pilotar vêm do CharacterSkeleton do personagem
+## (padrão: o esqueleto do Celerino, 65 ossos).
 
 ## Emitido quando a expressão muda (o retrato do HUD imita o piloto).
 signal face_changed(face_name: StringName)
 
 enum Mode { STAND, DRIVE }
 
-# --- Grupos de ossos ------------------------------------------------------------
-const BODY := [&"body_01", &"body_02", &"body_03", &"body_04", &"body_05"]
-const ARM_L := [&"upper_arm.L", &"forearm.L", &"hand.L"]
-const ARM_R := [&"upper_arm.R", &"forearm.R", &"hand.R"]
-const LEGS := [&"thigh.L", &"shin.L", &"foot.L", &"toe.L", &"thigh.R", &"shin.R", &"foot.R", &"toe.R"]
-const FACE := [&"brow.L", &"brow.R", &"eye.L", &"eye.R", &"eyelid.L", &"eyelid.R", &"mouth", &"jaw",
-		&"teeth_lower", &"teeth_upper", &"tongue", &"lip_corner.L", &"lip_corner.R"]
-const EYES := [&"eye.L", &"eye.R"]
-const LIDS := [&"eyelid.L", &"eyelid.R"]
-const FINGERS := [&"index_01", &"index_02", &"index_03", &"middle_01", &"middle_02", &"middle_03",
-		&"pinky_01", &"pinky_02", &"pinky_03", &"thumb_01", &"thumb_02", &"thumb_03"]
-
 ## Ordem de aplicação das camadas (menor primeiro).
 const ORDER := {
 	&"body": 0, &"body_add": 1, &"legs": 2, &"hands": 3, &"gesture": 4,
 	&"face": 5, &"eyes": 6, &"blink": 7,
 }
-
-## Pálpebra: deslocamento em Y que fecha o olho (veja RIG.md).
-const EYELID_CLOSED := -0.332
 
 
 class Layer:
@@ -65,22 +55,8 @@ var data: CharacterData
 var mode := Mode.STAND
 ## Expressão padrão (volta para ela depois de uma reação).
 var default_face := &"face_happy"
-
-@export_group("Pose de piloto")
-## Ponto da mão esquerda fechada (espaço do osso hand.L) por onde passa a barra do
-## volante: o vão entre a palma (+X) e os dedos dobrados, perto dos nós dos dedos (+Y).
-## O eixo Z do osso vai do mindinho para o polegar. A mão direita usa o espelho em X.
-@export var grip_point := Vector3(0.03, 0.18, 0.0)
-## Quanto o braço todo pode esticar (1 = tamanho normal).
-@export var max_arm_stretch := 2.6
-## Quanto o punho pode dobrar (graus) para a mão acompanhar a barra. Se precisar de
-## mais, a mão fica um pouco atravessada na barra em vez de quebrar o punho.
-@export var max_wrist_bend_degrees := 35.0
-## Direção das coxas e canelas (espaço do personagem: +Z = frente).
-@export var thigh_direction := Vector3(0.12, -0.12, 1.0)
-@export var shin_direction := Vector3(0.05, -1.0, 0.45)
-## Inclinação para a frente ao pilotar (0 a 1).
-@export var lean_forward := 0.25
+## Ossos e jeito de pilotar (CharacterData.skeleton, ou o padrão do Celerino).
+var skeleton_data: CharacterSkeleton
 
 # --- Entradas do modo piloto (atualizadas pelo kart) --------------------------------
 ## -1 a 1 (positivo = esquerda).
@@ -94,6 +70,23 @@ var hand_target_r := Vector3.ZERO
 var hand_grip_l := Vector3.UP
 var hand_grip_r := Vector3.UP
 var has_hand_targets := false
+## Medidas do banco e do assoalho do kart (KartData.cockpit(), espaço do nó pai). Com
+## `skeleton_data.fit_seat`, a pose sentada é montada a partir delas.
+var cockpit := {}:
+	set(value):
+		cockpit = value
+		_cp_corner = value.get("seat_back_point", Vector3.ZERO)
+		_cp_back_angle = deg_to_rad(float(value.get("seat_back_angle", 0.0)))
+		_cp_seat_front = float(value.get("seat_front_z", 0.0))
+		_cp_floor = float(value.get("floor_height", 0.0))
+		_cp_foot_limit = float(value.get("foot_limit_z", 0.0))
+		_cp_foot_spread = float(value.get("foot_spread", 0.12))
+var _cp_corner := Vector3.ZERO
+var _cp_back_angle := 0.0
+var _cp_seat_front := 0.0
+var _cp_floor := 0.0
+var _cp_foot_limit := 0.0
+var _cp_foot_spread := 0.12
 
 var skeleton: Skeleton3D
 var model: Node3D
@@ -114,6 +107,8 @@ var _bone := {}
 
 var _model_scale := 1.0
 var _model_base := Vector3.ZERO
+## Sentado numa moto (usa a pose de moto do esqueleto, se houver).
+var _bike := false
 var _blink: Layer
 var _look := {}
 var _body_add := {}
@@ -139,6 +134,31 @@ var _skipped := 0
 var _skipped_delta := 0.0
 ## Coxa e canela de cada lado (L, L, R, R) para _pose_legs (-1 = osso não existe).
 var _leg_bones := PackedInt32Array([-1, -1, -1, -1])
+## Braço, antebraço e mão de cada lado (-1 = osso não existe).
+var _arm_bones: Array[PackedInt32Array] = [PackedInt32Array([-1, -1, -1]), PackedInt32Array([-1, -1, -1])]
+## Coxa, canela e pé de cada lado, o quadril e os dois últimos ossos da coluna (pescoço e
+## cabeça), para montar a pose sentada (-1 = osso não existe).
+var _leg_chain: Array[PackedInt32Array] = [PackedInt32Array([-1, -1, -1]), PackedInt32Array([-1, -1, -1])]
+var _hips_bone := -1
+var _neck_bones := PackedInt32Array()
+## Pálpebras que giram: eixo e ângulo de fechar de cada uma (tirados da piscada).
+var _lid_axis := {}
+var _lid_closed := {}
+## Braço com cotovelo: giro da mão em relação ao antebraço na pose sentada (a pegada
+## medida) e a base global de repouso do pai de cada braço (o cotovelo acompanha o peito).
+var _neutral_hand: Array[Quaternion] = [Quaternion.IDENTITY, Quaternion.IDENTITY]
+var _arm_parent_rest: Array[Basis] = [Basis.IDENTITY, Basis.IDENTITY]
+## Inclinação extra do tronco para alcançar o volante (peso de body_lean_forward) e
+## quanto o corpo deslizou para a frente no banco (no modelo, em metros).
+var _reach_lean := 0.0
+var _reach_slide := 0.0
+## Quanto faltou (+) ou sobrou (-) de braço em cada lado no último quadro, para o punho
+## ficar a 95% do braço esticado (no modelo, em metros; NAN = sem medida).
+var _arm_excess := PackedFloat32Array([NAN, NAN])
+## Fração do braço esticado que a pose busca (um pouco dobrado parece mais natural).
+const REACH_EXTENSION := 0.95
+## Quanto body_lean_forward inclina o tronco inteiro (rad, com peso 1).
+var _lean_angle := deg_to_rad(20.0)
 
 ## Trilhas de cada animação por osso (id da animação -> {osso: Vector3i(pos, rot, escala)}).
 static var _track_cache := {}
@@ -147,6 +167,7 @@ static var _constant_cache := {}
 
 
 func _ready() -> void:
+	skeleton_data = data.skeleton if data and data.skeleton else CharacterSkeleton.new()
 	if data and data.model_scene:
 		model = data.model_scene.instantiate() as Node3D
 	if model == null:
@@ -165,6 +186,11 @@ func _ready() -> void:
 		player.active = false
 		for anim_name in player.get_animation_list():
 			_anims[StringName(anim_name)] = player.get_animation(anim_name)
+	# As do esqueleto completam (ou trocam) as do modelo.
+	var library := skeleton_data.animations
+	if library:
+		for anim_name in library.get_animation_list():
+			_anims[anim_name] = library.get_animation(anim_name)
 	_setup_skeleton()
 	_apply_mode()
 	# Cada piloto começa numa fase diferente: com `update_every` > 1 eles não refazem a
@@ -183,11 +209,13 @@ func setup_stand(scale_value := 1.0) -> void:
 		_apply_mode()
 
 
-## Personagem sentado: a base do corpo fica na origem deste nó.
-func setup_drive(scale_value: float, seat_height: float) -> void:
+## Personagem sentado: a base do corpo fica na origem deste nó. `seat_forward` (no
+## modelo) adianta o corpo no banco; `bike` = montado numa moto.
+func setup_drive(scale_value: float, seat_height: float, bike := false, seat_forward := 0.0) -> void:
 	mode = Mode.DRIVE
 	_model_scale = scale_value
-	_model_base = Vector3(0.0, -seat_height * scale_value, 0.0)
+	_model_base = Vector3(0.0, -seat_height, seat_forward) * scale_value
+	_bike = bike
 	if is_node_ready():
 		_apply_mode()
 
@@ -208,28 +236,83 @@ func _setup_skeleton() -> void:
 	_pos = _rest_pos.duplicate()
 	_rot = _rest_rot.duplicate()
 	_scl = _rest_scl.duplicate()
-	var legs := [&"thigh.L", &"shin.L", &"thigh.R", &"shin.R"]
-	for i in legs.size():
-		_leg_bones[i] = _bone.get(legs[i], -1)
+	var sd := skeleton_data
+	var legs := sd.legs
+	if legs.size() >= 6:
+		_leg_bones = PackedInt32Array([_bone.get(StringName(legs[0]), -1), _bone.get(StringName(legs[1]), -1),
+				_bone.get(StringName(legs[legs.size() / 2]), -1), _bone.get(StringName(legs[legs.size() / 2 + 1]), -1)])
+	for side in 2:
+		var names := sd.arm_left if side == 0 else sd.arm_right
+		for k in mini(names.size(), 3):
+			_arm_bones[side][k] = _bone.get(StringName(names[k]), -1)
+		var half := legs.size() / 2
+		if half >= 3:
+			for k in 3:
+				_leg_chain[side][k] = _bone.get(StringName(legs[side * half + k]), -1)
+	_hips_bone = _bone.get(StringName(sd.hips[0]), -1) if not sd.hips.is_empty() else -1
+	_neck_bones.clear()
+	for k in range(maxi(sd.body.size() - 2, 0), sd.body.size()):
+		_neck_bones.append(_bone.get(StringName(sd.body[k]), -1))
 
-	var fingers_l: Array = []
-	var fingers_r: Array = []
-	for f in FINGERS:
-		fingers_l.append(StringName(f + ".L"))
-		fingers_r.append(StringName(f + ".R"))
-	_masks[&"body"] = _ids(BODY)
-	_masks[&"legs"] = _ids(LEGS)
-	_masks[&"arms"] = _ids(ARM_L + ARM_R)
-	_masks[&"body_arms"] = _ids(BODY + ARM_L + ARM_R)
-	_masks[&"body_arms_legs"] = _ids(BODY + ARM_L + ARM_R + LEGS)
+	var body := Array(sd.body)
+	var arms := Array(sd.arm_left) + Array(sd.arm_right)
+	var fingers_l := Array(sd.fingers_left)
+	var fingers_r := Array(sd.fingers_right)
+	_masks[&"body"] = _ids(body)
+	_masks[&"legs"] = _ids(Array(sd.legs))
+	_masks[&"arms"] = _ids(arms)
+	_masks[&"body_arms"] = _ids(body + arms)
+	_masks[&"body_arms_legs"] = _ids(body + arms + Array(sd.legs))
+	_masks[&"drive"] = _ids(Array(sd.hips) + body + Array(sd.shoulders) + arms + Array(sd.legs) + fingers_l + fingers_r)
 	_masks[&"fingers_l"] = _ids(fingers_l)
 	_masks[&"fingers_r"] = _ids(fingers_r)
-	_masks[&"arms_fingers"] = _ids(ARM_L + ARM_R + fingers_l + fingers_r)
-	_masks[&"arm_fingers_l"] = _ids(ARM_L + fingers_l)
-	_masks[&"arm_fingers_r"] = _ids(ARM_R + fingers_r)
-	_masks[&"face"] = _ids(FACE)
-	_masks[&"eyes"] = _ids(EYES)
-	_masks[&"lids"] = _ids(LIDS)
+	_masks[&"arms_fingers"] = _ids(arms + fingers_l + fingers_r)
+	_masks[&"arm_fingers_l"] = _ids(Array(sd.arm_left) + fingers_l)
+	_masks[&"arm_fingers_r"] = _ids(Array(sd.arm_right) + fingers_r)
+	_masks[&"face"] = _ids(Array(sd.face))
+	_masks[&"eyes"] = _ids(Array(sd.eyes))
+	_masks[&"lids"] = _ids(Array(sd.lids))
+	_setup_lid_limits()
+	for side in 2:
+		var upper := _arm_bones[side][0]
+		if upper >= 0 and _parent[upper] >= 0:
+			_arm_parent_rest[side] = _rest_global_basis(_parent[upper])
+
+
+## Base global (espaço do esqueleto) de um osso na pose de repouso.
+func _rest_global_basis(i: int) -> Basis:
+	var b := Basis(_rest_rot[i])
+	var p := _parent[i]
+	while p >= 0:
+		b = Basis(_rest_rot[p]) * b
+		p = _parent[p]
+	return b
+
+
+## Pálpebras que fecham girando: o eixo e o ângulo de fechar saem do quadro mais
+## fechado da animação `blink` (para a piscada não passar do fechado em cima de uma
+## expressão que já aperta os olhos).
+func _setup_lid_limits() -> void:
+	_lid_axis.clear()
+	_lid_closed.clear()
+	var blink_anim: Animation = _anims.get(&"blink")
+	if skeleton_data.eyelid_closed_offset != 0.0 or blink_anim == null:
+		return
+	var map := _track_map(blink_anim)
+	for b in _masks[&"lids"]:
+		var tr: Vector3i = map.get(StringName(skeleton.get_bone_name(b)), Vector3i(-1, -1, -1))
+		if tr.y < 0:
+			continue
+		var best := Quaternion.IDENTITY
+		for k in blink_anim.track_get_key_count(tr.y):
+			var d := _rest_rot[b].inverse() * (blink_anim.track_get_key_value(tr.y, k) as Quaternion)
+			if d.w < 0.0:
+				d = -d
+			if d.get_angle() > best.get_angle():
+				best = d
+		if best.get_angle() > 0.05:
+			_lid_axis[b] = best.get_axis().normalized()
+			_lid_closed[b] = best.get_angle()
 
 
 ## Recolore o modelo: os materiais da lista trocam a matiz para a de `tint`. O
@@ -296,17 +379,43 @@ func _apply_mode() -> void:
 		_set_layer(&"body", &"idle", &"body_arms", 100.0)
 		_set_layer(&"hands", &"hand_relaxed_L", &"fingers_l", 100.0)
 		_add_layer(&"hand_relaxed_R", &"fingers_r", &"hands").weight = 1.0
+	elif skeleton_data.drive_pose != &"":
+		# Pose sentada pronta (quadril, pernas, braços e dedos) com a respiração somada.
+		var pose_name := skeleton_data.drive_pose
+		if _bike and skeleton_data.bike_pose != &"":
+			pose_name = skeleton_data.bike_pose
+		_set_layer(&"body", pose_name, &"drive", 100.0)
+		var breathing := _add_layer(&"idle", &"body", &"body_add", true)
+		if breathing:
+			breathing.manual = true
+			breathing.weight = 0.5
+		_store_neutral_hands(_anims.get(pose_name))
 	else:
 		var breathing := _set_layer(&"body", &"idle", &"body", 100.0)
 		if breathing:
 			breathing.target = 0.5
 			breathing.weight = 0.5
+	if mode == Mode.DRIVE:
 		for clip in [&"body_lean_forward", &"body_lean_back", &"body_bend_left", &"body_bend_right",
 				&"body_twist_left", &"body_twist_right"]:
 			var layer := _add_layer(clip, &"body", &"body_add", true)
 			if layer:
 				layer.manual = true
 				_body_add[clip] = layer
+		_reach_lean = 0.0
+		_reach_slide = 0.0
+		_arm_excess = PackedFloat32Array([NAN, NAN])
+		var lean: Layer = _body_add.get(&"body_lean_forward")
+		if lean and lean.static_pose and _arm_bones[0][0] >= 0:
+			# Só contam os ossos entre o quadril e o ombro (o pescoço não leva o braço).
+			var net := Quaternion.IDENTITY
+			for k in lean.bones.size():
+				var p := _parent[_arm_bones[0][0]]
+				while p >= 0 and p != lean.bones[k]:
+					p = _parent[p]
+				if p >= 0:
+					net = net * lean.s_rot[k]
+			_lean_angle = maxf(net.get_angle(), 0.05)
 		_set_layer(&"hands", &"hand_fist_L", &"fingers_l", 100.0)
 		_add_layer(&"hand_fist_R", &"fingers_r", &"hands").weight = 1.0
 	_set_layer(&"face", default_face, &"face", 100.0)
@@ -321,6 +430,21 @@ func _apply_mode() -> void:
 		_blink.manual = true
 		_blink.weight = 0.0
 	_process(0.0)
+
+
+## Giro de cada mão em relação ao antebraço na pose sentada: é a pegada "neutra" da
+## mão no volante (os valores do esqueleto foram medidos nessa pose).
+func _store_neutral_hands(pose: Animation) -> void:
+	for side in 2:
+		var hand := _arm_bones[side][2]
+		if hand < 0:
+			continue
+		_neutral_hand[side] = _rest_rot[hand]
+		if pose == null:
+			continue
+		var tr: Vector3i = _track_map(pose).get(StringName(skeleton.get_bone_name(hand)), Vector3i(-1, -1, -1))
+		if tr.y >= 0:
+			_neutral_hand[side] = pose.rotation_track_interpolate(tr.y, 0.0)
 
 
 # --- Camadas ---------------------------------------------------------------------------
@@ -652,9 +776,17 @@ func _process(delta: float) -> void:
 	_clamp_eyelids()
 
 	if mode == Mode.DRIVE:
-		_pose_legs()
+		var fit := _fitting()
+		if fit:
+			# O pulinho entra antes: o quadril sobe com ele e os pés e as mãos ficam presos
+			# no kart.
+			_update_bounce(delta)
+			_fit_seat()
+		elif skeleton_data.drive_pose == &"":
+			_pose_legs()
 		_pose_arms(delta)
-		_update_bounce(delta)
+		if not fit:
+			_update_bounce(delta)
 	for i in _pos.size():
 		skeleton.set_bone_pose_position(i, _pos[i])
 		skeleton.set_bone_pose_rotation(i, _rot[i])
@@ -699,7 +831,10 @@ func _update_manual_layers() -> void:
 	var bend := _steer_s * 0.55 + _drift_s * 0.35 + _pose.y
 	var twist := _drift_s * 0.35 + _pose.z
 	var back := maxf(_pose.x, 0.0)
-	_set_weight(_body_add, &"body_lean_forward", lean_forward * (1.0 - _boost_lean) * (1.0 - back) + maxf(-_pose.x, 0.0))
+	# A inclinação para alcançar o volante entra aqui (coluna) ou no quadril (_fit_seat).
+	var reach := 0.0 if _fitting() else _reach_lean
+	_set_weight(_body_add, &"body_lean_forward", skeleton_data.lean_forward * (1.0 - _boost_lean) * (1.0 - back)
+			+ maxf(-_pose.x, 0.0) + reach * (1.0 - back))
 	_set_weight(_body_add, &"body_lean_back", _boost_lean * 0.7 + back)
 	_set_weight(_body_add, &"body_bend_left", maxf(bend, 0.0))
 	_set_weight(_body_add, &"body_bend_right", maxf(-bend, 0.0))
@@ -714,8 +849,23 @@ func _set_weight(dict: Dictionary, key: StringName, value: float) -> void:
 
 
 func _clamp_eyelids() -> void:
-	for b in _masks[&"lids"]:
-		_pos[b].y = clampf(_pos[b].y, _rest_pos[b].y + EYELID_CLOSED, _rest_pos[b].y)
+	var closed := skeleton_data.eyelid_closed_offset
+	if closed != 0.0:
+		for b in _masks[&"lids"]:
+			_pos[b].y = clampf(_pos[b].y, _rest_pos[b].y + closed, _rest_pos[b].y)
+		return
+	# Pálpebras que giram: o giro em volta do eixo de fechar fica entre "bem aberta"
+	# (metade do ângulo para o outro lado) e fechada.
+	for b in _lid_axis:
+		var axis: Vector3 = _lid_axis[b]
+		var limit: float = _lid_closed[b]
+		var d := _rest_rot[b].inverse() * _rot[b]
+		if d.w < 0.0:
+			d = -d
+		var angle := 2.0 * atan2(Vector3(d.x, d.y, d.z).dot(axis), d.w)
+		var clamped := clampf(angle, -0.5 * limit, limit)
+		if not is_equal_approx(angle, clamped):
+			_rot[b] = _rest_rot[b] * Quaternion(axis, clamped)
 
 
 func _update_bounce(delta: float) -> void:
@@ -728,7 +878,8 @@ func _update_bounce(delta: float) -> void:
 		_bounce_vel += (-_bounce * 90.0 - _bounce_vel * 9.0) * dt
 		_bounce += _bounce_vel * dt
 		remaining -= dt
-	model.position = _model_base + Vector3(0.0, _bounce * 0.05 * _model_scale, 0.0)
+	var slide := 0.0 if _fitting() else _reach_slide
+	model.position = _model_base + Vector3(0.0, _bounce * 0.05, slide) * _model_scale
 
 
 # --- Pose de piloto ------------------------------------------------------------------------
@@ -753,6 +904,11 @@ func _aim(i: int, dir: Vector3, weight := 1.0) -> void:
 	var parent_basis := Basis.IDENTITY
 	if _parent[i] >= 0:
 		parent_basis = _global(_parent[i]).basis.orthonormalized()
+	_aim_in(i, parent_basis, dir, weight)
+
+
+## Como _aim, com a base global (sem escala) do pai já calculada.
+func _aim_in(i: int, parent_basis: Basis, dir: Vector3, weight := 1.0) -> void:
 	var current := parent_basis * Basis(_rot[i])
 	var from := current.y.normalized()
 	var to := dir.normalized()
@@ -763,6 +919,121 @@ func _aim(i: int, dir: Vector3, weight := 1.0) -> void:
 	_rot[i] = _rot[i].slerp(local, weight)
 
 
+## Monta a pose sentada no kart a partir das medidas do cockpit (veja fit_seat).
+func _fitting() -> bool:
+	return mode == Mode.DRIVE and skeleton_data.fit_seat and not cockpit.is_empty() and _hips_bone >= 0
+
+
+func _fit_seat() -> void:
+	var sd := skeleton_data
+	var hips := _hips_bone
+	var to_skel := _parent_to_skeleton()
+	var from_skel := to_skel.affine_inverse()
+	var s := _model_scale
+	var corner := _cp_corner
+	# Tronco: paralelo ao encosto e inclinado a partir do quadril para alcançar o volante.
+	# Giro em volta do X do personagem: + = para a frente.
+	var lean := deg_to_rad(sd.max_hip_lean) * _reach_lean
+	var recline := 0.0 if _bike else _cp_back_angle - deg_to_rad(sd.pose_recline)
+	var pitch := lean - recline
+	_rotate_global(hips, Basis(Vector3.RIGHT, pitch))
+	# O pescoço e a cabeça desfazem parte da inclinação (olhando a pista).
+	if lean > 0.0:
+		for b in _neck_bones:
+			if b >= 0:
+				_rotate_global(b, Basis(Vector3.RIGHT, -lean * sd.head_counter / _neck_bones.size()))
+	# Quadril: o bumbum apoia no estofado com as costas no encosto (ou deslizou para a
+	# frente); a inclinação gira em volta do ponto de apoio, embaixo da articulação.
+	var fwd := Vector3.FORWARD
+	var seat_point := corner + fwd * (sd.hip_ahead_of_back + _reach_slide) * s
+	var hip_k := seat_point + (Vector3.UP * cos(pitch) + fwd * sin(pitch)) * sd.hip_above_seat * s
+	var hip_s := to_skel * hip_k + Vector3(0.0, _bounce * 0.05, 0.0)
+	var parent_g := _global(_parent[hips]) if _parent[hips] >= 0 else Transform3D.IDENTITY
+	_pos[hips] = parent_g.affine_inverse() * hip_s
+	if _bike:
+		return
+	var hips_g := parent_g * _local(hips)
+	for side in 2:
+		_fit_leg(side, hips_g, to_skel, from_skel)
+
+
+## Perna esticada para a frente até o calcanhar apoiar no estofado ou no assoalho, o mais
+## longe que ela alcança (`leg_extension`), sem a ponta do pé passar dos pedais.
+func _fit_leg(side: int, hips_g: Transform3D, to_skel: Transform3D, from_skel: Transform3D) -> void:
+	var chain := _leg_chain[side]
+	var upleg := chain[0]
+	var leg := chain[1]
+	var foot := chain[2]
+	if upleg < 0 or leg < 0 or foot < 0:
+		return
+	var sd := skeleton_data
+	var s := _model_scale
+	var parent_g := hips_g if _parent[upleg] == _hips_bone else _global(_parent[upleg])
+	var hip_k := from_skel * (parent_g * _local(upleg)).origin
+	var reach := (_rest_pos[leg].length() + _rest_pos[foot].length()) * s * sd.leg_extension
+	var pitch := deg_to_rad(sd.foot_pitch)
+	var lift := sd.ankle_lift * s
+	var out := signf(hip_k.x) if hip_k.x != 0.0 else (-1.0 if side == 0 else 1.0)
+	var x := out * maxf(absf(hip_k.x), _cp_foot_spread)
+	var z_stop := _cp_foot_limit + sd.foot_length * s * cos(pitch)
+	# O ponto mais à frente ao alcance: primeiro no estofado; se a perna passa da frente
+	# dele, no assoalho. A ponta do pé não passa dos pedais (z_stop).
+	var dx2 := (x - hip_k.x) * (x - hip_k.x)
+	var z := hip_k.z
+	var y := _cp_corner.y + lift
+	var dy := y - hip_k.y
+	var room := reach * reach - dx2 - dy * dy
+	if room > 0.0:
+		z = hip_k.z - sqrt(room)
+	if z <= _cp_seat_front:
+		var floor_y := _cp_floor + lift
+		var fdy := floor_y - hip_k.y
+		var froom := reach * reach - dx2 - fdy * fdy
+		if froom > 0.0 and hip_k.z - sqrt(froom) < _cp_seat_front:
+			y = floor_y
+			z = hip_k.z - sqrt(froom)
+		else:
+			z = _cp_seat_front
+	z = minf(maxf(z, z_stop), hip_k.z)
+	var ankle := Vector3(x, y, z)
+	var kp := sd.knee_pole
+	var pole := (to_skel.basis * Vector3(out * kp.x, kp.y, -kp.z)).normalized()
+	var foot_dir := (to_skel.basis * Vector3(out * 0.15, sin(pitch), -cos(pitch))).normalized()
+	_leg_ik(parent_g, upleg, leg, foot, to_skel * ankle, pole, foot_dir)
+
+
+## IK de dois ossos da perna (espaço do esqueleto; `parent_g` = transformação global do
+## pai da coxa): joelho para o lado de `pole`, pé apontando para `foot_dir`.
+func _leg_ik(parent_g: Transform3D, upleg: int, leg: int, foot: int, ankle: Vector3, pole: Vector3, foot_dir: Vector3) -> void:
+	var upper_g := parent_g * _local(upleg)
+	var hip := upper_g.origin
+	var a := _rest_pos[leg].length()
+	var b := _rest_pos[foot].length()
+	var to := ankle - hip
+	var dist := maxf(to.length(), 1e-5)
+	var dir := to / dist
+	var knee := hip + dir * a
+	if dist < (a + b) * 0.9995:
+		var cos_a := clampf((a * a + dist * dist - b * b) / (2.0 * a * dist), -1.0, 1.0)
+		var side_dir := pole - dir * pole.dot(dir)
+		if side_dir.length_squared() < 1e-8:
+			side_dir = Vector3.UP - dir * dir.y
+		knee = hip + (dir * cos_a + side_dir.normalized() * sqrt(1.0 - cos_a * cos_a)) * a
+	_aim_in(upleg, parent_g.basis.orthonormalized(), knee - hip)
+	upper_g = parent_g * _local(upleg)
+	_aim_in(leg, upper_g.basis.orthonormalized(), ankle - (upper_g * _local(leg)).origin)
+	var leg_g := upper_g * _local(leg)
+	_aim_in(foot, leg_g.basis.orthonormalized(), foot_dir)
+
+
+## Gira um osso no espaço do esqueleto (por cima da rotação que ele já tem).
+func _rotate_global(i: int, rotation_basis: Basis) -> void:
+	var parent_basis := Basis.IDENTITY
+	if _parent[i] >= 0:
+		parent_basis = _global(_parent[i]).basis.orthonormalized()
+	_rot[i] = Quaternion(parent_basis.inverse() * rotation_basis * parent_basis).normalized() * _rot[i]
+
+
 func _pose_legs() -> void:
 	for side in 2:
 		var thigh := _leg_bones[side * 2]
@@ -770,8 +1041,10 @@ func _pose_legs() -> void:
 		if thigh < 0 or shin < 0:
 			continue
 		var s := 1.0 if side == 0 else -1.0
-		_aim(thigh, Vector3(thigh_direction.x * s, thigh_direction.y, thigh_direction.z))
-		_aim(shin, Vector3(shin_direction.x * s, shin_direction.y, shin_direction.z))
+		var thigh_dir := skeleton_data.thigh_direction
+		var shin_dir := skeleton_data.shin_direction
+		_aim(thigh, Vector3(thigh_dir.x * s, thigh_dir.y, thigh_dir.z))
+		_aim(shin, Vector3(shin_dir.x * s, shin_dir.y, shin_dir.z))
 
 
 func _pose_arms(delta: float) -> void:
@@ -782,11 +1055,19 @@ func _pose_arms(delta: float) -> void:
 	if not has_hand_targets:
 		return
 	var to_skel := _parent_to_skeleton()
-	var grip_r := Vector3(-grip_point.x, grip_point.y, grip_point.z)
-	_arm_ik(&"upper_arm.L", &"forearm.L", &"hand.L", to_skel * hand_target_l,
-			(to_skel.basis * hand_grip_l).normalized(), grip_point, _ik_l)
-	_arm_ik(&"upper_arm.R", &"forearm.R", &"hand.R", to_skel * hand_target_r,
-			(to_skel.basis * hand_grip_r).normalized(), grip_r, _ik_r)
+	var target_l := to_skel * hand_target_l
+	var target_r := to_skel * hand_target_r
+	var thumb_l := (to_skel.basis * hand_grip_l).normalized()
+	var thumb_r := (to_skel.basis * hand_grip_r).normalized()
+	var sd := skeleton_data
+	if sd.bend_elbows:
+		_update_reach_lean(delta)
+		_arm_ik_bend(0, target_l, thumb_l, _ik_l)
+		_arm_ik_bend(1, target_r, thumb_r, _ik_r)
+		return
+	var grip_r := Vector3(-sd.grip_point.x, sd.grip_point.y, sd.grip_point.z)
+	_arm_ik(_arm_bones[0], target_l, thumb_l, sd.grip_point, _ik_l)
+	_arm_ik(_arm_bones[1], target_r, thumb_r, grip_r, _ik_r)
 
 
 ## Braço reto do ombro ao punho, com a mão fechada em volta da barra: o eixo Z da mão
@@ -796,13 +1077,12 @@ func _pose_arms(delta: float) -> void:
 ## Braço elástico: só o osso do braço estica (escala em Y); o antebraço desfaz essa
 ## escala e fica do tamanho normal. Escala não uniforme num osso entorta os filhos que
 ## giram em relação a ele, então assim a mão pode dobrar no punho sem deformar.
-func _arm_ik(upper_name: StringName, fore_name: StringName, hand_name: StringName,
-		target: Vector3, thumb: Vector3, grip: Vector3, weight: float) -> void:
+func _arm_ik(arm: PackedInt32Array, target: Vector3, thumb: Vector3, grip: Vector3, weight: float) -> void:
 	if weight <= 0.0:
 		return
-	var upper: int = _bone.get(upper_name, -1)
-	var fore: int = _bone.get(fore_name, -1)
-	var hand: int = _bone.get(hand_name, -1)
+	var upper := arm[0]
+	var fore := arm[1]
+	var hand := arm[2]
 	if upper < 0 or fore < 0 or hand < 0:
 		return
 	var shoulder := _global(upper).origin
@@ -815,7 +1095,7 @@ func _arm_ik(upper_name: StringName, fore_name: StringName, hand_name: StringNam
 	var to := wrist - shoulder
 	var upper_len := _rest_pos[fore].length()
 	var fore_len := _rest_pos[hand].length()
-	var max_stretch := (max_arm_stretch * (upper_len + fore_len) - fore_len) / upper_len
+	var max_stretch := (skeleton_data.max_arm_stretch * (upper_len + fore_len) - fore_len) / upper_len
 	var stretch := lerpf(1.0, clampf((to.length() - fore_len) / upper_len, 0.5, max_stretch), weight)
 
 	# Braço apontado para o punho, com o antebraço reto.
@@ -847,11 +1127,191 @@ func _grip_basis(arm_dir: Vector3, thumb: Vector3) -> Basis:
 		y = z.cross(Vector3.RIGHT if absf(z.x) < 0.9 else Vector3.FORWARD)
 	y = y.normalized()
 	var bend := y.angle_to(arm_dir)
-	var max_bend := deg_to_rad(max_wrist_bend_degrees)
+	var max_bend := deg_to_rad(skeleton_data.max_wrist_bend_degrees)
 	if bend > max_bend:
 		y = arm_dir.slerp(y, max_bend / bend).normalized()
 		z = (z - y * z.dot(y)).normalized()
 	return Basis(y.cross(z), y, z)
+
+
+## Leva os ombros para perto do volante até os punhos ficarem ao alcance dos braços
+## (só braços com cotovelo): primeiro o corpo desliza no banco, depois o tronco
+## inclina. Mede com a pose deste quadro (média das duas mãos, para o corpo não ir e
+## vir quando o volante gira) e corrige aos poucos; vale no quadro seguinte.
+func _update_reach_lean(delta: float) -> void:
+	var sd := skeleton_data
+	if sd.max_reach_lean <= 0.0 and sd.max_seat_slide <= 0.0:
+		_reach_lean = 0.0
+		_reach_slide = 0.0
+		return
+	var fit := _fitting()
+	var excess := 0.0
+	var hands := 0.0
+	var radius := 0.3
+	for side in 2:
+		var arm := _arm_bones[side]
+		if arm[0] < 0 or arm[1] < 0 or arm[2] < 0 or is_nan(_arm_excess[side]):
+			continue
+		var weight := _ik_l if side == 0 else _ik_r
+		if weight <= 0.0:
+			continue
+		excess += _arm_excess[side] * weight
+		hands += weight
+		# Distância do quadril ao ombro: quanto o ombro anda por unidade de inclinação.
+		var shoulder := _global(arm[0]).origin
+		var base := arm[0]
+		while _parent[base] >= 0 and _parent[_parent[base]] >= 0:
+			base = _parent[base]
+		radius = maxf(_global(base).origin.distance_to(shoulder), 0.05)
+	if hands <= 0.0:
+		return
+	excess /= hands
+	var rate := 1.0 - exp(-10.0 * minf(delta, 0.1))
+	if fit:
+		# Sentado no banco do kart: primeiro inclina a partir do quadril (gira em volta do
+		# apoio no estofado), depois desliza, sem o bumbum passar da frente do estofado.
+		radius += sd.hip_above_seat
+		var lean_unit := radius * deg_to_rad(sd.max_hip_lean)
+		var room := (_cp_corner.z - _cp_seat_front) / maxf(_model_scale, 0.01) - 2.0 * sd.hip_ahead_of_back
+		var max_slide := clampf(room, 0.0, sd.max_seat_slide)
+		# Etapas: inclina até `first`, desliza até o máximo, inclina o resto.
+		var first := sd.max_reach_lean * sd.lean_before_slide
+		var lean := _reach_lean
+		var slide := _reach_slide
+		var left := excess
+		if left > 0.0:
+			var add := clampf(left / lean_unit, 0.0, maxf(first - lean, 0.0))
+			lean += add
+			left -= add * lean_unit
+			var add_slide := clampf(left, 0.0, maxf(max_slide - slide, 0.0))
+			slide += add_slide
+			left -= add_slide
+			lean = minf(lean + maxf(left, 0.0) / lean_unit, sd.max_reach_lean)
+		else:
+			# Sobrando braço: desfaz na ordem contrária.
+			var cut := clampf(-left / lean_unit, 0.0, maxf(lean - first, 0.0))
+			lean -= cut
+			left += cut * lean_unit
+			var cut_slide := clampf(-left, 0.0, slide)
+			slide -= cut_slide
+			left += cut_slide
+			lean = maxf(lean + minf(left, 0.0) / lean_unit, 0.0)
+		_reach_lean = lerpf(_reach_lean, lean, rate)
+		_reach_slide = lerpf(_reach_slide, minf(slide, max_slide), rate)
+		return
+	# 1 de peso = a inclinação inteira da animação ≈ radius * ângulo de avanço do ombro.
+	var lean_per_unit := radius * _lean_angle
+	if excess > 0.0:
+		var slide := minf(_reach_slide + excess, sd.max_seat_slide)
+		var rest := excess - (slide - _reach_slide)
+		_reach_slide = lerpf(_reach_slide, slide, rate)
+		var lean := clampf(_reach_lean + rest / lean_per_unit, 0.0, sd.max_reach_lean)
+		_reach_lean = lerpf(_reach_lean, lean, rate)
+	else:
+		# Sobrando braço: desfaz na ordem contrária (primeiro a inclinação).
+		var lean := maxf(_reach_lean + excess / lean_per_unit, 0.0)
+		var rest := excess + (_reach_lean - lean) * lean_per_unit
+		_reach_lean = lerpf(_reach_lean, lean, rate)
+		_reach_slide = lerpf(_reach_slide, maxf(_reach_slide + minf(rest, 0.0), 0.0), rate)
+
+
+## Braço com cotovelo (IK de dois ossos): o ombro fica onde a pose do corpo deixou, o
+## cotovelo dobra para o lado de `elbow_pole` e a mão fecha na barra com a pegada da
+## pose sentada. Se o volante estiver longe demais, o braço fica reto e o osso do
+## braço estica (no máximo `max_arm_stretch`, como no braço elástico).
+func _arm_ik_bend(side: int, target: Vector3, thumb: Vector3, weight: float) -> void:
+	if weight <= 0.0:
+		return
+	var arm := _arm_bones[side]
+	var upper := arm[0]
+	var fore := arm[1]
+	var hand := arm[2]
+	if upper < 0 or fore < 0 or hand < 0:
+		return
+	var sd := skeleton_data
+	var mirror := Vector3(1.0 if side == 0 else -1.0, 1.0, 1.0)
+	var grip := sd.grip_point * mirror
+	var bar := (sd.grip_axis * mirror).normalized()
+	var neutral := _neutral_hand[side]
+	var a := _rest_pos[fore].length()
+	var b := _rest_pos[hand].length()
+	# O pai do braço não muda aqui: a transformação dele é calculada uma vez só.
+	var parent_g := _global(_parent[upper]) if _parent[upper] >= 0 else Transform3D.IDENTITY
+	var parent_basis := parent_g.basis.orthonormalized()
+	var upper_g := parent_g * _local(upper)
+	var shoulder := upper_g.origin
+	# O lado do cotovelo acompanha o peito (inclinações e torções do corpo).
+	var chest := parent_basis * _arm_parent_rest[side].inverse()
+	var pole := chest * (sd.elbow_pole * mirror)
+
+	# A mão depende do antebraço, que depende de onde fica o punho: algumas voltas.
+	var fore_basis := (upper_g * _local(fore)).basis.orthonormalized()
+	var hand_basis := Basis.IDENTITY
+	var wrist := target
+	var elbow := shoulder
+	var stretch := 1.0
+	for i in 3:
+		hand_basis = _grip_hand_basis(fore_basis, thumb, neutral, bar)
+		wrist = target - hand_basis * grip
+		var to := wrist - shoulder
+		var dist := maxf(to.length(), 1e-5)
+		var dir := to / dist
+		_arm_excess[side] = dist - (a + b) * REACH_EXTENSION
+		if dist >= (a + b) * 0.9995:
+			stretch = clampf((dist - b) / a, 1.0, sd.max_arm_stretch)
+			elbow = shoulder + dir * a * stretch
+		else:
+			stretch = 1.0
+			var cos_a := clampf((a * a + dist * dist - b * b) / (2.0 * a * dist), -1.0, 1.0)
+			var side_dir := pole - dir * pole.dot(dir)
+			if side_dir.length_squared() < 1e-8:
+				side_dir = Vector3.DOWN - dir * dir.y
+			side_dir = side_dir.normalized()
+			elbow = shoulder + (dir * cos_a + side_dir * sqrt(1.0 - cos_a * cos_a)) * a
+		var fore_dir := (wrist - elbow).normalized()
+		fore_basis = Basis(Quaternion(fore_basis.y.normalized(), fore_dir)) * fore_basis
+
+	_aim_in(upper, parent_basis, elbow - shoulder, weight)
+	stretch = lerpf(1.0, stretch, weight)
+	_scl[upper] = Vector3(1.0, stretch, 1.0)
+	_scl[fore] = Vector3(1.0, 1.0 / stretch, 1.0)
+	upper_g = parent_g * _local(upper)
+	_aim_in(fore, upper_g.basis.orthonormalized(), wrist - (upper_g * _local(fore)).origin, weight)
+	# Metade da torção que a mão precisa vai para o antebraço (o pulso não "embrulha").
+	var fore_global := (upper_g * _local(fore)).basis.orthonormalized()
+	var local := (fore_global.inverse() * hand_basis).get_rotation_quaternion()
+	var d := neutral.inverse() * local
+	var twist := 2.0 * atan2(d.y, d.w)
+	twist = wrapf(twist, -PI, PI)
+	_rot[fore] = _rot[fore] * Quaternion(Vector3.UP, twist * 0.5 * weight)
+	fore_global = (upper_g * _local(fore)).basis.orthonormalized()
+	local = (fore_global.inverse() * hand_basis).get_rotation_quaternion()
+	_rot[hand] = _rot[hand].slerp(local, weight)
+
+
+## Mão fechada na barra a partir da pegada da pose sentada (`neutral`, relativa ao
+## antebraço): gira o mínimo para a barra (`bar`, espaço da mão) seguir `thumb`. A
+## torção em volta do antebraço é livre (até 100°); a dobra do punho para no máximo
+## `max_wrist_bend_degrees` (depois disso a mão fica um pouco atravessada na barra).
+func _grip_hand_basis(fore_basis: Basis, thumb: Vector3, neutral: Quaternion, bar: Vector3) -> Basis:
+	var pref := fore_basis * Basis(neutral)
+	var now := (pref * bar).normalized()
+	if now.dot(thumb) < -0.999:
+		return pref
+	var r := Quaternion(now, thumb)
+	var f := fore_basis.y.normalized()
+	var v := Vector3(r.x, r.y, r.z)
+	var along := f * v.dot(f)
+	var twist := Quaternion(along.x, along.y, along.z, r.w)
+	twist = twist.normalized() if twist.length_squared() > 1e-9 else Quaternion.IDENTITY
+	var swing := r * twist.inverse()
+	var max_twist := deg_to_rad(100.0)
+	if twist.get_angle() > max_twist:
+		twist = Quaternion.IDENTITY.slerp(twist, max_twist / twist.get_angle())
+	var max_bend := deg_to_rad(skeleton_data.max_wrist_bend_degrees)
+	if swing.get_angle() > max_bend:
+		swing = Quaternion.IDENTITY.slerp(swing, max_bend / swing.get_angle())
+	return Basis(swing * twist) * pref
 
 
 ## Converte do espaço do nó pai deste personagem para o espaço do esqueleto.

@@ -47,7 +47,8 @@ func setup(data: CharacterData, pixels := 192, fps := 0.0) -> void:
 	camera.current = true
 
 	rig = data.instantiate_rig()
-	rig.setup_stand(1.0)
+	rig.setup_stand(data.portrait_scale)
+	rig.position = data.portrait_offset
 	add_child(rig)
 
 
