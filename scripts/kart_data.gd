@@ -75,6 +75,25 @@ const STAT_KEYS := ["speed", "acceleration", "handling", "weight"]
 ## guidão: para dentro, em direção ao meio da moto).
 @export var hand_grip_axis := Vector3.ZERO
 
+@export_group("Cockpit")
+## Medidas do banco e do assoalho para pilotos de proporção humana (o Jarbas), que
+## sentam no estofado, encostam no encosto e esticam as pernas até o assoalho. O
+## Celerino não usa. Medidas no modelo (espaço do kart, frente = -Z) com mapas de
+## ocupação da faixa das pernas (x de 0,06 a 0,16 m); veja tools/personagens/README.md.
+## Zero = sem medida: o piloto usa a pose da animação em `seat_position`.
+## Canto entre o estofado e o encosto: altura do estofado (y) e onde as costas encostam (z).
+@export var seat_back_point := Vector3.ZERO
+## Quanto o encosto deita para trás (graus a partir da vertical). Em motos não vale.
+@export_range(0.0, 45.0, 0.5) var seat_back_angle := 0.0
+## Onde o estofado acaba na frente (z). Daí para a frente os pés apoiam no assoalho.
+@export var seat_front_z := 0.0
+## Altura do assoalho na frente do banco.
+@export var floor_height := 0.0
+## Até onde os pés podem ir (z da parede da frente ou dos pedais): a ponta do pé para aí.
+@export var foot_limit_z := 0.0
+## Distância do meio do kart até o meio de cada pé (x).
+@export var foot_spread := 0.12
+
 @export_group("Turbo")
 ## Saídas de escapamento/turbinas na traseira, de onde sai o fogo do turbo
 ## (espaço do kart). Vazio = uma saída genérica no meio da traseira.
@@ -89,6 +108,17 @@ func get_exhausts() -> Array[KartExhaust]:
 	fallback.position = Vector3(0, 0.45, 1.15)
 	fallback.radius = 0.08
 	return [fallback]
+
+
+## Medidas do cockpit para o CharacterRig (vazio = sem medida). Espaço do kart.
+func cockpit() -> Dictionary:
+	if seat_back_point == Vector3.ZERO:
+		return {}
+	return {
+		"seat_back_point": seat_back_point, "seat_back_angle": seat_back_angle,
+		"seat_front_z": seat_front_z, "floor_height": floor_height,
+		"foot_limit_z": foot_limit_z, "foot_spread": foot_spread,
+	}
 
 
 ## Cria o modelo 3D já com escala, rotação e deslocamento aplicados.
