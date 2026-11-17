@@ -71,7 +71,9 @@ Godot --headless --audio-driver Dummy --path . -s res://_probe/cpu_native.gd -- 
 Medido assim em 2026-11-17 (M4): o passo de física de uma corrida 1P custa ~1–2 ms, dos
 quais ~1 ms é o kart.gd (IA ~30 µs, `move_and_slide` ~30–40 µs e visual ~15–25 µs por
 kart) e ~0,4–0,7 ms é o motor (Jolt, interpolação, áreas). No headless os sons 3D não
-custam nada mensurável (no navegador custam, veja `cpuab`). Para comparar duas versões
+custam nada mensurável, mas no navegador custam: com `cpuab` e `--cpu=4`, 7 motores
+3D tocando custavam 3–4,4 ms por quadro (1P); com o limite de 3 vozes
+(`Race._update_engine_voices`) sobram 0,2–0,5 ms. Para comparar duas versões
 de um script, rode cada uma num processo separado (o estado de uma rodada vaza para a
 seguinte no mesmo processo) e, para quatérnios, compare `min(|a-b|, |a+b|)`, não
 `1-|a·b|` (os dos ossos não são unitários e essa conta nunca dá zero).
