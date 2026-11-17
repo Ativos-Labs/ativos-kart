@@ -57,6 +57,25 @@ sentadas:
 | `drive_kart`, `drive_moto` | `POSE_Kart` e `POSE_Moto` (corpo todo menos o rosto) |
 | `idle`, `gesture_*`, `hand_*_L/R`, `eyes_*` | transferidas do Celerino |
 | `body_lean_*`, `body_bend_*`, `body_twist_*` | geradas: giro espalhado por `Spine`, `Spine1`, `Spine2`; pescoço e cabeça desfazem parte da inclinação para a frente (ele continua olhando a pista) |
+| `idle_stand` | gerada: parado em pé nas telas de seleção e nos retratos (`stand_idle` do esqueleto), corpo todo, laço de 12 s (veja abaixo) |
+
+**Parado em pé (`idle_stand`).** A `idle` transferida do Celerino mexe só a coluna (0,5°)
+e um braço (3°), em 2 s: no Jarbas, de proporção humana, ele parecia uma estátua. A
+`idle_stand` mexe o corpo todo, com cada movimento num ritmo próprio (todos dão um número
+inteiro de voltas em 12 s, então o laço emenda):
+
+- troca o peso de uma perna para a outra (6 s para cada lado, parando um pouco em cada
+  uma): o quadril vai 3 cm para o lado do apoio, sobe desse lado (2,5°) e gira (3°); os
+  ombros inclinam para o outro lado (contrapposto). Os pés ficam plantados por IK: a perna
+  de apoio fica quase reta e a outra solta o joelho (14° a 30°);
+- respira a cada 4 s: o peito abre e as clavículas sobem 4°;
+- a cabeça olha devagar em volta (até ~10° para os lados);
+- os braços continuam pendurados (seguem o giro do peito, não a inclinação) e balançam
+  atrasados em relação ao quadril, com cotovelo e punho soltos.
+
+Os números estão em `_idle_stand` (`gerar_animacoes.gd`); o gerador imprime a faixa de
+dobra dos joelhos e quanto da perna o quadril usa (tem de ficar abaixo de 100%, senão o pé
+sai do chão).
 
 Transferência do Celerino: os dois estão em pose T, de frente para +Z. Cada osso do braço,
 da coluna e os olhos recebem o mesmo giro, no espaço do personagem, que o osso

@@ -6,7 +6,8 @@ extends Node3D
 ## misturadas aqui por código, em camadas, cada uma limitada a um grupo de ossos:
 ## corpo → pernas → mãos → gestos → rosto → olhos → piscada.
 ##
-## Modo STAND (telas de seleção): em pé, respirando, acenando, com expressões.
+## Modo STAND (telas de seleção): em pé, respirando, acenando, com expressões. Com
+## `stand_idle` no esqueleto, o corpo todo se mexe (quadril, pernas, clavículas).
 ## Modo DRIVE (no kart): sentado no banco, mãos no volante, inclina nas curvas, reage a
 ## turbo, batidas e chegada. As mãos seguem o volante por IK: braço reto e "elástico" de
 ## desenho animado (Celerino) ou braço com cotovelo, com o tronco inclinando para
@@ -263,6 +264,7 @@ func _setup_skeleton() -> void:
 	_masks[&"arms"] = _ids(arms)
 	_masks[&"body_arms"] = _ids(body + arms)
 	_masks[&"body_arms_legs"] = _ids(body + arms + Array(sd.legs))
+	_masks[&"stand"] = _ids(Array(sd.hips) + body + Array(sd.shoulders) + arms + Array(sd.legs))
 	_masks[&"drive"] = _ids(Array(sd.hips) + body + Array(sd.shoulders) + arms + Array(sd.legs) + fingers_l + fingers_r)
 	_masks[&"fingers_l"] = _ids(fingers_l)
 	_masks[&"fingers_r"] = _ids(fingers_r)
@@ -376,7 +378,10 @@ func _apply_mode() -> void:
 	_ik_l = 1.0
 	_ik_r = 1.0
 	if mode == Mode.STAND:
-		_set_layer(&"body", &"idle", &"body_arms", 100.0)
+		if skeleton_data.stand_idle != &"" and _anims.has(skeleton_data.stand_idle):
+			_set_layer(&"body", skeleton_data.stand_idle, &"stand", 100.0)
+		else:
+			_set_layer(&"body", &"idle", &"body_arms", 100.0)
 		_set_layer(&"hands", &"hand_relaxed_L", &"fingers_l", 100.0)
 		_add_layer(&"hand_relaxed_R", &"fingers_r", &"hands").weight = 1.0
 	elif skeleton_data.drive_pose != &"":

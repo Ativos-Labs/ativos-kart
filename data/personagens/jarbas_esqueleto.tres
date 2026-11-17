@@ -18,6 +18,7 @@ eyes = PackedStringArray("Olho.L", "Olho.R")
 lids = PackedStringArray("Palpebra_Sup.L", "Palpebra_Sup.R", "Palpebra_Inf.L", "Palpebra_Inf.R")
 eyelid_closed_offset = 0.0
 animations = ExtResource("2_anims")
+stand_idle = &"idle_stand"
 drive_pose = &"drive_kart"
 bike_pose = &"drive_moto"
 lean_forward = 0.0

@@ -352,6 +352,9 @@ original por `tools/personagens/` (README lá, com todos os números).
 - **Expressões e piscada:** as do próprio modelo (alegria, surpresa, raiva, tristeza...).
   **Gestos, respiração, olhar e formatos de mão:** transferidos das animações do Celerino
   (`tools/personagens/gerar_animacoes.gd`).
+- **Parado na seleção:** a `idle_stand` mexe o corpo todo (troca o peso de uma perna para
+  a outra com os pés plantados, respira, olha em volta e solta os braços); a respiração
+  do Celerino, que só mexe a coluna, deixava o Jarbas duro. Vale também para os retratos.
 - **Uma malha só, com textura:** as 27 texturas da Tripo e os logos viram um atlas, e o
   `CharacterMesh` junta tudo numa superfície (`shaders/character_textured.gdshader`). No
   multijogador, o jogador que repete o Jarbas corre com o azul do macacão na cor dele.

@@ -2,7 +2,8 @@ extends SceneTree
 ## Monta as animações que o jogo usa para o Jarbas e grava em
 ## res://assets/models/personagens/jarbas_animacoes.res (AnimationLibrary), com os
 ## mesmos nomes das do Celerino (idle, gesture_*, hand_*, face_*, body_*, eyes_look_*,
-## blink) e mais as poses sentadas drive_kart e drive_moto.
+## blink), mais as poses sentadas drive_kart e drive_moto e o idle_stand (parado em pé
+## nas telas de seleção).
 ##
 ## - Expressões, piscada e poses sentadas: copiadas das animações do modelo
 ##   (EXP_*, ANIM_Piscar, POSE_Kart, POSE_Moto), só com os ossos de cada grupo.
@@ -17,6 +18,7 @@ extends SceneTree
 ##   (braços caídos) não, e as palmas ficam viradas para o corpo, como numa pessoa.
 ## - Inclinações do corpo: geradas aqui, espalhadas pela coluna, com o pescoço
 ##   compensando um pouco para o Jarbas continuar olhando para a frente.
+## - Parado em pé (idle_stand): gerado aqui, o corpo todo (veja _idle_stand).
 ##
 ## Rode de novo depois de mudar o jarbas.glb (build_jarbas.py) ou as animações do
 ## Celerino:
@@ -218,6 +220,9 @@ func _run() -> void:
 		var spec: Array = BODY_CLIPS[clip]
 		lib.add_animation(clip, _body_bend(spec[0], deg_to_rad(spec[1]), spec[2]))
 
+	# Parado em pé (telas de seleção), a partir dos braços caídos da respiração.
+	lib.add_animation(&"idle_stand", _idle_stand(lib.get_animation(&"idle")))
+
 	var err := ResourceSaver.save(lib, OUT)
 	print("gravado %s (%d animações): %s" % [OUT, lib.get_animation_list().size(), error_string(err)])
 
@@ -405,6 +410,155 @@ func _body_bend(axis: Vector3, angle: float, head_counter: float) -> Animation:
 		anim.track_set_path(t, NodePath("%s:%s" % [_prefix, j.sk.get_bone_name(b)]))
 		anim.rotation_track_insert_key(t, 0.0, rots[b])
 	return anim
+
+
+# --- Parado em pé --------------------------------------------------------------------------
+
+## Duração do idle_stand (s) e amostragem. Cada movimento dá um número inteiro de voltas
+## nesse tempo: o laço emenda sem tranco.
+const STAND_LEN := 12.0
+const STAND_FPS := 15.0
+
+
+## Parado em pé, vivo (CharacterSkeleton.stand_idle). τ dá uma volta em STAND_LEN; ângulos
+## em graus, no espaço do personagem:
+## - troca o peso de uma perna para a outra (uma vez para cada lado, demorando um pouco
+##   em cada uma): o quadril vai 3 cm para o lado da perna de apoio, sobe desse lado e
+##   gira um pouco, e os ombros inclinam para o outro lado (contrapposto). Os pés ficam
+##   plantados (IK das pernas): a perna de apoio fica quase reta, a outra dobra o joelho;
+## - respira a cada 4 s: o peito abre e as clavículas sobem;
+## - a cabeça olha devagar em volta;
+## - os braços pendem (seguem só o giro do peito, não a inclinação) e balançam um pouco
+##   atrasados em relação ao quadril, com cotovelo e punho soltos.
+## `base`: animação com os braços caídos (a respiração transferida do Celerino).
+func _idle_stand(base: Animation) -> Animation:
+	var base_g := j.globals(j.sample(base, 0.0))
+	var rest_t: Array[Transform3D] = []
+	for i in j.parent.size():
+		rest_t.append(j.sk.get_bone_global_rest(i))
+	var hips := j.bone(&"Hips")
+	var spine: Array[int] = [j.bone(&"Spine"), j.bone(&"Spine1"), j.bone(&"Spine2")]
+	var spine_share := [0.35, 0.7, 1.0]
+	var neck := j.bone(&"Neck")
+	var head := j.bone(&"Head")
+	var hips_parent := rest_t[j.parent[hips]] if j.parent[hips] >= 0 else Transform3D.IDENTITY
+	var frames: Array[Array] = []
+	var hips_pos := PackedVector3Array()
+	var times := PackedFloat32Array()
+	var used := {}
+	var knee := Vector2(INF, -INF)
+	var reach := 0.0
+	for k in int(round(STAND_LEN * STAND_FPS)):
+		var t := k / STAND_FPS
+		var tau := TAU * t / STAND_LEN
+		var w := _stand_weight(tau)
+		var breath := sin(3.0 * tau)
+		var hips_e := _deg(0.6 * sin(2.0 * tau + 0.5), 3.0 * w + 1.0 * sin(2.0 * tau + 1.3), 2.5 * w)
+		var chest_e := _deg(-1.5 * breath + 1.0 * sin(tau + 1.8), -1.2 * w + 1.5 * sin(2.0 * tau + 0.4),
+				-3.0 * w + 0.6 * sin(2.0 * tau + 2.2))
+		var look := _deg(2.5 * sin(2.0 * tau + 1.9), 7.0 * sin(tau + 2.6) + 3.0 * sin(2.0 * tau + 0.9),
+				2.5 * sin(tau + 0.2))
+		var head_e := chest_e * 0.3 + look
+		# Quadril: para o lado da perna de apoio, um pouco mais baixo no meio da troca.
+		var offset := Vector3(0.03 * w, -0.0065 - 0.002 * maxf(1.0 - w * w, 0.0) + 0.001 * breath,
+				0.004 * sin(2.0 * tau + 0.5))
+		var wanted := {}
+		wanted[hips] = Basis.from_euler(hips_e) * rest_t[hips].basis
+		for s in spine.size():
+			wanted[spine[s]] = Basis.from_euler(hips_e.lerp(chest_e, spine_share[s])) * rest_t[spine[s]].basis
+		wanted[neck] = Basis.from_euler(chest_e.lerp(head_e, 0.45)) * rest_t[neck].basis
+		wanted[head] = Basis.from_euler(head_e) * rest_t[head].basis
+		var chest_b := Basis.from_euler(chest_e)
+		var lift := deg_to_rad(4.0) * sin(3.0 * tau - 0.35)
+		# Velocidade do quadril para o lado, um pouco atrasada (de -1 a 1).
+		var drag := (_stand_weight(tau - 0.34) - _stand_weight(tau - 0.36)) / 0.02 / 1.5
+		var hips_now := Transform3D(wanted[hips], rest_t[hips].origin + offset)
+		for side in 2:
+			var sg := 1.0 if side == 0 else -1.0
+			var long_side := "Left" if side == 0 else "Right"
+			var clavicle := j.bone(StringName(long_side + "Shoulder"))
+			wanted[clavicle] = chest_b * Basis(Vector3.BACK, sg * lift) * rest_t[clavicle].basis
+			# Braço: para a frente (fb), para o lado (drag) e o giro do peito.
+			var fb := deg_to_rad(2.5 * sin(tau + 1.1 + sg * 0.7) + 1.0 * sin(3.0 * tau - 0.9))
+			var swing := Basis(Vector3.UP, chest_e.y) * Basis(Vector3.BACK, deg_to_rad(-3.0) * drag) \
+					* Basis(Vector3.RIGHT, -fb)
+			var elbow := Basis(Vector3.RIGHT, -deg_to_rad(7.0 + 2.5 * sin(3.0 * tau - 0.6 + sg * 0.3)
+					+ 1.5 * sin(tau + sg * 1.2)))
+			var wrist := Basis(Vector3.RIGHT, -deg_to_rad(3.0 + 2.0 * sin(3.0 * tau - 1.2 + sg * 0.4)))
+			var arm := j.bone(StringName(long_side + "Arm"))
+			var fore := j.bone(StringName(long_side + "ForeArm"))
+			var hand := j.bone(StringName(long_side + "Hand"))
+			wanted[arm] = swing * base_g[arm]
+			wanted[fore] = swing * elbow * base_g[fore]
+			wanted[hand] = swing * elbow * wrist * base_g[hand]
+			# Perna: o pé fica onde está (IK de dois ossos, joelho para a frente).
+			var upleg := j.bone(StringName(long_side + "UpLeg"))
+			var leg := j.bone(StringName(long_side + "Leg"))
+			var foot := j.bone(StringName(long_side + "Foot"))
+			var hip_rest := rest_t[upleg].origin
+			var knee_rest := rest_t[leg].origin
+			var ankle := rest_t[foot].origin
+			var hip_p := hips_now * (rest_t[hips].affine_inverse() * hip_rest)
+			var thigh_len := hip_rest.distance_to(knee_rest)
+			var shin_len := knee_rest.distance_to(ankle)
+			var to_ankle := ankle - hip_p
+			reach = maxf(reach, to_ankle.length() / (thigh_len + shin_len))
+			var d := minf(to_ankle.length(), (thigh_len + shin_len) * 0.9995)
+			var dir := to_ankle.normalized()
+			var pole := Vector3(0.15 * sg, 0.0, 1.0)
+			var cos_hip := clampf((thigh_len * thigh_len + d * d - shin_len * shin_len) / (2.0 * thigh_len * d), -1.0, 1.0)
+			var knee_p := hip_p + dir * thigh_len * cos_hip \
+					+ (pole - dir * pole.dot(dir)).normalized() * thigh_len * sqrt(1.0 - cos_hip * cos_hip)
+			var ankle_p := hip_p + dir * d
+			wanted[upleg] = _swing(knee_rest - hip_rest, knee_p - hip_p, pole) * rest_t[upleg].basis
+			wanted[leg] = _swing(ankle - knee_rest, ankle_p - knee_p, pole) * rest_t[leg].basis
+			wanted[foot] = rest_t[foot].basis
+			var bend := rad_to_deg((knee_p - hip_p).angle_to(ankle_p - knee_p))
+			knee = Vector2(minf(knee.x, bend), maxf(knee.y, bend))
+		frames.append(j.solve(j.rest_rot, wanted))
+		for b in wanted:
+			used[b] = true
+		hips_pos.append(hips_parent.affine_inverse() * (rest_t[hips].origin + offset))
+		times.append(t)
+
+	var anim := Animation.new()
+	anim.length = STAND_LEN
+	anim.loop_mode = Animation.LOOP_LINEAR
+	var pt := anim.add_track(Animation.TYPE_POSITION_3D)
+	anim.track_set_path(pt, NodePath("%s:%s" % [_prefix, j.sk.get_bone_name(hips)]))
+	for f in times.size():
+		anim.position_track_insert_key(pt, times[f], hips_pos[f])
+	var bones := used.keys()
+	bones.sort()
+	for b in bones:
+		var tr := anim.add_track(Animation.TYPE_ROTATION_3D)
+		anim.track_set_path(tr, NodePath("%s:%s" % [_prefix, j.sk.get_bone_name(b)]))
+		for f in frames.size():
+			anim.rotation_track_insert_key(tr, times[f], (frames[f] as Array)[b])
+	print("idle_stand: joelhos dobram de %.0f° a %.0f°; quadril até o pé: %.1f%% da perna" % [knee.x, knee.y, reach * 100.0])
+	return anim
+
+
+## Peso nas pernas: 1 = na esquerda, -1 = na direita (fica um pouco mais em cada lado
+## do que no meio da troca).
+static func _stand_weight(tau: float) -> float:
+	var s := sin(tau + 0.4)
+	return s * (1.5 - 0.5 * s * s) + 0.1 * sin(2.0 * tau + 2.0)
+
+
+static func _deg(x: float, y: float, z: float) -> Vector3:
+	return Vector3(deg_to_rad(x), deg_to_rad(y), deg_to_rad(z))
+
+
+## Giro que leva o osso da direção `from` para `to`, sem torcer em volta de `pole`.
+static func _swing(from: Vector3, to: Vector3, pole: Vector3) -> Basis:
+	return _frame(to, pole) * _frame(from, pole).inverse()
+
+
+static func _frame(dir: Vector3, pole: Vector3) -> Basis:
+	var y := dir.normalized()
+	var z := (pole - y * pole.dot(y)).normalized()
+	return Basis(y.cross(z), y, z)
 
 
 func _v(v: Vector3) -> String:

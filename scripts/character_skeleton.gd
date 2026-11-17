@@ -38,6 +38,10 @@ extends Resource
 ## Animações que completam ou substituem as do modelo (mesmos nomes do Celerino:
 ## idle, gesture_*, face_*, hand_*, body_*, eyes_look_*, blink...).
 @export var animations: AnimationLibrary
+## Animação parada em pé (telas de seleção e retratos) que mexe o corpo todo: quadril,
+## coluna, clavículas, braços e pernas. Vazio = `idle` só na coluna e nos braços (a
+## respiração do Celerino).
+@export var stand_idle := &""
 
 @export_group("Pose de piloto")
 ## Animação com a pose sentada no kart (quadril, pernas, braços e dedos). Vazio = pose
