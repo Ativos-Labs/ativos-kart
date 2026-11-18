@@ -12,6 +12,7 @@ const CONTROLS := [
 	["Frear / ré", [&"frear"], ["B", "LT"]],
 	["Virar", [&"esquerda", &"direita"], ["Analógico"]],
 	["Pulo / drift", [&"drift"], ["RB", "X"]],
+	["Usar item", [&"usar_item"], ["LB"]],
 	["Reposicionar", [&"reposicionar"], ["Y"]],
 	["Pausar", ["Esc", "P"], ["Start"]],
 ]

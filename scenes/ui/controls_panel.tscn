@@ -76,7 +76,7 @@ custom_minimum_size = Vector2(660, 0)
 layout_mode = 2
 theme_type_variation = &"PanelLabel"
 theme_override_font_sizes/font_size = 17
-text = "Drift: pule e segure o drift virando numa curva. As faíscas mudam de cor (azul, laranja, roxo) — solte para ganhar um turbo! Placas laranjas na pista também dão turbo. Acelere logo depois do \"2\" na contagem para largar com turbo."
+text = "Drift: pule e segure o drift virando numa curva. As faíscas mudam de cor (azul, laranja, roxo) — solte para ganhar um turbo! Placas laranjas na pista também dão turbo. Acelere logo depois do \"2\" na contagem para largar com turbo. Nas rampas azuis a asa-delta abre: vire no ar e segure o freio para planar mais devagar."
 autowrap_mode = 3
 
 [node name="ControlsBackButton" type="Button" parent="Center/Panel/VBox"]

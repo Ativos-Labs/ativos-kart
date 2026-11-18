@@ -9,6 +9,8 @@ extends Control
 const SETTLE_TIME := 0.2
 const PODIUM_COLORS := [Color("ffd21a"), Color("dfe6f2"), Color("f0a061")]
 
+## Encosta o número na direita do retângulo (selo no canto inferior direito).
+var align_right := false
 var place := 0
 var total := 0
 var _pending := 0
@@ -18,7 +20,7 @@ var _tween: Tween
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	resized.connect(func(): pivot_offset = Vector2(size.x * 0.3, size.y * 0.6))
+	resized.connect(func(): pivot_offset = Vector2(size.x * (0.7 if align_right else 0.3), size.y * 0.6))
 
 
 ## Posição atual (chame a cada quadro; a troca aparece quando estabiliza).
@@ -62,14 +64,18 @@ func _draw() -> void:
 	var color: Color = PODIUM_COLORS[place - 1] if place <= 3 else Color.WHITE
 	var outline := UiKit.NAVY
 	var baseline := size.y * 0.5 + (font.get_ascent(big) - font.get_descent(big)) * 0.5
-	var x := 6.0
 	var w := font.get_string_size(number, HORIZONTAL_ALIGNMENT_LEFT, -1, big).x
+	var of_text := "de %d" % total
+	var x := 6.0
+	if align_right:
+		var tail := maxf(font.get_string_size("º", HORIZONTAL_ALIGNMENT_LEFT, -1, small).x + 2.0,
+				UiKit.FONT_BODY.get_string_size(of_text, HORIZONTAL_ALIGNMENT_LEFT, -1, int(small * 0.55)).x + 4.0)
+		x = size.x - 10.0 - w - tail
 	# Sombra, contorno e número; o "º" fica no alto, à direita.
 	draw_string_outline(font, Vector2(x + 3.0, baseline + 6.0), number, HORIZONTAL_ALIGNMENT_LEFT, -1, big, 22, Color(0, 0, 0, 0.35))
 	UiKit.draw_outlined(self, font, Vector2(x, baseline), number, big, color, outline, 22)
 	var sup := Vector2(x + w + 2.0, baseline - big * 0.42)
 	UiKit.draw_outlined(self, font, sup, "º", small, color, outline, 14)
 	# "de 8" embaixo do º.
-	var of_text := "de %d" % total
 	UiKit.draw_outlined(self, UiKit.FONT_BODY, Vector2(x + w + 4.0, baseline - 4.0), of_text, int(small * 0.55),
 			Color(0.9, 0.93, 1.0), outline, 8)

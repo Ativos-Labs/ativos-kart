@@ -1,8 +1,15 @@
 class_name Hud
 extends CanvasLayer
-## Interface da corrida: retrato do piloto, posição, volta, moedas, tempo,
-## velocímetro, mini-mapa com todos os karts, semáforo de largada, mensagens e a tela
-## de resultado com a classificação.
+## Interface da corrida: mini-mapa com todos os karts, moedas e volta (pílulas no canto
+## inferior esquerdo), posição (canto inferior direito), semáforo de largada, mensagens e
+## a tela de resultado com a classificação.
+##
+## A tela do piloto fica limpa: o canto superior esquerdo só mostra o slot do item
+## (ItemSlot, com a roleta) enquanto há item — vazio, some — e o tempo (canto superior
+## direito) só aparece quando ele cruza a chegada, menos no contra-relógio, em que o
+## relógio é o objetivo. Na tela dividida fica a etiqueta "J2" no alto, com o slot ao lado.
+## Os itens também mostram aqui a tinta do Juridiquês (InkOverlay, embaixo do resto do
+## HUD), o contrato da Cessão de crédito (ContractCard) e o clarão do raio do Deságio.
 ##
 ## Na tela dividida cada jogador tem um HUD compacto (Layout.PLAYER, dentro da tela
 ## dele) e um HUD por cima de tudo (Layout.OVERLAY) mostra o mapa da pista e o
@@ -20,17 +27,13 @@ signal change_track_requested
 signal change_character_requested
 signal menu_requested
 
-@onready var badge: PortraitBadge = %Badge
 @onready var driver_name: Label = %DriverName
 @onready var track_name: Label = %TrackName
-@onready var lap_box: Control = %LapBox
 @onready var place_badge: PlaceBadge = %PlaceBadge
 @onready var result_laps: Label = %ResultLaps
-@onready var lap_value: Label = %LapValue
 @onready var time_value: Label = %TimeValue
 @onready var lap_times_label: Label = %LapTimes
 @onready var best_label: Label = %BestLabel
-@onready var speed_gauge: SpeedGauge = %SpeedGauge
 @onready var minimap: Minimap = %Minimap
 @onready var start_lights: StartLights = %StartLights
 @onready var center_label: Label = %CenterLabel
@@ -51,12 +54,23 @@ signal menu_requested
 
 @onready var map_panel: Control = $Root/MapPanel
 @onready var time_panel: Control = $Root/TimePanel
-@onready var lap_title: Label = $Root/LapBox/LapTitle
 
 var kart: Kart
 var layout := Layout.FULL
-## Moedas Ativos do jogador (em cima da posição).
-var coin_counter: CoinCounter
+## Canto inferior esquerdo: moedas Ativos e volta, cada uma numa pílula escura.
+var status_box: HBoxContainer
+var coin_pill: HudPill
+var lap_pill: HudPill
+## Canto superior esquerdo: o item guardado (roleta ao pegar uma caixa).
+var item_slot: ItemSlot
+var contract_card: ContractCard
+var ink_overlay: InkOverlay
+var _flash: ColorRect
+var _flash_tween: Tween
+var _coins := -1
+var _max_coins := 10
+## O relógio aparece durante a corrida (contra-relógio) ou só na chegada.
+var _clock_always := false
 var _next_button: FancyButton
 var _timeout_label: Label
 var _center_tween: Tween
@@ -86,12 +100,53 @@ func _ready() -> void:
 	_next_button.pressed.connect(func(): next_requested.emit())
 	result_buttons.add_child(_next_button)
 	result_buttons.move_child(_next_button, 0)
-	coin_counter = CoinCounter.new()
-	coin_counter.name = "CoinCounter"
-	$Root.add_child(coin_counter)
-	$Root.move_child(coin_counter, place_badge.get_index())
-	coin_counter.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	_set_offsets(coin_counter, 34.0, -356.0, 260.0, -300.0)
+	status_box = HBoxContainer.new()
+	status_box.name = "StatusBox"
+	status_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	status_box.add_theme_constant_override("separation", 12)
+	coin_pill = HudPill.new(HudPill.Icon.COIN)
+	lap_pill = HudPill.new(HudPill.Icon.FLAG)
+	status_box.add_child(coin_pill)
+	status_box.add_child(lap_pill)
+	$Root.add_child(status_box)
+	$Root.move_child(status_box, place_badge.get_index())
+	status_box.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	status_box.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_set_offsets(status_box, 28.0, -82.0, 28.0, -24.0)
+	# Posição no canto inferior direito.
+	place_badge.align_right = true
+	place_badge.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	place_badge.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_set_offsets(place_badge, -300.0, -146.0, -28.0, -24.0)
+	_build_item_widgets(100.0, Vector2(26.0, 22.0))
+
+
+## Itens: a tinta (embaixo de tudo), o clarão do raio, o slot e o contrato.
+func _build_item_widgets(slot_size: float, slot_pos: Vector2) -> void:
+	var root := $Root as Control
+	ink_overlay = InkOverlay.new()
+	ink_overlay.name = "Tinta"
+	root.add_child(ink_overlay)
+	root.move_child(ink_overlay, 0)
+	ink_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_flash = ColorRect.new()
+	_flash.name = "Clarao"
+	_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_flash.color = Color(1, 1, 1, 0)
+	_flash.visible = false
+	root.add_child(_flash)
+	root.move_child(_flash, 1)
+	_flash.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	item_slot = ItemSlot.new(slot_size)
+	item_slot.name = "SlotItem"
+	item_slot.position = slot_pos
+	root.add_child(item_slot)
+	root.move_child(item_slot, results.get_index())
+	contract_card = ContractCard.new()
+	contract_card.name = "Contrato"
+	root.add_child(contract_card)
+	root.move_child(contract_card, results.get_index())
+	contract_card.set_home(slot_pos + Vector2(slot_size + 16.0, 0.0))
 
 
 ## `karts` = todos os karts da corrida (para o mini-mapa), incluindo `p_kart`.
@@ -103,56 +158,54 @@ func setup(track: Track, p_kart: Kart, karts: Array[Kart], laps: int, best_total
 		_setup_overlay(track, karts)
 		return
 	kart = p_kart
-	coin_counter.max_coins = Kart.MAX_COINS
-	coin_counter.set_coins(p_kart.coins, false)
+	_max_coins = Kart.MAX_COINS
+	_coins = -1
+	set_coins(p_kart.coins, false)
+	_clock_always = GameState.mode == GameState.Mode.TIME_TRIAL
+	time_panel.visible = _clock_always
+	best_label.visible = _clock_always and layout == Layout.FULL
 	track_name.text = track.track_name
 	place_badge.visible = karts.size() > 1
 	minimap.setup(track, karts, p_kart)
 	if layout == Layout.PLAYER:
 		_setup_compact(slot)
 	else:
-		if p_kart.character:
-			badge.setup(p_kart.character)
-			badge.follow(p_kart.driver)
-			driver_name.text = p_kart.character.display_name.to_upper()
-		else:
-			badge.hide()
-			driver_name.text = ""
+		# Canto superior esquerdo vazio: sem nome do piloto nem da pista.
+		driver_name.hide()
+		track_name.hide()
 		# A dica da largada mostra a tecla de drift atual (dá para trocar nas opções).
 		var drift_keys := GameState.settings.key_labels(&"drift")
 		var hint_label := hint_pill.get_node_or_null("HintLabel") as Label
 		if hint_label and not drift_keys.is_empty():
 			hint_label.text = "Dica: segure %s + direção nas curvas para derrapar e soltar um turbo!" % drift_keys[0].to_upper()
-	set_lap(1, laps)
+	set_lap(1, laps, false)
 	set_time(0.0)
 	lap_times_label.text = ""
 	best_label.text = "RECORDE  %s   •   VOLTA  %s" % [GameState.format_time(best_total), GameState.format_time(best_lap)]
 	start_lights.step = 0
 
 
-## HUD de um jogador na tela dividida: sem retrato (cada um custaria uma SubViewport),
-## sem mapa (fica no HUD por cima de tudo), números menores e a etiqueta "J2" na cor
-## do jogador no lugar do nome.
+## HUD de um jogador na tela dividida: mapa pequeno, números menores e a etiqueta "J2"
+## na cor do jogador no lugar do nome.
 func _setup_compact(slot: PlayerSlot) -> void:
-	badge.hide()
 	track_name.hide()
 	best_label.hide()
 	lap_times_label.hide()
 	hint_pill.hide()
-	# Mapa pequeno no meio da direita, entre o tempo e o velocímetro (o do jogador fica
-	# por cima dos outros).
+	# Mapa pequeno no meio da direita (o do jogador fica por cima dos outros).
 	_set_offsets(map_panel, -184.0, -150.0, -18.0, 16.0)
 	driver_name.text = slot.tag if slot else ""
 	driver_name.add_theme_color_override("font_color", slot.color if slot else Color.WHITE)
 	driver_name.add_theme_font_size_override("font_size", 40)
 	driver_name.position = Vector2(24.0, 14.0)
-	_set_offsets(place_badge, 22.0, -236.0, 212.0, -146.0)
-	_set_offsets(coin_counter, 26.0, -282.0, 226.0, -240.0)
-	_set_offsets(lap_box, 26.0, -146.0, 280.0, -16.0)
-	lap_box.add_theme_constant_override("separation", -16)
-	lap_title.add_theme_font_size_override("font_size", 26)
-	lap_value.add_theme_font_size_override("font_size", 70)
-	_set_offsets(speed_gauge, -196.0, -170.0, -16.0, -8.0)
+	# Slot do item menor, ao lado da etiqueta "J2"; contrato e tinta menores também.
+	_rebuild_item_slot(78.0, Vector2(88.0, 12.0))
+	ink_overlay.text_size = 9
+	_set_offsets(place_badge, -230.0, -110.0, -20.0, -14.0)
+	coin_pill.height = 46.0
+	lap_pill.height = 46.0
+	status_box.add_theme_constant_override("separation", 10)
+	_set_offsets(status_box, 20.0, -62.0, 20.0, -16.0)
 	_set_offsets(time_panel, -262.0, 14.0, -18.0, 84.0)
 	time_value.add_theme_font_size_override("font_size", 38)
 	center_label.add_theme_font_size_override("font_size", 130)
@@ -173,10 +226,85 @@ func _setup_compact(slot: PlayerSlot) -> void:
 	_timeout_label.hide()
 
 
+## Troca o slot do item por um do tamanho `slot_size` em `slot_pos` (HUD compacto).
+func _rebuild_item_slot(slot_size: float, slot_pos: Vector2) -> void:
+	var root := $Root as Control
+	var index := item_slot.get_index()
+	var key := item_slot.key_text
+	root.remove_child(item_slot)
+	item_slot.queue_free()
+	item_slot = ItemSlot.new(slot_size)
+	item_slot.name = "SlotItem"
+	item_slot.position = slot_pos
+	item_slot.key_text = key
+	root.add_child(item_slot)
+	root.move_child(item_slot, index)
+	contract_card.card_scale = 0.8
+	contract_card.set_home(slot_pos + Vector2(slot_size + 10.0, -8.0))
+
+
+# --- Itens --------------------------------------------------------------------------
+
+## A roleta do slot gira e para em `kind` depois de `duration` s.
+func roll_item(kind: int, duration: float) -> void:
+	item_slot.roll(kind, duration)
+
+
+## O jogador usou o item guardado.
+func use_item() -> void:
+	item_slot.use()
+
+
+## Um rival levou o item do jogador (Cessão de crédito).
+func item_stolen() -> void:
+	item_slot.stolen()
+
+
+## Cessão de crédito do jogador: o contrato é assinado e o item cai no slot.
+func receive_item(kind: int, from_name: String, to_name: String, duration: float) -> void:
+	item_slot.receive(kind, duration)
+	var target := contract_card.get_parent_control().get_global_transform().affine_inverse() * item_slot.get_box_center()
+	contract_card.play(kind, from_name, to_name, duration, target)
+
+
+## Tecla (ou botão) de usar o item, no canto do slot.
+func set_item_key(text: String) -> void:
+	item_slot.key_text = text
+
+
+## Juridiquês: tinta na tela por `duration` s.
+func show_ink(duration: float) -> void:
+	ink_overlay.splat(duration)
+
+
+## Clarão na tela (raio do Deságio): pisca duas vezes e some.
+func flash(color: Color, strength := 0.6) -> void:
+	if _flash == null:
+		return
+	if _flash_tween:
+		_flash_tween.kill()
+	_flash.visible = true
+	_flash.color = Color(color, strength)
+	_flash_tween = create_tween()
+	_flash_tween.tween_property(_flash, "color:a", strength * 0.15, 0.08)
+	_flash_tween.tween_property(_flash, "color:a", strength * 0.7, 0.05)
+	_flash_tween.tween_property(_flash, "color:a", 0.0, 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_flash_tween.tween_callback(_flash.hide)
+
+
+## Tira tudo dos itens da tela (fim da corrida).
+func clear_items() -> void:
+	if item_slot:
+		item_slot.clear()
+	if contract_card:
+		contract_card.clear()
+	if ink_overlay:
+		ink_overlay.clear()
+
+
 ## HUD por cima das telas divididas: só o mapa da pista (com todos os karts) e a tela
 ## de resultado.
 func _setup_overlay(track: Track, karts: Array[Kart]) -> void:
-	coin_counter.hide()
 	for child in $Root.get_children():
 		if child != map_panel and child != results:
 			child.hide()
@@ -217,29 +345,34 @@ func set_timeout(seconds: float) -> void:
 
 
 func _process(delta: float) -> void:
-	if kart and is_instance_valid(kart):
-		speed_gauge.kmh = kart.get_speed_kmh()
-		speed_gauge.ratio = absf(kart.speed) / maxf(kart.max_speed, 1.0)
-		speed_gauge.boosting = kart.boost_time > 0.0
-		speed_gauge.drift_level = kart.drift_level if kart.drifting else -1
 	if _message_time > 0.0:
 		_message_time -= delta
 		message_label.modulate.a = 0.55 + 0.45 * absf(sin(Time.get_ticks_msec() * 0.008))
 
 
-func set_lap(current: int, total: int) -> void:
-	var text := "%d/%d" % [clampi(current, 1, total), total]
-	if lap_value.text == text:
-		return
-	lap_value.text = text
-	lap_value.pivot_offset = Vector2(0.0, lap_value.size.y)
-	lap_value.scale = Vector2.ONE * 1.35
-	var tw := create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tw.tween_property(lap_value, "scale", Vector2.ONE, 0.35)
+func set_lap(current: int, total: int, animate := true) -> void:
+	if lap_pill.set_text("%d/%d" % [clampi(current, 1, total), total]) and animate:
+		lap_pill.bump(1.3)
 
 
 func set_time(t: float) -> void:
 	time_value.text = GameState.format_time(t)
+
+
+## Chegada: o painel do tempo (com as voltas) entra no canto superior direito.
+func show_final_time() -> void:
+	if layout == Layout.OVERLAY or (time_panel.visible and time_panel.modulate.a >= 1.0):
+		return
+	time_panel.visible = true
+	best_label.visible = layout == Layout.FULL
+	for c: Control in [time_panel, best_label]:
+		c.modulate.a = 0.0
+	var x := time_panel.position.x
+	time_panel.position.x = x + 80.0
+	var tw := create_tween().set_parallel().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(time_panel, "position:x", x, 0.4)
+	tw.tween_property(time_panel, "modulate:a", 1.0, 0.25)
+	tw.tween_property(best_label, "modulate:a", 1.0, 0.25).set_delay(0.15)
 
 
 ## Posição do jogador (chame a cada quadro; o selo só muda quando estabiliza).
@@ -247,9 +380,19 @@ func set_place(place: int, total: int) -> void:
 	place_badge.set_place(place, total)
 
 
-## Moedas do jogador (pula ao ganhar, pisca ao perder).
-func set_coins(value: int) -> void:
-	coin_counter.set_coins(value)
+## Moedas do jogador (pula ao ganhar, pisca ao perder; no máximo o número fica laranja).
+func set_coins(value: int, animate := true) -> void:
+	if value == _coins:
+		return
+	var gained := value > _coins
+	_coins = value
+	var full := value >= _max_coins
+	coin_pill.set_text(str(value), UiKit.ORANGE if full else UiKit.YELLOW, Color(0.32, 0.16, 0.0, 0.85))
+	if animate:
+		if gained:
+			coin_pill.bump()
+		else:
+			coin_pill.flash()
 
 
 func set_lap_times(times: Array[float]) -> void:
@@ -330,7 +473,8 @@ func show_results(standings: Array[Dictionary], place: int, total: float, lap_ti
 		record_total: bool, record_lap: bool, options := {}) -> void:
 	set_warning("")
 	place_badge.visible = false
-	coin_counter.visible = false
+	status_box.visible = false
+	clear_items()
 	var best := INF
 	for t in lap_times:
 		best = minf(best, t)
