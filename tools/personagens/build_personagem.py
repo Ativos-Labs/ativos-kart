@@ -1,26 +1,33 @@
-"""Prepara o modelo do Jarbas para o jogo.
+"""Prepara o modelo de um piloto com textura (Jarbas, Henrique) para o jogo.
 
-Lê tools/personagens/originais/jarbas-piloto.glb (exportado do Blender) e grava
-assets/models/personagens/jarbas.glb:
+Lê o modelo original de tools/personagens/originais/ (exportado do Blender) e grava
+assets/models/personagens/<nome>.glb:
 
 - tira o volante e o guidão de referência (Ref_*) e os desenhos de controle (WGT_*);
+- Henrique: o modelo veio sem esqueleto; o esqueleto e os pesos saem de
+  henrique_esqueleto.json (gerado por rig_henrique.py, que precisa do Blender) e as
+  cores de vértice e o segundo UV, que o jogo não usa, saem;
 - tira do esqueleto os ossos sem peso nenhum (controles de IK do Blender, alvos do
   olhar, pontas dos dedos e dos pés) — no Godot eles não fazem nada e o CharacterRig
   percorre todos os ossos a cada quadro;
 - renomeia os ossos "mixamorig:Xxx" para "Xxx";
-- junta as 27 texturas da Tripo e os dois logos num atlas só (2048 x 2048). As partes
-  de cor lisa (olhos, boca, luvas, pálpebras) apontam para um quadradinho branco do
-  atlas e mantêm a cor no material. Assim o CharacterMesh junta o piloto inteiro numa
-  superfície só (na web cada superfície com esqueleto custa um passe de GPU por quadro);
+- junta as texturas (as 27 da Tripo no Jarbas, a única do Henrique) e os logos num
+  atlas só (2048 x 2048). As partes de cor lisa (olhos, boca, luvas, pálpebras)
+  apontam para um quadradinho branco do atlas e mantêm a cor no material. Assim o
+  CharacterMesh junta o piloto inteiro numa superfície só (na web cada superfície com
+  esqueleto custa um passe de GPU por quadro). Mapas de normal, rugosidade e metal
+  saem (o shader dos pilotos não usa);
 - logos: transparência recortada (alpha scissor) em vez de mistura, para caberem na
   mesma superfície.
 
-As animações do arquivo (expressões, piscada, POSE_Kart, POSE_Moto) vão junto. As que
-o jogo usa são montadas no Godot por gerar_animacoes.gd (veja o README desta pasta).
+As animações do arquivo do Jarbas (expressões, piscada, POSE_Kart, POSE_Moto) vão
+junto. As que o jogo usa são montadas no Godot por gerar_animacoes.gd (veja o README
+desta pasta); as do Henrique saem das do Jarbas.
 
-Uso: python3 tools/personagens/build_jarbas.py
+Uso: python3 tools/personagens/build_personagem.py jarbas|henrique
 """
 import io
+import json
 import math
 import os
 import struct
@@ -33,8 +40,10 @@ sys.path.insert(0, os.path.join(HERE, "..", "karts"))
 from gltf_util import Glb  # noqa: E402
 
 PROJ = os.path.abspath(os.path.join(HERE, "..", ".."))
-SRC = os.path.join(HERE, "originais", "jarbas-piloto.glb")
-DST = os.path.join(PROJ, "assets", "models", "personagens", "jarbas.glb")
+CHARACTERS = {
+    "jarbas": {"src": "jarbas-piloto.glb", "skeleton": None, "root": None},
+    "henrique": {"src": "henrique-piloto.glb", "skeleton": "henrique_esqueleto.json", "root": "Henrique"},
+}
 
 ATLAS = 2048
 PAD = 6  # pixels entre retângulos no atlas (já na escala final)
@@ -44,18 +53,28 @@ KEEP_UNWEIGHTED = ("Raiz",)  # raiz do esqueleto (pai do quadril)
 
 
 def main():
-    g = Glb(SRC)
+    if len(sys.argv) < 2 or sys.argv[1] not in CHARACTERS:
+        raise SystemExit("uso: python3 tools/personagens/build_personagem.py %s" % "|".join(CHARACTERS))
+    name = sys.argv[1]
+    cfg = CHARACTERS[name]
+    src = os.path.join(HERE, "originais", cfg["src"])
+    dst = os.path.join(PROJ, "assets", "models", "personagens", name + ".glb")
+    g = Glb(src)
     js = g.js
-    _drop_scene_nodes(g)
+    drop = DROP_NODES + ((cfg["root"],) if cfg["root"] else ())
+    _drop_scene_nodes(g, drop)
+    if cfg["skeleton"]:
+        with open(os.path.join(HERE, cfg["skeleton"])) as f:
+            _add_skeleton(g, json.load(f), cfg["root"])
     _clean_skeleton(g)
     _rename_bones(js)
     _build_atlas(g)
-    js["asset"]["generator"] = "Ativos Kart build_jarbas.py (de: %s)" % js["asset"].get("generator", "")
+    js["asset"]["generator"] = "Ativos Kart build_personagem.py (de: %s)" % js["asset"].get("generator", "")
     js.pop("extensionsUsed", None)
     g.compact()
-    os.makedirs(os.path.dirname(DST), exist_ok=True)
-    g.save(DST)
-    print("gravado", os.path.relpath(DST, PROJ), "%.1f MB" % (os.path.getsize(DST) / 1e6))
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    g.save(dst)
+    print("gravado", os.path.relpath(dst, PROJ), "%.1f MB" % (os.path.getsize(dst) / 1e6))
 
 
 # --- Nós e esqueleto ------------------------------------------------------------------
@@ -108,13 +127,71 @@ def _subtree(js, root):
     return out
 
 
-def _drop_scene_nodes(g):
+def _drop_scene_nodes(g, names):
     js = g.js
     drop = set()
     for i, n in enumerate(js["nodes"]):
-        if n.get("name") in DROP_NODES:
+        if n.get("name") in names:
             drop.update(_subtree(js, i))
     _reindex_nodes(g, [i for i in range(len(js["nodes"])) if i not in drop])
+
+
+def _add_skeleton(g, data, root_name):
+    """Esqueleto e pesos de rig_henrique.py: nós dos ossos, skin e JOINTS_0/WEIGHTS_0
+    em cada primitiva. Fica como o do Jarbas: <root> > Armature > (malhas, Raiz > ossos)."""
+    js = g.js
+    meshes = {n["name"]: i for i, n in enumerate(js["nodes"]) if "mesh" in n}
+    missing = set(data["meshes"]) ^ set(meshes)
+    if missing:
+        raise SystemExit("malhas diferentes entre o modelo e o esqueleto: %s" % sorted(missing))
+    first = len(js["nodes"])
+    bones = data["bones"]
+    for b in bones:
+        js["nodes"].append({"name": b["name"], "translation": b["translation"], "rotation": b["rotation"]})
+    for k, b in enumerate(bones):
+        if b["parent"] >= 0:
+            js["nodes"][first + b["parent"]].setdefault("children", []).append(first + k)
+    roots = [first + k for k, b in enumerate(bones) if b["parent"] < 0]
+    armature = len(js["nodes"])
+    js["nodes"].append({"name": "Armature", "children": sorted(meshes.values()) + roots})
+    js["nodes"].append({"name": root_name, "children": [armature]})
+    js["scenes"][0]["nodes"] = [armature + 1]
+    # Matrizes inversas de ligação: as malhas ficam na origem, então é a inversa da
+    # transformação de cada osso (giro e translação, sem escala).
+    world = g.world_matrices()
+    ibm = []
+    for k in range(len(bones)):
+        m = world[first + k]
+        r = [[m[i][j] for j in range(3)] for i in range(3)]
+        t = [m[i][3] for i in range(3)]
+        rt = [[r[j][i] for j in range(3)] for i in range(3)]
+        tt = [-sum(rt[i][j] * t[j] for j in range(3)) for i in range(3)]
+        inv = [rt[0] + [tt[0]], rt[1] + [tt[1]], rt[2] + [tt[2]], [0.0, 0.0, 0.0, 1.0]]
+        ibm.append(tuple(inv[row][col] for col in range(4) for row in range(4)))
+    js.setdefault("skins", []).append({"name": "Armature", "joints": list(range(first, first + len(bones))),
+                                       "inverseBindMatrices": g.add_accessor(ibm, "MAT4", target=None)})
+    skin = len(js["skins"]) - 1
+    for name, node in meshes.items():
+        js["nodes"][node]["skin"] = skin
+        prims = js["meshes"][js["nodes"][node]["mesh"]]["primitives"]
+        for p, w in zip(prims, data["meshes"][name]):
+            count = js["accessors"][p["attributes"]["POSITION"]]["count"]
+            if count != w["count"]:
+                raise SystemExit("%s: %d vértices no modelo, %d no esqueleto" % (name, count, w["count"]))
+            J = w["joints"]
+            W = w["weights_1e4"]
+            joints = [tuple(J[i * 4:i * 4 + 4]) for i in range(count)]
+            weights = []
+            for i in range(count):
+                q = W[i * 4:i * 4 + 4]
+                total = float(sum(q)) or 1.0
+                weights.append(tuple(v / total for v in q))
+            p["attributes"]["JOINTS_0"] = g.add_accessor(joints, "VEC4", component=5123)
+            p["attributes"]["WEIGHTS_0"] = g.add_accessor(weights, "VEC4")
+            # O jogo não usa cor de vértice nem o segundo UV.
+            for attr in ("COLOR_0", "COLOR_1", "TEXCOORD_1"):
+                p["attributes"].pop(attr, None)
+    print("esqueleto: %d ossos, %d malhas com pesos" % (len(bones), len(meshes)))
 
 
 def _clean_skeleton(g):
@@ -190,21 +267,24 @@ def _build_atlas(g):
         for p in m["primitives"]:
             users.setdefault(p.get("material"), []).append(p)
 
-    pieces = []  # {"mat", "img", "rect": (x0, y0, x1, y1) em px da imagem original, "mask"}
+    # Materiais que usam a mesma imagem (no Henrique, o corpo e a pele da boca) viram uma
+    # peça só do atlas.
+    by_image = {}
     for mi, mat in enumerate(mats):
-        pbr = mat.get("pbrMetallicRoughness", {})
-        tex = pbr.get("baseColorTexture")
-        if tex is None or mi not in users:
-            continue
-        image_index = js["textures"][tex["index"]]["source"]
+        tex = mat.get("pbrMetallicRoughness", {}).get("baseColorTexture")
+        if tex is not None and mi in users:
+            by_image.setdefault(js["textures"][tex["index"]]["source"], []).append(mi)
+
+    pieces = []  # {"mats", "img", "rect": (x0, y0, x1, y1) em px da imagem original, "mask"}
+    for image_index, group in by_image.items():
         img = Image.open(io.BytesIO(g.image_bytes(image_index)))
-        logo = mat.get("alphaMode") == "BLEND"
+        logo = any(mats[mi].get("alphaMode") == "BLEND" for mi in group)
         img = img.convert("RGBA")
         w, h = img.size
         tris = []
         lo = [math.inf, math.inf]
         hi = [-math.inf, -math.inf]
-        for p in users[mi]:
+        for p in (p for mi in group for p in users[mi]):
             uv = g.read_accessor(p["attributes"]["TEXCOORD_0"])
             idx = [i[0] for i in g.read_accessor(p["indices"])] if "indices" in p else list(range(len(uv)))
             for t in range(0, len(idx), 3):
@@ -219,7 +299,7 @@ def _build_atlas(g):
             rect = (math.floor(lo[0]) - 2, math.floor(lo[1]) - 2, math.ceil(hi[0]) + 2, math.ceil(hi[1]) + 2)
             canvas = Image.new("RGBA", (rect[2] - rect[0], rect[3] - rect[1]), (0, 0, 0, 0))
             canvas.paste(img, (-rect[0], -rect[1]))
-            pieces.append({"mat": mi, "img": canvas, "rect": rect, "scale": (w, h), "logo": True})
+            pieces.append({"mats": group, "img": canvas, "rect": rect, "scale": (w, h), "logo": True})
             continue
         rect = (max(0, math.floor(lo[0]) - 4), max(0, math.floor(lo[1]) - 4),
                 min(w, math.ceil(hi[0]) + 4), min(h, math.ceil(hi[1]) + 4))
@@ -229,7 +309,7 @@ def _build_atlas(g):
             draw.polygon(tri, fill=255, outline=255)
         crop = img.crop(rect)
         crop_mask = mask.crop(rect)
-        pieces.append({"mat": mi, "img": crop, "mask": crop_mask, "rect": rect, "scale": (w, h), "logo": False})
+        pieces.append({"mats": group, "img": crop, "mask": crop_mask, "rect": rect, "scale": (w, h), "logo": False})
 
     # Escala única (a Tripo já escolhe a resolução de cada parte pelo tamanho dela; os
     # logos ficam numa escala própria, menor). Busca binária da maior que cabe.
@@ -311,7 +391,8 @@ def _build_atlas(g):
         w, h = pc["scale"]
         sx = bw / (rect[2] - rect[0])
         sy = bh / (rect[3] - rect[1])
-        uv_xf[pc["mat"]] = (x, y, rect[0], rect[1], sx, sy, w, h)
+        for mi in pc["mats"]:
+            uv_xf[mi] = (x, y, rect[0], rect[1], sx, sy, w, h)
 
     # Atlas como textura 0 (PNG, com transparência por causa dos logos).
     buf = io.BytesIO()
@@ -330,6 +411,10 @@ def _build_atlas(g):
             pbr.pop("baseColorFactor", None)
         pbr["metallicFactor"] = 0
         pbr.setdefault("roughnessFactor", 1.0)
+        # As texturas antigas saem (o atlas é a única): mapas de metal/rugosidade, normal...
+        pbr.pop("metallicRoughnessTexture", None)
+        for key in ("normalTexture", "occlusionTexture", "emissiveTexture"):
+            mat.pop(key, None)
         mat.pop("extensions", None)  # KHR_materials_specular (só a sombra da órbita)
         mat["doubleSided"] = True
         if mat.get("alphaMode") == "BLEND":

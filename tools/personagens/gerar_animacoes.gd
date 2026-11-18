@@ -1,12 +1,16 @@
 extends SceneTree
-## Monta as animações que o jogo usa para o Jarbas e grava em
-## res://assets/models/personagens/jarbas_animacoes.res (AnimationLibrary), com os
-## mesmos nomes das do Celerino (idle, gesture_*, hand_*, face_*, body_*, eyes_look_*,
-## blink), mais as poses sentadas drive_kart e drive_moto e o idle_stand (parado em pé
-## nas telas de seleção).
+## Monta as animações que o jogo usa para um piloto com esqueleto estilo Mixamo (Jarbas,
+## Henrique) e grava em res://assets/models/personagens/<nome>_animacoes.res
+## (AnimationLibrary), com os mesmos nomes das do Celerino (idle, gesture_*, hand_*,
+## face_*, body_*, eyes_look_*, blink), mais as poses sentadas drive_kart e drive_moto e o
+## idle_stand (parado em pé nas telas de seleção).
 ##
 ## - Expressões, piscada e poses sentadas: copiadas das animações do modelo
-##   (EXP_*, ANIM_Piscar, POSE_Kart, POSE_Moto), só com os ossos de cada grupo.
+##   (EXP_*, ANIM_Piscar, POSE_Kart, POSE_Moto), só com os ossos de cada grupo. O
+##   Henrique veio sem animações (e sem esqueleto; veja rig_henrique.py): as dele são as
+##   do Jarbas transferidas (_transfer), com o mesmo giro de cada osso no espaço do
+##   personagem, os deslocamentos do rosto na escala do rosto dele e as pálpebras na
+##   proporção da abertura delas (as do Henrique são mais caídas).
 ## - Gestos, respiração, olhar e formatos de mão: transferidos das animações do
 ##   Celerino. Os dois estão em pose T, de frente para +Z, com a palma para baixo: cada
 ##   osso do braço (e da coluna, e os olhos) recebe o mesmo giro, no espaço do
@@ -20,13 +24,29 @@ extends SceneTree
 ##   compensando um pouco para o Jarbas continuar olhando para a frente.
 ## - Parado em pé (idle_stand): gerado aqui, o corpo todo (veja _idle_stand).
 ##
-## Rode de novo depois de mudar o jarbas.glb (build_jarbas.py) ou as animações do
-## Celerino:
-##   Godot --headless --path . -s res://tools/personagens/gerar_animacoes.gd
+## Rode de novo depois de mudar o modelo (build_personagem.py) ou as animações do
+## Celerino (o Henrique também depois de mudar as do Jarbas):
+##   Godot --headless --path . -s res://tools/personagens/gerar_animacoes.gd -- jarbas
+##   Godot --headless --path . -s res://tools/personagens/gerar_animacoes.gd -- henrique
 
-const JARBAS := "res://assets/models/personagens/jarbas.glb"
 const CELERINO := "res://assets/models/personagens/celerino.glb"
-const OUT := "res://assets/models/personagens/jarbas_animacoes.res"
+## Modelo e saída de cada personagem. `from`: modelo de onde vêm as expressões e as poses
+## (quando o próprio não tem), com as medidas do rosto em `rig` (JSON de rig_henrique.py).
+const CHARACTERS := {
+	"jarbas": {
+		"model": "res://assets/models/personagens/jarbas.glb",
+		"out": "res://assets/models/personagens/jarbas_animacoes.res",
+	},
+	"henrique": {
+		"model": "res://assets/models/personagens/henrique.glb",
+		"out": "res://assets/models/personagens/henrique_animacoes.res",
+		"from": "res://assets/models/personagens/jarbas.glb",
+		"rig": "res://tools/personagens/henrique_esqueleto.json",
+	},
+}
+## Animações do modelo (do Blender) que o gerador usa.
+const OWN_CLIPS := [&"EXP_Neutro", &"EXP_Alegria", &"EXP_Surpresa", &"EXP_Raiva", &"EXP_Tristeza",
+	&"EXP_Olhos_Fechados", &"EXP_Boca_Aberta", &"ANIM_Piscar", &"POSE_Kart", &"POSE_Moto"]
 ## Duração das poses paradas (um quadro, como as do Celerino).
 const POSE_LEN := 1.0 / 24.0
 ## Amostragem das animações com movimento.
@@ -81,6 +101,7 @@ class Skel:
 	var index := {}
 	var parent := PackedInt32Array()
 	var rest_rot: Array[Quaternion] = []
+	var rest_pos := PackedVector3Array()
 	var rest_global: Array[Basis] = []
 	var depth := PackedInt32Array()
 
@@ -93,6 +114,7 @@ class Skel:
 			index[StringName(sk.get_bone_name(i))] = i
 			parent[i] = sk.get_bone_parent(i)
 			rest_rot.append(sk.get_bone_rest(i).basis.get_rotation_quaternion())
+			rest_pos.append(sk.get_bone_rest(i).origin)
 		rest_global = globals(rest_rot)
 		for i in n:
 			var d := 0
@@ -150,14 +172,21 @@ class Skel:
 		return out
 
 
-var _jarbas: Node
-var _celerino: Node
+## Instâncias carregadas (liberadas no fim).
+var _loaded: Array[Node] = []
+## Esqueleto do personagem (j), do Celerino (c) e do modelo de onde vêm as expressões e
+## as poses, quando não é o próprio (src).
 var j: Skel
 var c: Skel
+var src: Skel
 var j_anims := {}
 var c_anims := {}
 var _prefix := ""
 var _frames := 0
+## Transferência das animações do `from`: escala dos deslocamentos do rosto (espaço do
+## personagem) e do giro das pálpebras.
+var _face_scale := Vector3.ONE
+var _lid_scale := 1.0
 ## Giro (espaço do personagem) que leva a mão do Jarbas em repouso para a orientação
 ## da mão do Celerino em repouso, por lado ("L"/"R").
 var _hand_align := {}
@@ -167,23 +196,55 @@ func _process(_delta: float) -> bool:
 	_frames += 1
 	if _frames < 2:
 		return false
-	_run()
-	_jarbas.free()
-	_celerino.free()
+	var args := OS.get_cmdline_user_args()
+	var who := args[0] if args.size() > 0 else "jarbas"
+	if not CHARACTERS.has(who):
+		push_error("personagem desconhecido: %s (use %s)" % [who, ", ".join(CHARACTERS.keys())])
+	else:
+		_run(CHARACTERS[who])
+	for node in _loaded:
+		node.free()
 	return true
 
 
-func _run() -> void:
-	_jarbas = (load(JARBAS) as PackedScene).instantiate()
-	_celerino = (load(CELERINO) as PackedScene).instantiate()
-	j = Skel.new(_jarbas.find_child("Skeleton3D", true, false) as Skeleton3D)
-	c = Skel.new(_celerino.find_child("Skeleton3D", true, false) as Skeleton3D)
-	for pair in [[_jarbas, j_anims], [_celerino, c_anims]]:
-		var player := (pair[0] as Node).find_child("AnimationPlayer", true, false) as AnimationPlayer
+func _instance(path: String) -> Node:
+	var node := (load(path) as PackedScene).instantiate()
+	_loaded.append(node)
+	return node
+
+
+static func _animations(model: Node) -> Dictionary:
+	var out := {}
+	var player := model.find_child("AnimationPlayer", true, false) as AnimationPlayer
+	if player:
 		for anim_name in player.get_animation_list():
-			(pair[1] as Dictionary)[StringName(anim_name)] = player.get_animation(anim_name)
-	var sample_anim: Animation = j_anims[&"EXP_Neutro"]
-	_prefix = str(sample_anim.track_get_path(0)).split(":")[0]
+			out[StringName(anim_name)] = player.get_animation(anim_name)
+	return out
+
+
+func _run(cfg: Dictionary) -> void:
+	var model := _instance(cfg["model"])
+	var celerino := _instance(CELERINO)
+	j = Skel.new(model.find_child("Skeleton3D", true, false) as Skeleton3D)
+	c = Skel.new(celerino.find_child("Skeleton3D", true, false) as Skeleton3D)
+	c_anims = _animations(celerino)
+	if cfg.has("from"):
+		# Expressões e poses de outro modelo (o Henrique não tem animações).
+		var source := _instance(cfg["from"])
+		src = Skel.new(source.find_child("Skeleton3D", true, false) as Skeleton3D)
+		var face: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(cfg["rig"]))["face"]
+		var fs: Array = face["face_scale"]
+		_face_scale = Vector3(fs[0], fs[1], fs[2])
+		_lid_scale = face["lid_scale"]
+		print("rosto: escala %s, pálpebras ×%.3f" % [_face_scale, _lid_scale])
+		_prefix = str(model.get_path_to(j.sk))
+		var src_anims := _animations(source)
+		for clip in OWN_CLIPS:
+			j_anims[clip] = _transfer(src_anims[clip])
+	else:
+		j_anims = _animations(model)
+		var sample_anim: Animation = j_anims[&"EXP_Neutro"]
+		_prefix = str(sample_anim.track_get_path(0)).split(":")[0]
 	_check_rest_poses()
 	for side in ["L", "R"]:
 		var long_side := "Left" if side == "L" else "Right"
@@ -223,8 +284,8 @@ func _run() -> void:
 	# Parado em pé (telas de seleção), a partir dos braços caídos da respiração.
 	lib.add_animation(&"idle_stand", _idle_stand(lib.get_animation(&"idle")))
 
-	var err := ResourceSaver.save(lib, OUT)
-	print("gravado %s (%d animações): %s" % [OUT, lib.get_animation_list().size(), error_string(err)])
+	var err := ResourceSaver.save(lib, cfg["out"])
+	print("gravado %s (%d animações): %s" % [cfg["out"], lib.get_animation_list().size(), error_string(err)])
 
 
 ## Confere a premissa da transferência: braços em pose T, palma para baixo, nos dois.
@@ -253,6 +314,71 @@ func _hand_frame(s: Skel, hand: String, middle: String, index: String, pinky: St
 	var thumb_side := (pos.call(index) as Vector3) - (pos.call(pinky) as Vector3)
 	thumb_side = (thumb_side - fingers * thumb_side.dot(fingers)).normalized()
 	return Basis(fingers, thumb_side, fingers.cross(thumb_side))
+
+
+# --- Transferência de outro modelo (Henrique ← Jarbas) --------------------------------------
+
+## Animação de `src` (esqueleto com os mesmos nomes de ossos) passada para o personagem:
+## cada osso recebe o mesmo giro, no espaço do personagem, que o osso de mesmo nome. As
+## pálpebras giram `_lid_scale` do ângulo, no espaço delas (igual nos dois: o
+## rig_henrique.py copia a orientação dos ossos do rosto do Jarbas). Os deslocamentos do
+## rosto (lábios, cantos da boca, sobrancelhas) vão na escala do rosto.
+func _transfer(anim: Animation) -> Animation:
+	var keys := {}
+	for t in anim.get_track_count():
+		for k in anim.track_get_key_count(t):
+			keys[snappedf(anim.track_get_key_time(t, k), 0.0001)] = true
+	var times: Array = keys.keys()
+	times.sort()
+	var rot_bones: Array[StringName] = []
+	var pos_tracks := {}
+	for t in anim.get_track_count():
+		var bone_name := StringName(anim.track_get_path(t).get_concatenated_subnames())
+		if j.bone(bone_name) < 0 or src.bone(bone_name) < 0:
+			continue
+		match anim.track_get_type(t):
+			Animation.TYPE_ROTATION_3D:
+				rot_bones.append(bone_name)
+			Animation.TYPE_POSITION_3D:
+				pos_tracks[bone_name] = t
+	var out := Animation.new()
+	out.length = anim.length
+	out.loop_mode = anim.loop_mode
+	var rot_t := {}
+	for bone_name in rot_bones:
+		var tr := out.add_track(Animation.TYPE_ROTATION_3D)
+		out.track_set_path(tr, NodePath("%s:%s" % [_prefix, bone_name]))
+		rot_t[bone_name] = tr
+	var pos_t := {}
+	for bone_name in pos_tracks:
+		var tr := out.add_track(Animation.TYPE_POSITION_3D)
+		out.track_set_path(tr, NodePath("%s:%s" % [_prefix, bone_name]))
+		pos_t[bone_name] = tr
+	for time in times:
+		var sp := src.sample(anim, time)
+		var sg := src.globals(sp)
+		var wanted := {}
+		for bone_name in rot_bones:
+			var sb := src.bone(bone_name)
+			var jb := j.bone(bone_name)
+			wanted[jb] = sg[sb] * src.rest_global[sb].inverse() * j.rest_global[jb]
+		var rots := j.solve(j.rest_rot, wanted)
+		for bone_name in rot_bones:
+			var jb := j.bone(bone_name)
+			var q: Quaternion = rots[jb]
+			if LIDS.has(bone_name):
+				var sb := src.bone(bone_name)
+				var d := src.rest_rot[sb].inverse() * sp[sb]
+				q = j.rest_rot[jb] * Quaternion.IDENTITY.slerp(d, _lid_scale)
+			out.rotation_track_insert_key(rot_t[bone_name], time, q)
+		for bone_name in pos_tracks:
+			var sb := src.bone(bone_name)
+			var jb := j.bone(bone_name)
+			var d := anim.position_track_interpolate(pos_tracks[bone_name], time) - src.rest_pos[sb]
+			var scaled := (src.rest_global[src.parent[sb]] * d) * _face_scale
+			out.position_track_insert_key(pos_t[bone_name], time,
+					j.rest_pos[jb] + j.rest_global[j.parent[jb]].inverse() * scaled)
+	return out
 
 
 # --- Cópias das animações do modelo ------------------------------------------------------
