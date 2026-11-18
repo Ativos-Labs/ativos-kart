@@ -282,13 +282,18 @@ assets/pistas/                       Imagens da tela de pistas: vista aérea (fu
 assets/models/personagens/celerino.glb   Modelo do Celerino (veja RIG.md ao lado)
 assets/models/personagens/jarbas.glb     Modelo do Jarbas (+ jarbas_atlas.png e
                                      jarbas_animacoes.res), gerados por tools/personagens/
+assets/models/personagens/henrique.glb   Modelo do Henrique (+ henrique_atlas.png e
+                                     henrique_animacoes.res), gerados por tools/personagens/
 assets/models/moeda/moeda.glb        Moeda Ativos (gerada por tools/moeda/build_moeda.py)
 tools/karts/                         Gera bolido/cometa/motoca/bugre.glb a partir dos
                                      modelos originais (troca os adesivos pelas logos
                                      da Ativos). O Godot ignora a pasta tools/.
-tools/personagens/                   Prepara o Jarbas: limpa o modelo e junta as texturas
-                                     num atlas (build_jarbas.py) e monta as animações
-                                     (gerar_animacoes.gd). Veja o README.md de lá.
+tools/personagens/                   Prepara o Jarbas e o Henrique: monta o esqueleto do
+                                     Henrique (rig_henrique.py, com o Blender), limpa o
+                                     modelo e junta as texturas num atlas
+                                     (build_personagem.py), monta as animações
+                                     (gerar_animacoes.gd) e confere a pose em cada kart
+                                     (poses_nos_karts.gd). Veja o README.md de lá.
 tools/moeda/                         Gera a moeda do jogo a partir de original/MOEDA.glb
                                      (textura de 2048 → 512 px, sem os mapas de normal e
                                      rugosidade, malha centralizada: 2,4 MB → 198 KB)

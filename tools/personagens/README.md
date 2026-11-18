@@ -1,29 +1,56 @@
-# Jarbas — modelo e animações
+# Jarbas e Henrique — modelos e animações
 
-O Jarbas é o segundo piloto jogável. Ao contrário do Celerino (folha de papel, braço
-elástico), ele tem proporção de gente: esqueleto estilo Mixamo, textura, cotovelos. Esta
-pasta guarda o modelo original e os dois passos que o preparam para o jogo. O Godot
-ignora `tools/` (`.gdignore`).
+O Jarbas e o Henrique são os pilotos jogáveis de proporção de gente. Ao contrário do
+Celerino (folha de papel, braço elástico), eles têm esqueleto estilo Mixamo, textura e
+cotovelos. Esta pasta guarda os modelos originais e os passos que os preparam para o
+jogo. O Godot ignora `tools/` (`.gdignore`).
 
 | Arquivo | O que é |
 |---|---|
-| `originais/jarbas-piloto.glb` | Modelo como veio do Blender: 93 ossos (com controles de IK), 27 texturas da Tripo, 2 logos, 10 animações (`ANIM_Piscar`, `EXP_*`, `POSE_Kart`, `POSE_Moto`) e o volante/guidão de referência das poses |
-| `build_jarbas.py` | Passo 1 (Python + Pillow): grava `assets/models/personagens/jarbas.glb` |
-| `gerar_animacoes.gd` | Passo 2 (Godot headless): grava `assets/models/personagens/jarbas_animacoes.res` |
+| `originais/jarbas-piloto.glb` | Modelo do Jarbas como veio do Blender: 93 ossos (com controles de IK), 27 texturas da Tripo, 2 logos, 10 animações (`ANIM_Piscar`, `EXP_*`, `POSE_Kart`, `POSE_Moto`) e o volante/guidão de referência das poses |
+| `originais/henrique-piloto.glb` | Modelo do Henrique como veio do Blender: **só as malhas**, em pose T (sem esqueleto e sem animações), 1 textura de 4096 px (+ normal, metal/rugosidade), 2 logos e o volante/guidão de referência |
+| `rig_henrique.py` | Passo 0, só do Henrique (Python do Blender + Blender): monta o esqueleto e os pesos e grava `henrique_esqueleto.json` (veja "Henrique: o esqueleto") |
+| `blender_pesos.py` | Roda dentro do Blender, chamado pelo `rig_henrique.py`: pesos automáticos (bone heat) e cores da textura |
+| `henrique_esqueleto.json` | Esqueleto e pesos do Henrique (gerado; o passo 1 lê daqui, sem precisar do Blender) |
+| `build_personagem.py` | Passo 1 (Python + Pillow): grava `assets/models/personagens/<nome>.glb` |
+| `gerar_animacoes.gd` | Passo 2 (Godot headless): grava `assets/models/personagens/<nome>_animacoes.res` |
 | `medir_cockpit.gd` | Mede banco, encosto, assoalho e pedais de cada kart (grupo "Cockpit" do `KartData`) e grava um mapa por kart |
+| `poses_nos_karts.gd` | Confere a pose de um piloto em cada veículo: imprime as medidas (tabelas abaixo) e grava um glb da cena posada por veículo |
+| `render_poses.py` | Renderiza esses glb no Blender (lado, 3/4, cima, perto do piloto e um corte que mostra pernas e pés) |
 
 ## Regerar
 
 ```sh
-python3 tools/personagens/build_jarbas.py
+# Jarbas
+python3 tools/personagens/build_personagem.py jarbas
 Godot --headless --path . --import
-Godot --headless --path . -s res://tools/personagens/gerar_animacoes.gd
+Godot --headless --path . -s res://tools/personagens/gerar_animacoes.gd -- jarbas
+
+# Henrique (o passo 0 só precisa rodar de novo se o modelo original mudar)
+/Applications/Blender.app/Contents/Resources/5.3/python/bin/python3.13 tools/personagens/rig_henrique.py
+python3 tools/personagens/build_personagem.py henrique
+Godot --headless --path . --import
+Godot --headless --path . -s res://tools/personagens/gerar_animacoes.gd -- henrique
 ```
 
-O passo 2 lê o `jarbas.glb` importado e o `celerino.glb`: rode de novo depois de mudar
-qualquer um dos dois.
+O passo 2 lê o modelo importado e o `celerino.glb` (o do Henrique lê também o
+`jarbas.glb`, de onde vêm as expressões e as poses dele): rode de novo depois de mudar
+qualquer um deles.
 
-## Passo 1: `build_jarbas.py`
+Conferir a pose em todos os veículos (sem janela):
+
+```sh
+Godot --headless --path . -s res://tools/personagens/poses_nos_karts.gd -- /tmp/poses henrique
+Blender -b --factory-startup -P tools/personagens/render_poses.py -- /tmp/poses/r_ /tmp/poses/henrique_*.glb
+```
+
+## Passo 1: `build_personagem.py`
+
+Igual para os dois (o que muda está no início do arquivo, em `CHARACTERS`). No Henrique,
+antes de tudo, entram o esqueleto e os pesos do `henrique_esqueleto.json` (nós dos
+ossos, skin, `JOINTS_0`/`WEIGHTS_0`), e saem as cores de vértice e o segundo UV, que o
+jogo não usa. Materiais que usam a mesma imagem (o corpo e a pele da boca do Henrique)
+viram uma peça só do atlas; mapas de normal e metal/rugosidade saem.
 
 - Tira o volante e o guidão de referência (`Ref_*`) e os desenhos de controle (`WGT_*`).
 - Tira os 25 ossos sem peso (IK, polos, alvos do olhar, pontas dos dedos e dos pés):
@@ -172,3 +199,80 @@ os pontos com matiz perto da do azul do macacão (`tint_reference`) trocam de co
 cabelo e branco ficam.
 
 Custo: o rig do Jarbas leva ~86 µs por quadro (o do Celerino, ~54 µs; M4, nativo).
+
+## Henrique: o esqueleto (`rig_henrique.py`)
+
+O modelo do Henrique veio do Blender só com as malhas (sem `Armature`, sem pesos e sem
+nenhuma animação), mas feito no mesmo molde do Jarbas: mesmas peças (`Boca`, `Olhos`,
+`Palpebras`, `Mao.L/R`, `Logos_Ativos`), e as luvas são a mesma malha das luvas do
+Jarbas (escala 0,708 e giro de ~5°, erro de 1 mm por vértice). Em vez de pedir outro
+arquivo, o `rig_henrique.py` dá a ele o esqueleto do Jarbas (os mesmos 68 ossos, com os
+mesmos nomes), ajustado ao corpo dele:
+
+- **Articulações do corpo**: cada articulação do Jarbas vai para o lugar equivalente. A
+  altura sai de uma interpolação entre pontos medidos nos dois corpos (chão,
+  entreperna, eixo dos braços, fenda da boca, olhos); dentro do corpo, a mesma posição
+  relativa no corte da perna, do tronco ou do braço naquela altura (cortes exatos da
+  malha por planos). Ombro e cotovelo: a mesma fração entre a lateral do tronco e o
+  punho.
+- **Mãos e dedos**: vão junto com a luva (a mesma escala e o mesmo giro). A pegada no
+  volante (`grip_point`) é a do Jarbas × 0,708.
+- **Rosto**: olhos e pálpebras no centro de cada globo (esfera ajustada à malha);
+  mandíbula pela posição relativa a olhos e boca; lábios e cantos da boca na fenda da
+  boca (o meio do tubo `Boca_Interior`, onde os lábios entram para dentro);
+  sobrancelhas pelos pontos escuros da textura entre os olhos e a aba do boné (elas
+  são pintadas, não são peças como as do Jarbas).
+- **Orientação**: cada osso aponta (eixo Y) para a articulação seguinte, como no
+  Blender (o IK de braços e pernas do `CharacterRig` usa isso); os outros eixos ficam o
+  mais perto possível dos do Jarbas, e os do rosto são iguais aos dele. Assim as
+  animações do Jarbas passam para o Henrique (`_transfer` no `gerar_animacoes.gd`).
+
+Pesos:
+
+| Malha | Pesos |
+|---|---|
+| Corpo | automáticos do Blender (bone heat, `blender_pesos.py`) numa cópia com os vértices repetidos juntados, nos ossos do corpo; por cima, na cabeça: mandíbula (tudo abaixo da fenda da boca, na frente da orelha e acima do pescoço; dentro da boca a separação é seca, dos cantos para fora se espalha pela bochecha), lábios (raio de 2,6 cm), cantos da boca (2,2 cm) e sobrancelhas (2 cm) |
+| Luvas | as do Jarbas, vértice a vértice |
+| Olhos, pálpebras | cada peça no seu osso (4 pálpebras: de cima com os cílios, de baixo) |
+| Boca por dentro | dentes e gengiva de cima na cabeça; de baixo e língua na mandíbula; o fundo dividido pela altura da fenda |
+| Logos | os pesos do ponto mais perto do corpo |
+
+As animações próprias (expressões, piscada, `POSE_Kart`, `POSE_Moto`) são as do Jarbas
+transferidas: cada osso recebe o mesmo giro no espaço do personagem; os deslocamentos
+dos lábios, cantos da boca e sobrancelhas vão na escala do rosto dele (0,72 × 0,68 ×
+0,61 do Jarbas); as pálpebras giram 0,573 do ângulo, porque abertas elas cobrem 49° do
+olho (as do Jarbas, 86°: as do Henrique são mais caídas). O resto (gestos, `idle_stand`,
+inclinações) sai como para o Jarbas. `idle_stand`: joelhos de 16° a 32°, quadril até o
+pé 99,0% da perna.
+
+Em `data/personagens/henrique.tres`: `kart_scale` 1,3 (fica com 1,30 m no kart; o Jarbas,
+1,32 m), `showcase_scale` 1,9, retrato `portrait_scale` 2,7 e `portrait_offset` −0,8 (a
+cabeça dele é bem menor que a do Jarbas em proporção: 0,22 m de largura num corpo de
+1 m, contra 0,40 m em 1,2 m). Medidas do assento no `henrique_esqueleto.tres`, na
+proporção das do Jarbas: quadril 0,102 acima do apoio, 0,111 à frente das costas, pé
+0,165, tornozelo 0,063. Recoloração: referência no azul do meio (matiz 0,61), para o
+marinho e o azul-claro do macacão e do boné trocarem juntos.
+
+Resultado: 38 mil vértices numa superfície só (o Jarbas tem 29 mil, o Celerino 40 mil);
+o rig custa o mesmo que o do Jarbas (~87 µs por quadro com o kart, M4).
+
+## Pose em cada veículo (`poses_nos_karts.gd`)
+
+Medido em 2026-11-18, mãos com erro 0,0 cm nos 7 veículos e nenhum braço esticado com o
+volante reto. Ângulos de cotovelo e joelho são o ângulo interno (180° = reto); "do aro"
+é a distância do centro do joelho ao aro do volante.
+
+| Veículo | Henrique | Jarbas |
+|---|---|---|
+| Kart Padrão | inclina 21°, desliza 0,11; pés no assoalho, joelho 147°, 14 cm do aro | 21°, 0,11; assoalho, 147°, 16 cm |
+| Relâmpago | 20°, 0; no fundo da "banheira", joelho 147°, 13 cm | 16°, 0; 147°, 15 cm |
+| Kart de Treino | 29°, 0,04; pés nos pedais, joelho 130°, 5 cm (logo abaixo do aro) | 24°, 0,05; assoalho, 147°, 7 cm |
+| Bólido | 21°, 0,03; pés nos pedais, joelho 82° (joelhos altos: o banco fica longe dos pedais para a perna dele) | 21°, 0,02; pedais, 97° |
+| Cometa | 22°, 0,02; pés nos pedais embaixo do painel, joelho 86°, 5 cm do aro | 19°, 0; pedais, 110°, 5 cm |
+| Motoca | 32° (pose da moto); deitado sobre o tanque, a barba encosta no suporte do guidão | 32°, igual (a barba dele também encosta) |
+| Bugre | 24°, 0,12; pés nos pedais, joelho 145°, 7 cm do manche | 21°, 0,13; assoalho, 147°, 11 cm |
+
+Com o volante todo virado (0,85 rad), o braço de fora estica no Kart Padrão (1,38) e no
+Bólido (1,33): o volante desses dois fica longe e baixo. O Jarbas estica mais (1,46 e
+1,38); nos outros veículos nenhum dos dois estica. Na Motoca, o guidão é largo (manoplas
+a 42 cm do meio) e o selim não deixa deslizar: só deitando o tronco os braços alcançam.
