@@ -1,0 +1,38 @@
+[gd_resource type="Resource" script_class="CharacterSkeleton" format=3]
+
+[ext_resource type="Script" path="res://scripts/character_skeleton.gd" id="1_skel"]
+[ext_resource type="AnimationLibrary" path="res://assets/models/personagens/henrique_animacoes.res" id="2_anims"]
+
+[resource]
+script = ExtResource("1_skel")
+body = PackedStringArray("Spine", "Spine1", "Spine2", "Neck", "Head")
+hips = PackedStringArray("Hips")
+shoulders = PackedStringArray("LeftShoulder", "RightShoulder")
+arm_left = PackedStringArray("LeftArm", "LeftForeArm", "LeftHand")
+arm_right = PackedStringArray("RightArm", "RightForeArm", "RightHand")
+legs = PackedStringArray("LeftUpLeg", "LeftLeg", "LeftFoot", "LeftToeBase", "RightUpLeg", "RightLeg", "RightFoot", "RightToeBase")
+fingers_left = PackedStringArray("LeftHandIndex1", "LeftHandIndex2", "LeftHandIndex3", "LeftHandMiddle1", "LeftHandMiddle2", "LeftHandMiddle3", "LeftHandRing1", "LeftHandRing2", "LeftHandRing3", "LeftHandPinky1", "LeftHandPinky2", "LeftHandPinky3", "LeftHandThumb1", "LeftHandThumb2", "LeftHandThumb3")
+fingers_right = PackedStringArray("RightHandIndex1", "RightHandIndex2", "RightHandIndex3", "RightHandMiddle1", "RightHandMiddle2", "RightHandMiddle3", "RightHandRing1", "RightHandRing2", "RightHandRing3", "RightHandPinky1", "RightHandPinky2", "RightHandPinky3", "RightHandThumb1", "RightHandThumb2", "RightHandThumb3")
+face = PackedStringArray("Canto_Boca.L", "Canto_Boca.R", "Labio_Sup", "Labio_Inf", "Mandibula", "Palpebra_Inf.L", "Palpebra_Inf.R", "Palpebra_Sup.L", "Palpebra_Sup.R", "Sobrancelha_Ext.L", "Sobrancelha_Ext.R", "Sobrancelha_Int.L", "Sobrancelha_Int.R")
+eyes = PackedStringArray("Olho.L", "Olho.R")
+lids = PackedStringArray("Palpebra_Sup.L", "Palpebra_Sup.R", "Palpebra_Inf.L", "Palpebra_Inf.R")
+eyelid_closed_offset = 0.0
+animations = ExtResource("2_anims")
+stand_idle = &"idle_stand"
+drive_pose = &"drive_kart"
+bike_pose = &"drive_moto"
+lean_forward = 0.0
+bend_elbows = true
+elbow_pole = Vector3(0.8, -0.6, 0)
+grip_point = Vector3(0.0085, 0.0439, -0.0198)
+grip_axis = Vector3(0.945, 0.233, -0.232)
+max_arm_stretch = 1.5
+max_wrist_bend_degrees = 35.0
+max_seat_slide = 0.18
+head_counter = 0.9
+max_reach_lean = 1.0
+fit_seat = true
+hip_above_seat = 0.102
+hip_ahead_of_back = 0.111
+foot_length = 0.165
+ankle_lift = 0.063

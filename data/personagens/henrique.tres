@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="CharacterData" format=3]
+
+[ext_resource type="Script" path="res://scripts/character_data.gd" id="1_data"]
+[ext_resource type="PackedScene" path="res://assets/models/personagens/henrique.glb" id="2_model"]
+[ext_resource type="Resource" path="res://data/personagens/henrique_esqueleto.tres" id="3_skel"]
+
+[resource]
+script = ExtResource("1_data")
+display_name = "Henrique"
+tagline = "Piloto de boné e barba"
+description = "Chega ao grid de boné da Ativos e sorriso no rosto. Explosivo: sai na frente na largada e depois de cada batida, mas é leve e sente quando levam uma fechada."
+model_scene = ExtResource("2_model")
+skeleton = ExtResource("3_skel")
+kart_scale = 1.3
+showcase_scale = 1.9
+portrait_scale = 2.7
+portrait_offset = Vector3(0, -0.8, 0)
+seat_height = 0.3
+seat_forward = 0.04
+color = Color(0.1, 0.56, 0.9, 1)
+color_dark = Color(0.03, 0.12, 0.3, 1)
+tint_reference = Color(0.092, 0.301, 0.698, 1)
+speed = 3
+acceleration = 5
+handling = 3
+weight = 2
