@@ -32,13 +32,14 @@ const RESOLUTIONS: Array[Vector2i] = [
 ## Ações do kart que dá para trocar de tecla (as mesmas que cada jogador tem
 ## separadas no multijogador). A pausa fica fixa em Esc / P / Start: o Esc também
 ## volta nos menus.
-const KEY_ACTIONS: Array[StringName] = [&"acelerar", &"frear", &"esquerda", &"direita", &"drift", &"reposicionar"]
+const KEY_ACTIONS: Array[StringName] = [&"acelerar", &"frear", &"esquerda", &"direita", &"drift", &"usar_item", &"reposicionar"]
 const KEY_ACTION_NAMES := {
 	&"acelerar": "Acelerar",
 	&"frear": "Frear / ré",
 	&"esquerda": "Virar à esquerda",
 	&"direita": "Virar à direita",
 	&"drift": "Pulo / drift",
+	&"usar_item": "Usar item",
 	&"reposicionar": "Reposicionar",
 }
 ## Teclas por ação (a principal e a alternativa).

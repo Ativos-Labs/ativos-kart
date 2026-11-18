@@ -12,6 +12,7 @@ Abra a pasta no Godot (Importar → `project.godot`) e aperte **F5** (ou o botã
 | Frear / ré    | S ou seta para baixo | B ou LT                 |
 | Virar         | A / D ou setas       | Analógico ou direcional |
 | Pulo / drift  | Espaço ou Shift      | RB ou X                 |
+| Usar item     | E ou Enter           | LB                      |
 | Reposicionar  | R                    | Y                       |
 | Pausar        | Esc ou P             | Start                   |
 
@@ -35,7 +36,12 @@ rodapé mostra as teclas ou os botões do controle, conforme o último que foi u
 - **Moedas Ativos:** espalhadas em fileiras pela pista, quase sempre fora da trajetória
   ideal (dentro, fora ou no meio da curva, nas pontes, no arco dos pulos de rampa e no
   meio dos obstáculos). Cada moeda soma 0,6% na velocidade máxima, até 10 moedas (+6%).
-  O contador fica em cima da posição; as moedas voltam a aparecer 12 s depois de pegas.
+  O contador fica no canto inferior esquerdo, ao lado da volta; as moedas voltam a
+  aparecer 12 s depois de pegas.
+- **Tela limpa:** durante a corrida o HUD mostra só o mapa, as moedas e a volta (duas
+  pílulas escuras no canto inferior esquerdo) e a posição (canto inferior direito); o
+  canto superior esquerdo só mostra o item guardado (vazio, ele some). O tempo e o recorde aparecem no canto superior direito quando você cruza a
+  chegada — no contra-relógio o relógio fica na tela o tempo todo.
 - **Obstáculos que se mexem**, um tipo por pista (o Circuito não tem): **ondas do mar**
   que passam por cima da mureta e varrem a pista na Ilha, **fardos de feno** rolando aos
   trancos no Cânion e **bolas de neve** enormes descendo do lado do morro no Pico. Quem
@@ -47,8 +53,18 @@ rodapé mostra as teclas ou os botões do controle, conforme o último que foi u
   pista — quanto mais rápido, mais longe (com turbo o pulo fica bem maior). Aperte o
   **drift logo na saída da rampa** para fazer uma manobra no ar: o kart dá um giro e
   ganha um turbo ao aterrissar. No ar dá para corrigir a direção só um pouco.
+- **Rampas de asa-delta** (painel azul aceso com setas brancas e moldura amarela): o kart
+  sobe alto, a **asa-delta abre** em cima dele (presa na carroceria por quatro cordas) e ele **plana** de 3 a 7 s, descendo
+  devagar. No ar o direcional vira (o kart inclina como um avião) e **segurar o freio
+  levanta o bico** — desce mais devagar, mas perde velocidade. Paredes invisíveis altas
+  seguram o voo dentro da pista; ao tocar o chão a asa fecha. Também dá para fazer a
+  manobra na decolagem (o turbo vem na aterrissagem). Há uma em cada pista, três delas
+  saindo do alto de uma ponte, e moedas no ar pelo caminho (uma fileira de cada lado).
 - **Caixas de item** (com o logo "at"): passe por elas para pegar um item. Elas estouram e
-  voltam depois de alguns segundos. *(Os itens em si ainda não existem.)*
+  voltam depois de alguns segundos. O item aparece no **slot do canto superior esquerdo**
+  (como no Mario Kart) depois de uma **roleta vertical** (os ícones descem e freiam até
+  parar no sorteado) e fica guardado até você usar (**E**, **Enter** ou **LB**; a tecla
+  aparece no canto do slot). Com item guardado, a caixa não dá outro. Veja **Itens** abaixo.
 - **Turbo de largada:** comece a acelerar logo depois do "2" da contagem (o kart dispara
   com uma arrancada fortíssima, sem bater no kart da frente do grid).
 - **Adversários:** você corre contra 7 pilotos do computador e larga em último, como num
@@ -57,6 +73,25 @@ rodapé mostra as teclas ou os botões do controle, conforme o último que foi u
   dois para o lado — o mais pesado empurra mais.
 - Na grama o kart fica mais lento. A corrida tem 3 voltas e os recordes ficam salvos
   (separados por cilindrada).
+
+## Itens
+
+Poderes de **Caos** — o sorteio depende da posição: quem está atrás tem mais chance do
+Deságio e o líder nunca o recebe. Os pilotos do computador também pegam e usam itens
+(esperam um pouco; cada item tem um tempo mínimo entre usos do computador, para ninguém
+levar um poder atrás do outro). No contra-relógio e numa corrida sem rivais as caixas não
+dão item.
+
+| Item | O que faz |
+|------|-----------|
+| **Deságio** (o raio) | Todo mundo encolhe, menos você. Um **"−%" gigante aparece no céu**, um raio cai em cada rival (rodam e perdem velocidade) e eles ficam pequenos de 4,5 a 7,5 s (quem está mais na frente fica mais tempo): 20% mais lentos, leves nas batidas e com o motor fininho. Um kart grande que encosta num pequeno **amassa** ele. Se você estiver pequeno, volta ao normal. |
+| **Juridiquês** (a tinta na tela) | Cobre a visão dos rivais à frente com borrões de tinta cheios de **texto jurídico miúdo** ("Outrossim, data venia, considerando-se…") por 5 s; depois a tinta escorre e some. Quem leva fica com um "§" flutuando em cima do kart; os pilotos do computador ziguezagueiam e aliviam o pé. Usado pelo líder, pega quem vem atrás. |
+| **Cessão de crédito** (o fantasma) | Rouba o item do rival mais perto à frente (ou atrás, se não houver ninguém à frente). **O Celerino, de fantasma, assina um contrato no ar** em cima do rival — no seu HUD aparece o contrato com cedente, cessionário, a assinatura e o carimbo "CEDIDO" — e o item muda de dono. Não rouba outra Cessão; se ninguém tiver item, o crédito vem novo (a roleta gira de novo). |
+
+Para criar um item novo: acrescente-o em `RaceItem` (`Kind`, `INFO` e o desenho do ícone
+em `draw_icon`), o peso no sorteio em `RaceItems._draw_item` e o efeito em
+`RaceItems._use`. Item de uso imediato (um turbo, por exemplo) leva `"auto": true` em
+`INFO`: sai da roleta e já é usado, sem ficar no slot.
 
 ## Modos de jogo
 
@@ -91,7 +126,8 @@ cor fica de fora da corrida.
 
 - **2 jogadores:** uma tela em cima da outra (a câmera fica mais afastada nessa faixa larga).
 - **3 ou 4:** quatro quadrantes; com 3, o quarto mostra o mapa grande da pista.
-- Cada tela tem um HUD compacto (posição, volta, tempo, velocímetro e mapa) e uma etiqueta
+- Cada tela tem um HUD compacto (moedas, volta, posição e mapa; o tempo aparece na
+  chegada) e uma etiqueta
   "J2" flutua em cima do kart de cada jogador para os outros acharem ele.
 - O elástico dos adversários se mede pelo jogador mais adiantado.
 - A corrida acaba quando todos os jogadores chegam; depois que o primeiro chega, quem falta
@@ -152,8 +188,8 @@ LB/RB trocam de aba no controle.
 ## Fluxo das telas
 
 Menu principal → **Modo de jogo** (e "Quem vai jogar?" com 2+ jogadores) → **Escolha seu
-piloto** → **Escolha seu kart** (uma vez para cada jogador) → **Escolha a pista** (no Grand
-Prix, a copa) → Corrida → Resultado (classificação dos 8 karts, suas voltas; correr de novo,
+piloto** → **Escolha seu kart** → **Escolha sua asa-delta** (cada uma uma vez para cada
+jogador) → **Escolha a pista** (no Grand Prix, a copa) → Corrida → Resultado (classificação dos 8 karts, suas voltas; correr de novo,
 trocar pista, trocar piloto, trocar kart ou voltar ao menu). No Grand Prix o resultado
 mostra a classificação geral com os pontos e o botão "Próxima corrida" (na última, "Nova
 copa").
@@ -167,10 +203,10 @@ traçado, extensão, voltas, curvas, dificuldade e recordes. Vagas sem pista apa
 
 | Pista            | Cenário | Destaques                                                                 |
 |------------------|---------|---------------------------------------------------------------------------|
-| Circuito Ativos  | Campo   | Lagos, montanhas nevadas, "S" apertado no meio                            |
-| Ilha Ativos      | Praia   | Ilha com lagoa no meio, ponte estaiada com o logo na torre, ponte sobre o mar, coqueiros, guarda-sóis, veleiros com o logo na vela, farol e ondas do mar invadindo a pista |
-| Cânion Ativos    | Deserto | Traçado em "8" com viaduto passando por cima da própria pista, ponte em arco azul e viaduto de pedra sobre o rio do cânion, arco de pedra sobre a pista, caixa-d'água, letreiro gigante da Ativos e fardos de feno rolando |
-| Pico Nevado      | Neve    | Subida até um platô, viaduto de pedra sobre o rio congelado, ponte estaiada, pinheiros nevados, chalés, bonecos de neve de cachecol azul, neve caindo e bolas de neve descendo o morro |
+| Circuito Ativos  | Campo   | Lagos, montanhas nevadas, "S" apertado no meio, rampa de asa-delta na reta antes da curva longa |
+| Ilha Ativos      | Praia   | Ilha com lagoa no meio, ponte estaiada com o logo na torre, ponte sobre o mar, coqueiros, guarda-sóis, veleiros com o logo na vela, farol, ondas do mar invadindo a pista e rampa de asa-delta no alto da ponte estaiada (voa por baixo da torre, sobre o mar) |
+| Cânion Ativos    | Deserto | Traçado em "8" com viaduto passando por cima da própria pista, ponte em arco azul e viaduto de pedra sobre o rio do cânion, arco de pedra sobre a pista, caixa-d'água, letreiro gigante da Ativos, fardos de feno rolando e rampa de asa-delta no alto do viaduto (8,5 m): o voo mais longo, ~6,5 s descendo pela diagonal do "8" |
+| Pico Nevado      | Neve    | Subida até um platô, viaduto de pedra sobre o rio congelado, ponte estaiada, pinheiros nevados, chalés, bonecos de neve de cachecol azul, neve caindo, bolas de neve descendo o morro e rampa de asa-delta na ponte estaiada (no 150cc dá para cruzar a chegada voando) |
 
 Todas usam as logos da Ativos no pórtico, nas muretas, outdoors, bandeiras, balões, dirigível,
 no asfalto e nas pontes.
@@ -183,6 +219,7 @@ scenes/
   mode_select.tscn       Modo de jogo, jogadores, cilindrada, dificuldade + "Quem vai jogar?"
   character_select.tscn  Seleção de piloto (grade de retratos + personagem 3D)
   kart_select.tscn       Seleção de kart (kart com o piloto girando + atributos)
+  glider_select.tscn     Seleção de asa-delta (kart e piloto com a asa aberta girando)
   track_select.tscn      Seleção de pista (vista aérea ao fundo, copas, cartões, mapa e recordes)
   race.tscn              Corrida (carrega a pista escolhida + kart + câmera + HUD + pausa)
   kart.tscn              O kart (física, faíscas, turbo, som do motor)
@@ -210,7 +247,12 @@ scripts/
   ghost_kart.gd         Kart transparente que refaz o percurso do fantasma
   mode_select.gd        Tela de modo de jogo
   kart.gd               Física arcade: aceleração, curva (com atrito), pulo, drift, turbo,
-                        moedas, rodopio ao bater num obstáculo, marcas de pneu e poeira
+                        moedas, rodopio ao bater num obstáculo, marcas de pneu e poeira,
+                        voo com a asa-delta (GLIDE_*)
+  glider_data.gd        Recurso com os dados de cada asa-delta (nome, textura)
+  glider_visual.gd      A asa-delta em cima do kart (abre/fecha, balança no ar, cordas
+                        esticadas até a carroceria)
+  glider_select.gd      Tela de seleção de asa-delta
   skid_marks.gd         Marcas de pneu de todos os karts numa malha só (anel de trechos;
                         só a parte nova vai para a GPU)
   kart_visual.gd        Modelo do kart + piloto: rodas, volante girando, mãos no volante
@@ -232,7 +274,8 @@ scripts/
                         caixa-d'água, letreiro, arco de pedra, chalés, bonecos de neve)
   track_bridge.gd       Recurso com os dados de uma ponte (trecho, altura, rampa, estilo)
   track_bridges.gd      Monta as pontes (tabuleiro, pilares, torre estaiada, arco, viaduto)
-  track_ramp.gd         Recurso com os dados de uma rampa de pulo (posição, altura, ângulo)
+  track_ramp.gd         Recurso com os dados de uma rampa de pulo ou de asa-delta (posição,
+                        altura, ângulo, alcance do voo)
   track_ramps.gd        Monta as rampas de pulo (malha, colisão, turbo, paredes invisíveis)
   jump_ramp.gd          Colisão da rampa com a borda de onde o kart decola
   item_box.gd           Caixa de item (gira e flutua no shader, estoura e volta)
@@ -252,10 +295,16 @@ scripts/
   race.gd               Grid com os adversários, contagem, voltas e posições de cada kart,
                         contramão, chegada e classificação
   kart_ai.gd            Piloto do computador (trajetória, drift, manobras, ultrapassagem)
+  race_item.gd          Os itens (Deságio, Juridiquês, Cessão de crédito): nomes, cores e ícones
+  race_items.gd         Itens na corrida: sorteio, item guardado de cada kart, uso e poderes
+  item_effects.gd       Efeitos 3D dos itens: raio, "−%" no céu, "§" de tinta
+  cessao_ghost.gd       Celerino-fantasma que assina o contrato da Cessão de crédito
   racing_line.gd        Trajetória de corrida dos adversários (calculada a cada corrida)
   chase_camera.gd       Câmera que segue o kart (e se ajusta à faixa larga do 2 jogadores)
   ui/                   Interface: ui_kit.gd (cores, fontes, desenho), botões, faixas,
-                        barras de atributos, retratos, velocímetro, semáforo, HUD, pausa,
+                        barras de atributos, retratos, pílulas do HUD (hud_pill.gd), slot do item com a roleta
+                        (item_slot.gd), tinta do Juridiquês (ink_overlay.gd), contrato da Cessão
+                        (contract_card.gd), semáforo, HUD, pausa,
                         posição na corrida (place_badge.gd), linhas da classificação,
                         tela dividida (split_screen.gd), cartões de modo, seletor de
                         opção, etiqueta do jogador, o painel "Quem vai jogar?" e a janela
@@ -276,6 +325,9 @@ data/personagens/celerino.tres       Dados do Celerino
 data/personagens/jarbas.tres         Dados do Jarbas (+ jarbas_esqueleto.tres: ossos,
                                      animações e jeito de pilotar)
 data/rivais/*.tres                   Adversários do computador (Celerino recolorido)
+data/asas/*.tres                     Asas-deltas (Asa Rubra, Asa Ativos, Bandeirada, Pôr do Sol)
+assets/models/asas/                  Asa-delta (asa_delta.glb) e a textura de cada asa,
+                                     gerados por tools/asas/ (créditos em CREDITOS.txt)
 data/pistas/*.tres                   Dados das pistas (nome, copa, descrição, dificuldade)
 assets/pistas/                       Imagens da tela de pistas: vista aérea (fundo) e foto
                                      da largada (cartão), geradas por tools/track_shots/
@@ -285,15 +337,19 @@ assets/models/personagens/jarbas.glb     Modelo do Jarbas (+ jarbas_atlas.png e
 assets/models/personagens/henrique.glb   Modelo do Henrique (+ henrique_atlas.png e
                                      henrique_animacoes.res), gerados por tools/personagens/
 assets/models/moeda/moeda.glb        Moeda Ativos (gerada por tools/moeda/build_moeda.py)
-tools/karts/                         Gera bolido/cometa/motoca/bugre.glb a partir dos
-                                     modelos originais (troca os adesivos pelas logos
-                                     da Ativos). O Godot ignora a pasta tools/.
+tools/karts/                         Gera bolido/cometa/motoca/bugre.glb e o
+                                     standard_kart.glb (azul, com o "A" da Ativos) a
+                                     partir dos modelos originais (troca os adesivos
+                                     pelas logos da Ativos). O Godot ignora a pasta tools/.
 tools/personagens/                   Prepara o Jarbas e o Henrique: monta o esqueleto do
                                      Henrique (rig_henrique.py, com o Blender), limpa o
                                      modelo e junta as texturas num atlas
                                      (build_personagem.py), monta as animações
                                      (gerar_animacoes.gd) e confere a pose em cada kart
                                      (poses_nos_karts.gd). Veja o README.md de lá.
+tools/asas/                          Gera a asa-delta do jogo e as texturas das asas a partir
+                                     do modelo original (build_asas.py) e traz a sonda que
+                                     mede os voos (veja o README.md de lá)
 tools/moeda/                         Gera a moeda do jogo a partir de original/MOEDA.glb
                                      (textura de 2048 → 512 px, sem os mapas de normal e
                                      rugosidade, malha centralizada: 2,4 MB → 198 KB)
@@ -331,8 +387,6 @@ arquivo trazem trilhas para quase todos os ossos.
   curva, faz cara de concentrado no drift, se assusta nas batidas, grita no turbo e
   comemora com os braços para cima na chegada.
 - **Nas telas de seleção:** fica em pé, respira, pisca, acena e comemora ao confirmar.
-- **No HUD:** o retrato redondo imita as expressões do piloto durante a corrida (a 24
-  quadros por segundo, o bastante para um selo pequeno).
 - **Uma malha só:** ao carregar, as 10 malhas do modelo (35 superfícies, uma por material)
   viram uma superfície com a cor e a rugosidade de cada material nos vértices
   (`scripts/character_mesh.gd` + `shaders/character.gdshader`, que imita os materiais e
@@ -479,6 +533,22 @@ Os modelos originais ficam em `tools/karts/originais/` e os `.glb` do jogo são 
 Para mudar posição ou tamanho de um adesivo, edite a função do kart no script
 (`build_bugre`, `build_bolido`...), rode de novo e reabra o Godot para reimportar.
 
+## Adicionar uma asa-delta nova
+
+As asas são o mesmo modelo (`assets/models/asas/asa_delta.glb`) com texturas diferentes.
+Todas planam igual — a escolha é só de estilo.
+
+1. Em `tools/asas/build_asas.py`, acrescente um estilo em `ESTILOS`: as cores das faixas da
+   borda da vela e do contorno, a função que pinta o desenho do meio da vela (recebe a
+   posição na vela em `u`, `v`) e as cores da moldura, das amarrações/cordas e das tiras.
+2. Rode `python3 tools/asas/build_asas.py <nome>` (precisa de Pillow): grava
+   `assets/models/asas/<nome>.png`. Na importação, deixe os mipmaps ligados.
+3. Duplique um `.tres` de `data/asas/`, troque o nome, a descrição, a textura e a cor de
+   destaque (a bolinha da tela de seleção).
+4. Acrescente o `.tres` na lista `gliders` em `scripts/game_state.gd`.
+
+Ela aparece na tela de seleção e no sorteio das asas dos adversários.
+
 ## Mudar a pista
 
 Abra `scenes/tracks/circuito_ativos.tscn`, selecione o nó **Tracado** e arraste os
@@ -538,6 +608,22 @@ No nó raiz, em **Rampas**, acrescente itens (`TrackRamp`) com:
 Ponha as rampas em retas, com uns 45 m livres depois da borda (no ar o kart vai quase reto).
 No trecho do pulo a pista ganha paredes invisíveis em cima das muretas, para o kart nunca
 sair da pista pelo ar; e se ele chegar torto, a rampa o endireita um pouco na decolagem.
+
+### Rampas de asa-delta
+
+Uma rampa com **Glider** ligado (grupo "Asa-delta" do `TrackRamp`) vira rampa de asa-delta:
+o kart decola sempre com a mesma subida (15 m/s, não importa a velocidade), a asa abre 0,4 s
+depois e ele desce a 2 m/s (0,8 m/s segurando o freio), na velocidade máxima dele; depois de
+4,5 s planando a asa "cansa" e desce cada vez mais rápido, então o voo sempre acaba. Em chão
+plano são ~3,5 s e 80–140 m; saindo de uma ponte, mais (o chão fica mais longe). As paredes
+invisíveis do voo têm 32 m de altura e vão até **Glide Distance** m depois da borda. As
+rampas atuais usam 14 m de subida, 2,2 m de altura e 26°.
+
+Ponha a rampa onde caibam uns 150 m (até ~220 m saindo de uma ponte alta) de pista sem
+outro trecho passando por cima, sem rampa de pulo, obstáculos ou caixas embaixo do voo —
+caixas e turbos ficam logo depois da aterrissagem. O alto de uma ponte é o melhor lugar: o
+voo passa por cima do rio, do mar ou do vale. Para conferir, rode a sonda de voos de
+`tools/asas/` (tempo no ar, distância, onde aterrissa, batidas na parede, quedas).
 
 ### Caixas de item
 
@@ -658,7 +744,8 @@ sem certificado (veja os READMEs de cada pasta).
 - Modelos dos karts "standard kart", "jon arbuckle's kart (speed)", "practice kart",
   "kartrider olypios", "pink excalibur" e "thermal buggy": amogusstrikesback2 (Sketchfab),
   licença CC BY 4.0; "Crash Team Racing Nitro-Fueled kart": drance (Sketchfab), licença
-  CC BY-SA 4.0 — os quatro últimos modificados (adesivos da Ativos). Veja
+  CC BY-SA 4.0 — o "standard kart" e os quatro últimos modificados (pintura azul e
+  emblema "A" no primeiro; adesivos da Ativos nos outros). Veja
   `assets/models/karts/CREDITOS.txt`.
 - Celerino: mascote da Ativos (`assets/models/personagens/`).
 - Jarbas: piloto da Ativos (`assets/models/personagens/jarbas.glb`, preparado a partir de

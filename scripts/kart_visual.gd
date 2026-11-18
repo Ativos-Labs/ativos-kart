@@ -69,13 +69,14 @@ func setup(p_kart: KartData, p_character: CharacterData) -> void:
 	_update_steering(0.0)
 
 
-## Atualiza rodas, volante e piloto. `steer` positivo = esquerda.
-func update_motion(delta: float, speed: float, steer: float, drift_dir := 0) -> void:
+## Atualiza rodas, volante e piloto. `steer` positivo = esquerda. `rear_slip` (m/s) é
+## o quanto as rodas de trás giram a mais que o chão (patinando parado na largada).
+func update_motion(delta: float, speed: float, steer: float, drift_dir := 0, rear_slip := 0.0) -> void:
 	if kart_data == null:
 		return
 	var dist := speed * delta
 	_spin_front = wrapf(_spin_front + dist / kart_data.front_wheel_radius, 0.0, TAU)
-	_spin_rear = wrapf(_spin_rear + dist / kart_data.rear_wheel_radius, 0.0, TAU)
+	_spin_rear = wrapf(_spin_rear + (dist + rear_slip * delta) / kart_data.rear_wheel_radius, 0.0, TAU)
 	var steer_target := steer * 0.45
 	if drift_dir != 0:
 		steer_target = drift_dir * 0.2 + steer * 0.2
@@ -111,6 +112,17 @@ func rear_contact_points() -> PackedVector3Array:
 	elif out.is_empty():
 		out = PackedVector3Array([Vector3(-0.66, 0.0, 0.8), Vector3(0.66, 0.0, 0.8)])
 	return out
+
+
+## Meio do eixo da frente (espaço deste nó, no chão): em volta dele a traseira balança
+## quando o kart patina parado na largada.
+func front_axle_center() -> Vector3:
+	if _front_wheels.is_empty():
+		return Vector3(0.0, 0.0, -0.7)
+	var z := 0.0
+	for part in _front_wheels:
+		z += part.rest.origin.z
+	return Vector3(0.0, 0.0, z / _front_wheels.size())
 
 
 func _update_steering(angle: float) -> void:

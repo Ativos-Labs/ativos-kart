@@ -10,6 +10,7 @@ const SCENE_MAIN_MENU := "res://scenes/main_menu.tscn"
 const SCENE_MODE_SELECT := "res://scenes/mode_select.tscn"
 const SCENE_CHARACTER_SELECT := "res://scenes/character_select.tscn"
 const SCENE_KART_SELECT := "res://scenes/kart_select.tscn"
+const SCENE_GLIDER_SELECT := "res://scenes/glider_select.tscn"
 const SCENE_TRACK_SELECT := "res://scenes/track_select.tscn"
 const SCENE_RACE := "res://scenes/race.tscn"
 
@@ -50,6 +51,16 @@ var karts: Array[KartData] = [
 	preload("res://data/karts/cometa.tres"),
 	preload("res://data/karts/motoca.tres"),
 	preload("res://data/karts/bugre.tres"),
+]
+
+## Asas-deltas da tela de seleção (abrem nas rampas de asa-delta; só mudam o visual).
+## Para adicionar uma asa nova, crie um .tres (GliderData) em res://data/asas/ e
+## acrescente-o nesta lista. Os adversários também usam (sorteadas a cada corrida).
+var gliders: Array[GliderData] = [
+	preload("res://data/asas/asa_rubra.tres"),
+	preload("res://data/asas/asa_ativos.tres"),
+	preload("res://data/asas/bandeirada.tres"),
+	preload("res://data/asas/por_do_sol.tres"),
 ]
 
 ## Personagens da tela de seleção (o primeiro é o padrão).
@@ -193,6 +204,7 @@ func _notification(what: int) -> void:
 
 func _exit_tree() -> void:
 	CharacterMesh.clear_cache()
+	GliderVisual.clear_cache()
 	TrackCoins.clear_cache()
 	TrackTheme.clear_cache()
 
@@ -223,6 +235,14 @@ func get_selected_character() -> CharacterData:
 func get_player_kart(i: int) -> KartData:
 	var slot := players[clampi(i, 0, players.size() - 1)]
 	return karts[clampi(slot.kart_index, 0, karts.size() - 1)]
+
+
+## Asa-delta do jogador `i` (null se não houver asas).
+func get_player_glider(i: int) -> GliderData:
+	if gliders.is_empty():
+		return null
+	var slot := players[clampi(i, 0, players.size() - 1)]
+	return gliders[clampi(slot.glider_index, 0, gliders.size() - 1)]
 
 
 ## Piloto do jogador `i`. Se um jogador anterior já escolheu o mesmo personagem, este
@@ -266,6 +286,7 @@ func set_players(devices: Array[int]) -> void:
 		if i < old.size():
 			slot.character_index = old[i].character_index
 			slot.kart_index = old[i].kart_index
+			slot.glider_index = old[i].glider_index
 		slot.apply_input_map()
 		players.append(slot)
 	picking_player = 0
@@ -353,6 +374,19 @@ func get_rival_karts(count: int) -> Array[KartData]:
 	return out
 
 
+## Asas-deltas dos adversários desta corrida, sorteadas como os karts (cada asa
+## aparece uma vez antes de alguma se repetir).
+func get_rival_gliders(count: int) -> Array[GliderData]:
+	var out: Array[GliderData] = []
+	var deck: Array[GliderData] = []
+	while out.size() < count and not gliders.is_empty():
+		if deck.is_empty():
+			deck = gliders.duplicate()
+			deck.shuffle()
+		out.append(deck.pop_back())
+	return out
+
+
 ## Começa uma copa com as pistas de `cup_name` e os jogadores atuais. Os adversários
 ## (pilotos, karts e nível de cada um) ficam os mesmos nas 4 corridas.
 func start_grand_prix(cup_name: String) -> void:
@@ -369,9 +403,11 @@ func start_grand_prix(cup_name: String) -> void:
 		e.player = i
 		e.character = get_player_character(i)
 		e.kart = get_player_kart(i)
+		e.glider = get_player_glider(i)
 		gp.entrants.append(e)
 	var lineup := get_rival_lineup(clampi(RACE_SIZE - players.size(), 0, rival_count))
 	var rival_karts := get_rival_karts(lineup.size())
+	var rival_gliders := get_rival_gliders(lineup.size())
 	var levels: Array[float] = []
 	for i in lineup.size():
 		levels.append(float(i) / maxf(lineup.size() - 1, 1.0))
@@ -381,6 +417,7 @@ func start_grand_prix(cup_name: String) -> void:
 		e.id = "cpu%d" % i
 		e.character = lineup[i]
 		e.kart = rival_karts[i]
+		e.glider = rival_gliders[i] if i < rival_gliders.size() else null
 		e.level = levels[i]
 		gp.entrants.append(e)
 	grand_prix = gp

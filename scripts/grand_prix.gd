@@ -19,6 +19,7 @@ class Entrant:
 	var player := -1
 	var character: CharacterData
 	var kart: KartData
+	var glider: GliderData
 	## Nível do adversário (0 = o mais fraco do grid, 1 = o mais forte).
 	var level := 0.5
 	var points := 0

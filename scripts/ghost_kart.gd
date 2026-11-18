@@ -8,6 +8,7 @@ const GHOST_SHADER := preload("res://shaders/ghost.gdshader")
 var ghost: Ghost
 var _visual: Node3D
 var _model: KartVisual
+var _glider: GliderVisual
 var _material: ShaderMaterial
 
 
@@ -27,6 +28,17 @@ func setup(g: Ghost) -> bool:
 	_visual.add_child(_model)
 	_model.setup(kart_data, character)
 	_model.scale = Vector3.ONE * kart_data.race_scale
+	# A asa-delta (fica escondida até o fantasma decolar de uma rampa de asa-delta).
+	var glider := load(g.glider_path) as GliderData if ResourceLoader.exists(g.glider_path) else null
+	if glider == null and not GameState.gliders.is_empty():
+		glider = GameState.gliders[0]
+	if glider:
+		_glider = GliderVisual.new()
+		_visual.add_child(_glider)
+		_glider.setup(glider)
+		_glider.sway = 0.0
+		_glider.position = _glider.fit_to(_model) * kart_data.race_scale
+		_glider.scale = Vector3.ONE * kart_data.race_scale
 	_material = ShaderMaterial.new()
 	_material.shader = GHOST_SHADER
 	# O piloto monta os materiais dele no _ready: a troca espera um quadro.
@@ -54,3 +66,5 @@ func show_at(time: float, delta: float) -> void:
 	global_transform = Transform3D(Basis(Vector3.UP, s.yaw), s.position)
 	_visual.transform = Transform3D(Basis(s.visual as Quaternion), Vector3(0.0, s.squash, 0.0))
 	_model.update_motion(delta, s.speed, s.steer, s.drift)
+	if _glider:
+		_glider.set_openness(s.glide)

@@ -12,6 +12,9 @@ extends Node3D
 ## (Track.obstacles, com o relógio acertado pela largada: o padrão é o mesmo em toda
 ## corrida). Aqui ficam as marcas de pneu (SkidMarks) e os sons/avisos de cada jogador.
 ##
+## Os itens das caixas (roleta, slot, Deságio, Juridiquês, Cessão de crédito) ficam em
+## RaceItems, filho desta cena.
+##
 ## Música (GameState.music): a trilha do cenário da pista entra no "VAI!", acelera
 ## quando o primeiro jogador chega na volta final e vira a do pódio no fim.
 
@@ -125,6 +128,8 @@ var ghost: Ghost
 var ghost_kart: GhostKart
 ## Marcas de pneu de todos os karts.
 var skid_marks: SkidMarks
+## Itens das caixas (roleta, item guardado de cada kart e os poderes).
+var items: RaceItems
 
 var _karts: Array[Kart] = []
 ## Compilando os shaders atrás da tela de carregamento (a contagem ainda não começou).
@@ -159,6 +164,9 @@ func _ready() -> void:
 		_setup_split_screen()
 	_build_grid()
 	_setup_views()
+	items = RaceItems.new()
+	add_child(items)
+	items.setup(self)
 	if mode == GameState.Mode.TIME_TRIAL:
 		_load_ghost()
 	_update_places()
@@ -212,7 +220,7 @@ func _build_grid() -> void:
 		var e: Dictionary = entries[i]
 		var slot: PlayerSlot = e.slot
 		var ai: KartAI = null if slot else KartAI.new()
-		var r := _add_racer(e.character, e.kart, i, ai, slot, lone)
+		var r := _add_racer(e.character, e.kart, i, ai, slot, lone, e.get("glider"))
 		r.entrant = e.get("entrant")
 		if ai:
 			var level: float = e.level
@@ -231,7 +239,7 @@ func _build_grid() -> void:
 
 
 ## Quem larga e onde (o primeiro da lista larga na pole). Cada entrada:
-## {character, kart, slot (PlayerSlot ou null), level (adversário, 0..1), entrant}.
+## {character, kart, glider, slot (PlayerSlot ou null), level (adversário, 0..1), entrant}.
 func _grid_entries() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	var gp := GameState.grand_prix
@@ -240,6 +248,7 @@ func _grid_entries() -> Array[Dictionary]:
 			out.append({
 				"character": e.character,
 				"kart": e.kart,
+				"glider": e.glider,
 				"slot": GameState.players[e.player] if e.is_human() and e.player < GameState.players.size() else null,
 				"level": e.level,
 				"entrant": e,
@@ -247,17 +256,20 @@ func _grid_entries() -> Array[Dictionary]:
 		return out
 	var lineup := GameState.get_rival_lineup()
 	var rival_karts := GameState.get_rival_karts(lineup.size())
+	var rival_gliders := GameState.get_rival_gliders(lineup.size())
 	# Níveis espalhados entre o mais fraco e o mais forte, sorteados pelo grid.
 	var levels: Array[float] = []
 	for i in lineup.size():
 		levels.append(float(i) / maxf(lineup.size() - 1, 1.0))
 	levels.shuffle()
 	for i in lineup.size():
-		out.append({"character": lineup[i], "kart": rival_karts[i], "slot": null, "level": levels[i]})
+		out.append({"character": lineup[i], "kart": rival_karts[i], "slot": null, "level": levels[i],
+				"glider": rival_gliders[i] if i < rival_gliders.size() else null})
 	for i in GameState.players.size():
 		out.append({
 			"character": GameState.get_player_character(i),
 			"kart": GameState.get_player_kart(i),
+			"glider": GameState.get_player_glider(i),
 			"slot": GameState.players[i],
 			"level": 0.0,
 		})
@@ -265,7 +277,7 @@ func _grid_entries() -> Array[Dictionary]:
 
 
 func _add_racer(character: CharacterData, kart_data: KartData, slot_index: int, ai: KartAI,
-		slot: PlayerSlot, lone: bool) -> Racer:
+		slot: PlayerSlot, lone: bool, glider: GliderData = null) -> Racer:
 	var r := Racer.new()
 	r.character = character
 	r.ai = ai
@@ -273,6 +285,7 @@ func _add_racer(character: CharacterData, kart_data: KartData, slot_index: int, 
 	var k: Kart = KART_SCENE.instantiate()
 	k.data = kart_data
 	k.character = character
+	k.glider = glider
 	k.is_player = slot != null
 	k.lone_player = lone
 	k.input_prefix = slot.input_prefix() if slot else ""
@@ -330,6 +343,8 @@ func _connect_human(r: Racer) -> void:
 	k.jumped.connect(_on_kart_jumped)
 	k.landed.connect(_on_kart_landed.bind(r))
 	k.trick_performed.connect(_on_kart_trick)
+	k.glider_opened.connect(_on_glider_opened.bind(r))
+	k.glider_closed.connect(_on_glider_closed)
 	k.item_box_collected.connect(_on_item_box_collected.bind(r))
 	k.coin_collected.connect(_on_coin_collected.bind(r))
 	k.coins_changed.connect(_on_coins_changed.bind(r))
@@ -498,8 +513,11 @@ func warm_up() -> void:
 	# A câmera de sempre (atrás do J1): o grid inteiro com os efeitos ligados.
 	cam.global_transform = _chase_view(humans[0])
 	cam.reset_physics_interpolation()
+	# Efeitos dos itens (raio, "−%", "§", Celerino-fantasma e o contrato) à vista.
+	items.prewarm(true)
 	for i in 3:
 		await RenderingServer.frame_post_draw
+	items.prewarm(false)
 	for k in _karts:
 		k.prewarm_effects(false)
 	if track.coins:
@@ -631,7 +649,8 @@ func _update_countdown(delta: float) -> void:
 				var colors := [UiKit.RED, UiKit.ORANGE, UiKit.YELLOW]
 				for r in humans:
 					r.hud.show_center(str(4 - step), colors[step - 1], 0.45)
-					if step == 1 and r.kart.driver:
+					# Acelerando parado o piloto fica concentrado (Kart._update_rev).
+					if step == 1 and r.kart.driver and not r.kart.is_revving():
 						r.kart.driver.set_face(&"face_smiling")
 				Sfx.play(self, &"beep", -6.0)
 			4:
@@ -659,6 +678,11 @@ func _start_race() -> void:
 			r.kart.apply_boost(1.0, 1, false)
 		r.recording = Ghost.start_recording(track.track_id, _record_class, r.kart)
 		r.recording.capture(r.kart, 0.0)
+
+
+## A corrida está valendo (depois do "VAI!" e antes do fim)?
+func is_racing() -> bool:
+	return state == State.RACING
 
 
 ## Trilha do cenário desta pista.
@@ -812,6 +836,7 @@ func _on_human_finished(r: Racer) -> void:
 	r.hud.set_lap_times(r.lap_times)
 	r.hud.set_lap(laps, laps)
 	r.hud.set_time(race_time)
+	r.hud.show_final_time()
 	r.hud.set_warning("")
 	r.hud.set_timeout(-1.0)
 	if r == player:
@@ -1141,6 +1166,16 @@ func _on_kart_trick() -> void:
 	Sfx.play(self, &"trick", -9.0)
 
 
+## A asa-delta de um jogador abriu (o tecido estala) / fechou na aterrissagem.
+func _on_glider_opened(r: Racer) -> void:
+	r.camera.shake(0.12)
+	Sfx.play(self, &"glider_open", -6.0)
+
+
+func _on_glider_closed() -> void:
+	Sfx.play(self, &"glider_close", -9.0)
+
+
 ## Moeda pega por um jogador.
 func _on_coin_collected(_r: Racer) -> void:
 	Sfx.play(self, &"coin", -11.0)
@@ -1169,8 +1204,8 @@ func _on_human_hit(lost: int, splash: bool, r: Racer) -> void:
 		Sfx.play(self, &"coin_lost", -12.0)
 
 
-## Caixa de item pega. Por enquanto só o som e a cara do piloto: a lógica dos
-## itens (sorteio, slot no HUD, usar o item) entra aqui.
+## Caixa de item pega por um jogador: o som e a cara do piloto. O sorteio, o slot no
+## HUD e o uso dos itens ficam em RaceItems.
 func _on_item_box_collected(_box: Node3D, r: Racer) -> void:
 	Sfx.play(self, &"item_box", -8.0)
 	if r.kart.driver:

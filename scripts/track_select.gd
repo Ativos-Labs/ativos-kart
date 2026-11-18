@@ -344,7 +344,7 @@ func _back() -> void:
 		return
 	Sfx.play(self, &"ui_back", -10.0)
 	GameState.picking_player = GameState.players.size() - 1
-	GameState.goto_scene(GameState.SCENE_KART_SELECT)
+	GameState.goto_scene(GameState.SCENE_GLIDER_SELECT)
 
 
 # --- Utilidades ---------------------------------------------------------------------

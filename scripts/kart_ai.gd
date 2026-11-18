@@ -103,6 +103,7 @@ func setup(p_kart: Kart, p_track: Track, p_line: RacingLine, p_karts: Array[Kart
 			"center": r.offset * (inner_half - half),
 			"half": half,
 			"narrow": r.width < 0.85,
+			"glider": r.glider,
 		})
 	for f in track.boost_pads:
 		_pads.append(wrapf(f, 0.0, 1.0) * track.length)
@@ -158,7 +159,9 @@ func drive(k: Kart) -> Dictionary:
 	var yaw_wanted := abs_speed * 2.0 * sin(alpha) / dist
 	var turn_factor := clampf(abs_speed / 7.0, 0.15, 1.0)
 	var high_speed := lerpf(1.0, k.high_speed_turn, clampf(abs_speed / k.max_speed, 0.0, 1.0))
-	var steer := clampf(yaw_wanted / (k.turn_rate * turn_factor * high_speed), -1.0, 1.0)
+	# Planando a asa vira menos que no chão (Kart.GLIDE_TURN): o volante compensa.
+	var air_turn := Kart.GLIDE_TURN if k.gliding else 1.0
+	var steer := clampf(yaw_wanted / (k.turn_rate * turn_factor * high_speed * air_turn), -1.0, 1.0)
 	if abs_speed < 4.0 or absf(alpha) > PI * 0.5:
 		steer = clampf(alpha * 2.0, -1.0, 1.0)
 
@@ -174,6 +177,13 @@ func drive(k: Kart) -> Dictionary:
 		brake = 0.35
 	if _blocked:
 		throttle = 0.0
+	if k.blind_time > 0.0:
+		# Juridiquês: com tinta na cara o piloto alivia o pé.
+		throttle = minf(throttle, lerpf(1.0, 0.78, clampf(k.blind_time, 0.0, 1.0)))
+	if k.gliding:
+		# No ar o freio levanta o bico da asa (desce devagar, perde velocidade).
+		throttle = 1.0
+		brake = 0.0
 
 	if cruising:
 		throttle = 0.55 if abs_speed < k.max_speed * 0.55 else 0.0
@@ -241,6 +251,9 @@ func _target_lateral(k: Kart, along: float, target_d: float, lat_now: float, del
 	# Balanço leve (iniciantes balançam mais).
 	lat += sin(_time * 0.6 + _phase) * (1.0 - skill) * 1.2
 	lat += _mistake_lateral(delta)
+	if k.blind_time > 0.0:
+		# Juridiquês: sem enxergar direito, ziguezagueia pela pista.
+		lat += sin(_time * 2.4 + _phase) * 3.4 * clampf(k.blind_time, 0.0, 1.0)
 	lat = _aim_boost_pads(along, lat)
 	_avoid = move_toward(_avoid, _avoid_offset(k, lat, lat_now), 7.0 * delta)
 	lat += _avoid
@@ -291,11 +304,13 @@ func _aim_boost_pads(along: float, lat: float) -> float:
 	return lat
 
 
-## Perto de uma rampa (antes da subida até a aterrissagem): sem drift.
+## Perto de uma rampa (antes da subida até a aterrissagem): sem drift. O voo de uma
+## rampa de asa-delta vai bem mais longe.
 func _near_ramp(along: float) -> bool:
 	for r in _ramps:
 		var to_lip := _to_ahead(r.lip, along)
-		if to_lip > -35.0 and to_lip < r.length + 45.0:
+		var after: float = 170.0 if r.glider else 35.0
+		if to_lip > -after and to_lip < r.length + 45.0:
 			return true
 	return false
 

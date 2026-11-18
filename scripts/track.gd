@@ -1010,6 +1010,19 @@ func _build_coins() -> void:
 				continue
 			var lip := wrapf(r.at, 0.0, 1.0) * length
 			var lateral := r.offset * (inner_half - inner_half * r.width)
+			if r.glider:
+				# Voo de asa-delta: uma fileira de três moedas à esquerda e, mais à
+				# frente, outra à direita, na altura do kart planando a 27 m/s (quem vira
+				# no ar pega as duas).
+				var base_y := get_point_at(lip).y + r.height
+				for group: Vector2 in [Vector2(30.0, -3.2), Vector2(68.0, 3.2)]:
+					for k in 3:
+						var gx := group.x + k * 6.0
+						var gp := get_transform_at(lip + gx, group.y).origin
+						var gy := base_y + TrackRamp.glide_height(gx, 27.0) + TrackCoins.KART_CENTER
+						points.append(Vector3(gp.x, maxf(gy, gp.y + TrackCoins.HEIGHT), gp.z))
+						dirs.append(get_direction_at(lip + gx))
+				continue
 			# Arco do kart saindo da borda a 27 m/s (com turbo, mais longo): altura do
 			# meio do kart = borda + subida - gravidade (como em Kart._launch).
 			var v := 27.0 * (1.35 if r.turbo else 1.0)

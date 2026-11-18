@@ -7,6 +7,12 @@ extends CharacterBody3D
 ## moedas Ativos aumentam um pouco a velocidade máxima e os obstáculos da pista fazem
 ## o kart rodar e perder moedas. No drift as rodas de trás deixam marcas no chão e
 ## levantam poeira (ou neve) com a cara do cenário.
+## Nas rampas de asa-delta o kart sobe alto, a asa abre em cima dele e ele plana: desce
+## devagar, vira com o direcional (inclinando como um avião) e o freio levanta o bico
+## (desce mais devagar, mas perde velocidade). Ao tocar o chão a asa fecha.
+## Itens (a lógica fica em RaceItems): o raio do Deságio faz o kart rodar e encolher
+## (mais lento, leve, motor fininho; um kart grande que encosta o amassa) e a tinta do
+## Juridiquês marca `blind_time` (o piloto do computador ziguezagueia).
 
 signal bumped(strength: float)
 signal boost_started(power: int)
@@ -27,6 +33,13 @@ signal coin_collected
 signal coins_changed(coins: int)
 ## Foi atingido por um obstáculo da pista (rodou ou levou uma onda) e perdeu `lost` moedas.
 signal obstacle_hit(lost: int, splash: bool)
+## A asa-delta abriu (decolou de uma rampa de asa-delta) / fechou (tocou o chão).
+signal glider_opened
+signal glider_closed
+## Encolheu (raio do Deságio) / voltou ao tamanho normal.
+signal shrunk(on: bool)
+## Encolhido, foi atropelado por um kart de tamanho normal (ficou amassado).
+signal squashed
 
 const GRAVITY := 32.0
 const HOP_VELOCITY := 4.6
@@ -78,6 +91,35 @@ const TRICK_LAND_MARGIN := 0.1
 const TRICK_PIVOT := 0.55
 ## Queda livre (sem rampa) a partir deste tempo no ar também conta como pulo.
 const LONG_AIR_TIME := 0.5
+## --- Asa-delta ---
+## Velocidade de subida (m/s) na borda de uma rampa de asa-delta: a mesma para todos
+## (o voo não depende de chegar rápido na rampa).
+const GLIDE_LAUNCH_VY := 15.0
+## A asa abre este tempo (s) depois da decolagem, perto do alto do arco (dá tempo de
+## fazer a manobra antes).
+const GLIDE_OPEN_DELAY := 0.4
+## Planando: velocidade de descida (m/s) normal e segurando o freio (bico para cima).
+const GLIDE_SINK := 2.0
+const GLIDE_SINK_SLOW := 0.8
+## Com que força (m/s²) a descida vai até a velocidade de planeio (subindo ou caindo).
+const GLIDE_GRAVITY := 9.0
+## Depois deste tempo planando (s) a asa cansa: a descida aumenta GLIDE_TIRED_SINK m/s a
+## cada segundo (o voo sempre acaba dentro do trecho cercado da rampa).
+const GLIDE_TIRED_TIME := 4.5
+const GLIDE_TIRED_SINK := 1.6
+## No ar a asa vira esta fração do giro no chão (sem asa, só 0,35) e segura o kart na
+## direção para onde ele aponta com esta fração da aderência (sem asa, 0,4).
+const GLIDE_TURN := 0.8
+const GLIDE_TRACTION := 0.6
+## Planando a velocidade vai até a máxima do kart (m/s²); segurando o freio, até esta
+## fração dela.
+const GLIDE_SPEED_RATE := 3.0
+const GLIDE_SLOW_SPEED := 0.72
+## Inclinação para dentro da curva (rad, direcional todo) e bico para baixo planando.
+const GLIDE_BANK := 0.32
+const GLIDE_NOSE := -0.06
+## Asa usada quando o kart não recebeu uma (`glider` vazio).
+const DEFAULT_GLIDER := "res://data/asas/asa_rubra.tres"
 ## --- Moedas ---
 ## Máximo de moedas e quanto cada uma soma na velocidade máxima (fração).
 const MAX_COINS := 10
@@ -92,6 +134,14 @@ const COIN_LOSS := 3
 const SPIN_TIME := 0.9
 const SPIN_LOCK := 0.65
 const HIT_COOLDOWN := 1.6
+## Deságio (item): tamanho do kart encolhido e quanto da velocidade máxima sobra.
+const SHRINK_SCALE := 0.5
+const SHRINK_SPEED := 0.8
+## Encolhido e atropelado por um kart grande: fica amassado por esse tempo (s), sem
+## acelerar no começo, e sobra essa fração da velocidade.
+const FLAT_TIME := 1.4
+const FLAT_LOCK := 0.45
+const FLAT_SLOW := 0.3
 ## --- Atrito nas curvas ---
 ## Desaceleração (m/s²) quando a curva segura o kart abaixo da velocidade dele.
 const CORNER_SCRUB := 4.5
@@ -100,6 +150,24 @@ const CORNER_SCRUB := 4.5
 const ENGINE_TABLE_SIZE := 4096
 ## Alcance (m) do som 3D do motor dos adversários: mais longe que isso ele não se ouve.
 const ENGINE_3D_RANGE := 60.0
+## --- Acelerando parado na largada ---
+## Na contagem regressiva, segurando o acelerador, o kart "esquenta" no lugar (como no
+## Mario Kart 8 Deluxe): as rodas de trás patinam, sai fumaça dos pneus e a traseira
+## escorrega de leve para um lado e para o outro. Só nos karts dos jogadores.
+## Rapidez (por s) com que a patinada chega ao máximo e some ao soltar ou na largada.
+const REV_RISE := 2.5
+const REV_FALL := 3.0
+## Velocidade (m/s) que as rodas de trás giram a mais que o chão com o acelerador todo.
+const REV_WHEEL_SPEED := 14.0
+## Balanço da traseira (rad, em volta do eixo da frente), tremida do motor (rad de
+## inclinação e m de pulinho) e o bico que sobe com a traseira agachada (rad).
+const REV_SWAY := 0.05
+const REV_SHAKE := 0.012
+const REV_BOUNCE := 0.01
+const REV_SQUAT := 0.03
+## Fumaça dos pneus: partículas por roda de trás e duração de cada uma (s).
+const REV_SMOKE_AMOUNT := 18
+const REV_SMOKE_LIFETIME := 0.95
 ## --- Marcas de pneu ---
 const MARK_WIDTH := 0.27
 const ROAD_MARK := Color(0.04, 0.04, 0.05, 0.62)
@@ -114,6 +182,9 @@ const DRIFT_COLORS := [
 @export var data: KartData
 ## Piloto sentado no kart (opcional). Defina antes de adicionar à cena.
 @export var character: CharacterData
+## Asa-delta que abre nas rampas de asa-delta (null = a primeira de GameState). Defina
+## antes de adicionar à cena.
+@export var glider: GliderData
 ## Kart de um jogador (lê o controle dele). Os adversários do computador usam o
 ## `autopilot`. Defina antes de adicionar à cena.
 @export var is_player := true
@@ -223,6 +294,16 @@ var _trick_boost := false
 ## Última manobra feita (o sorteio não repete) e tempo no ar previsto na decolagem.
 var _last_trick := -1
 var _air_expected := 0.0
+## Planando com a asa-delta aberta (até tocar o chão).
+var gliding := false
+## Decolou de uma rampa de asa-delta e a asa ainda vai abrir.
+var _glide_pending := false
+## Tempo planando (s) e o freio segurado no ar (0..1, suavizado): bico para cima.
+var _glide_time := 0.0
+var _glide_pull := 0.0
+## A asa em cima do kart (null sem asa) e onde ela fica no modelo (GliderVisual.fit_to).
+var glider_visual: GliderVisual
+var _glider_mount := Vector3.ZERO
 ## Mola da suspensão (aterrissagem): deslocamento vertical do modelo e velocidade.
 var _squash := 0.0
 var _squash_vel := 0.0
@@ -240,6 +321,16 @@ var _spin_t := -1.0
 var _spin_turns := 1.0
 var _spin_dir := 1.0
 var _hit_cooldown := 0.0
+## Deságio: segundos que faltam encolhido (0 = tamanho normal).
+var shrink_time := 0.0
+## Juridiquês: segundos com a visão coberta de tinta. O jogador vê a tinta no HUD; o
+## piloto do computador ziguezagueia e alivia o pé (KartAI).
+var blind_time := 0.0
+## Tamanho do modelo (1 = normal; mola até SHRINK_SCALE e de volta, com um balanço).
+var _size := 1.0
+var _size_vel := 0.0
+## Tempo desde que foi amassado (-1 = não está).
+var _flat_t := -1.0
 ## Perda de velocidade (fração) pela curva neste quadro.
 var _corner_loss := 0.0
 ## Rodas de trás (espaço do kart, no chão): uma trilha de marca e uma poeira por roda.
@@ -248,6 +339,15 @@ var _skid_trails := PackedInt32Array()
 var _marking := false
 var _offroad_mark := Color(0.2, 0.24, 0.08, 0.5)
 var _dust_emitters: Array[GPUParticles3D] = []
+## Acelerando parado na largada: força (0..1, suavizada), relógio do balanço, se o
+## acelerador está apertado, a fumaça de cada roda de trás (só jogadores) e o eixo da
+## frente (espaço do Visual), em volta do qual a traseira balança.
+var _rev := 0.0
+var _rev_t := 0.0
+var _revving := false
+var _rev_smoke: Array[GPUParticles3D] = []
+var _rev_smoke_ratio := -1.0
+var _rev_pivot := Vector3(0.0, 0.0, -0.7)
 ## Formas de colisão e posições das faíscas como vêm da cena (a caixa padrão dos karts).
 var _scene_body_shape: BoxShape3D
 var _scene_floor_shape: CapsuleShape3D
@@ -318,6 +418,7 @@ func apply_data(d: KartData, c: CharacterData = null) -> void:
 	# Só o kart do jogador acende uma luz no chão, e não na web: lá cada luz extra
 	# redesenha o que ela ilumina (asfalto incluído), caro para um enfeite.
 	boost_fx.setup(d, is_player and lone_player and not OS.has_feature("web"))
+	_setup_glider()
 	var stats := d.combined_stats(c)
 	max_speed = (22.0 + stats.speed * 1.7) * speed_class
 	acceleration = (9.0 + stats.acceleration * 2.0) * speed_class
@@ -339,10 +440,35 @@ func apply_data(d: KartData, c: CharacterData = null) -> void:
 		p.visible = i < _rear_points.size()
 		if p.visible:
 			p.position = _rear_points[i] + Vector3(0.0, 0.08, 0.15)
+	_rev_pivot = kart_visual.front_axle_center() * d.race_scale
+	_setup_rev_smoke()
 	_apply_hitbox(d.hitbox_size)
 	_place_sparks()
 	if skid_marks:
 		set_skid_marks(skid_marks)
+
+
+## Monta a asa-delta (escondida até a primeira rampa de asa-delta), com as cordas
+## presas na carroceria. Ela fica fora do modelo: acompanha a inclinação do kart, mas
+## não gira junto nas manobras.
+func _setup_glider() -> void:
+	if glider_visual:
+		glider_visual.queue_free()
+		glider_visual = null
+	var g := glider
+	if g == null and ResourceLoader.exists(DEFAULT_GLIDER):
+		# Sem asa escolhida (sondas, testes): a primeira da tela de seleção. Lida pelo
+		# caminho, sem o GameState: as rampas (@tool) usam as constantes deste script.
+		g = load(DEFAULT_GLIDER) as GliderData
+	if g == null:
+		return
+	glider_visual = GliderVisual.new()
+	glider_visual.name = "AsaDelta"
+	add_child(glider_visual)
+	glider_visual.setup(g)
+	_glider_mount = glider_visual.fit_to(kart_visual) if kart_visual else Vector3(0.0, 0.9, 0.0)
+	if gliding:
+		glider_visual.set_open(true, true)
 
 
 ## Troca a caixa de batida pela do veículo (zero = a padrão da cena). As formas da cena
@@ -386,6 +512,98 @@ func _place_sparks() -> void:
 		var p := _rear_points[0]
 		sparks_left.position = Vector3(p.x - 0.1, _scene_spark_points[0].y, p.z)
 		sparks_right.position = Vector3(p.x + 0.1, _scene_spark_points[1].y, p.z)
+
+
+## Fumaça dos pneus da largada (só nos karts dos jogadores): uma por roda de trás, com
+## a malha da poeira e um material de partícula com os mesmos recursos do dela
+## (TrackTheme.dust_material), então nenhum shader novo compila na hora.
+func _setup_rev_smoke() -> void:
+	if not is_player:
+		return
+	if _rev_smoke.is_empty():
+		var mat := _rev_smoke_material()
+		for i in 2:
+			var p := GPUParticles3D.new()
+			p.name = "FumacaLargada%d" % i
+			p.emitting = false
+			p.amount = REV_SMOKE_AMOUNT
+			p.lifetime = REV_SMOKE_LIFETIME
+			p.randomness = 0.4
+			p.process_material = mat
+			p.draw_pass_1 = dust.draw_pass_1
+			visual.add_child(p)
+			_rev_smoke.append(p)
+	for i in _rev_smoke.size():
+		var p := _rev_smoke[i]
+		p.visible = i < _rear_points.size()
+		if p.visible:
+			p.position = _rear_points[i] + Vector3(0.0, 0.1, 0.12)
+
+
+## Fumaça branca de pneu: sai para trás e para cima, perde a força logo, sobe devagar
+## abrindo em nuvens grandes e some aos poucos.
+func _rev_smoke_material() -> ParticleProcessMaterial:
+	var m := ParticleProcessMaterial.new()
+	m.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	m.emission_box_extents = Vector3(0.1, 0.03, 0.06)
+	m.direction = Vector3(0.0, 1.0, 0.8)
+	m.spread = 35.0
+	m.initial_velocity_min = 1.0
+	m.initial_velocity_max = 2.2
+	m.damping_min = 1.5
+	m.damping_max = 2.5
+	m.gravity = Vector3(0.0, 1.8, 0.0)
+	m.scale_min = 1.1
+	m.scale_max = 2.0
+	m.color = Color(0.86, 0.86, 0.86, 0.62)
+	var size := Curve.new()
+	size.add_point(Vector2(0.0, 0.3))
+	size.add_point(Vector2(1.0, 1.0))
+	var size_tex := CurveTexture.new()
+	size_tex.curve = size
+	m.scale_curve = size_tex
+	var fade := Gradient.new()
+	fade.set_color(0, Color(1, 1, 1, 1))
+	fade.set_color(1, Color(1, 1, 1, 0))
+	fade.add_point(0.5, Color(1, 1, 1, 0.65))
+	var fade_tex := GradientTexture1D.new()
+	fade_tex.gradient = fade
+	m.color_ramp = fade_tex
+	return m
+
+
+## Acelerando parado na largada (veja REV_*): a força sobe enquanto o jogador segura o
+## acelerador com o controle ainda desligado (contagem) e cai rápido ao soltar ou na
+## largada. Também liga a fumaça dos pneus e põe o piloto concentrado.
+func _update_rev(delta: float) -> void:
+	var target := _engine_rev if is_player and not controls_enabled else 0.0
+	_rev = move_toward(_rev, target, (REV_RISE if target > _rev else REV_FALL) * delta)
+	_rev_t = _rev_t + delta if _rev > 0.0 else 0.0
+	var revving := target > 0.5
+	if revving != _revving:
+		_revving = revving
+		# Na largada (controle ligado) quem muda a cara é a corrida.
+		if driver and not controls_enabled:
+			driver.set_face(&"face_angry" if revving else &"face_smiling")
+	if _rev_smoke.is_empty():
+		return
+	var smoking := _rev > 0.15 and is_on_floor()
+	if smoking:
+		# Mais fumaça com a patinada mais forte (só muda o que dá para notar).
+		var ratio := snappedf(lerpf(0.35, 1.0, _rev), 0.1)
+		if not is_equal_approx(ratio, _rev_smoke_ratio):
+			_rev_smoke_ratio = ratio
+			for p in _rev_smoke:
+				p.amount_ratio = ratio
+	for i in mini(_rev_smoke.size(), _rear_points.size()):
+		var p := _rev_smoke[i]
+		if p.emitting != smoking:
+			p.emitting = smoking
+
+
+## Na contagem, o jogador está segurando o acelerador (o kart patina parado).
+func is_revving() -> bool:
+	return _revving
 
 
 ## Liga as marcas de pneu (uma trilha por roda de trás).
@@ -461,7 +679,15 @@ func teleport(xform: Transform3D) -> void:
 	_trick_window = 0.0
 	_trick_buffer = 0.0
 	_spin_t = -1.0
+	_flat_t = -1.0
 	_corner_loss = 0.0
+	_glide_pending = false
+	_glide_pull = 0.0
+	if gliding:
+		gliding = false
+		glider_closed.emit()
+	if glider_visual:
+		glider_visual.set_open(false, true)
 	_break_skid_marks()
 	reset_physics_interpolation()
 
@@ -474,8 +700,14 @@ func _physics_process(delta: float) -> void:
 	var drift_held: bool = input.drift
 	var drift_pressed: bool = input.drift_pressed
 	_hit_cooldown = maxf(_hit_cooldown - delta, 0.0)
-	if _spin_t >= 0.0 and _spin_t < SPIN_LOCK:
-		# Rodando depois de um obstáculo: sem controle por um instante.
+	blind_time = maxf(blind_time - delta, 0.0)
+	if shrink_time > 0.0:
+		shrink_time -= delta
+		if shrink_time <= 0.0:
+			shrink_time = 0.0
+			shrunk.emit(false)
+	if (_spin_t >= 0.0 and _spin_t < SPIN_LOCK) or (_flat_t >= 0.0 and _flat_t < FLAT_LOCK):
+		# Rodando depois de um obstáculo (ou amassado): sem controle por um instante.
 		throttle = 0.0
 		brake = 0.0
 		raw_steer = 0.0
@@ -488,6 +720,13 @@ func _physics_process(delta: float) -> void:
 	var ramp := _current_ramp() if on_floor else null
 	_trick_buffer = maxf(_trick_buffer - delta, 0.0)
 	_trick_window = maxf(_trick_window - delta, 0.0)
+
+	# --- Asa-delta: abre perto do alto do arco; no ar o freio levanta o bico. ----
+	if _glide_pending and not on_floor and _air_time >= GLIDE_OPEN_DELAY:
+		_open_glider()
+	_glide_pull = move_toward(_glide_pull, brake if gliding else 0.0, 3.0 * delta)
+	if gliding:
+		_glide_time += delta
 
 	# --- Pulinho, drift e manobra --------------------------------------------
 	if drift_pressed:
@@ -515,8 +754,8 @@ func _physics_process(delta: float) -> void:
 		_start_drift(1 if raw_steer > 0.0 else -1)
 
 	# --- Velocidade ----------------------------------------------------------
-	# Moedas somam na velocidade máxima; a curva (atrito) tira.
-	var coin_bonus := 1.0 + coins * COIN_SPEED_BONUS
+	# Moedas somam na velocidade máxima; a curva (atrito) e o Deságio (encolhido) tiram.
+	var coin_bonus := (1.0 + coins * COIN_SPEED_BONUS) * _size_speed()
 	_corner_loss = _corner_slowdown() if on_floor else 0.0
 	var top := max_speed * speed_multiplier * coin_bonus * (offroad_factor if is_offroad and on_floor else 1.0)
 	top *= 1.0 - _corner_loss
@@ -528,6 +767,10 @@ func _physics_process(delta: float) -> void:
 			speed = move_toward(speed, top, acceleration * 3.0 * delta)
 		else:
 			speed = move_toward(speed, top, (coast_drag + CORNER_SCRUB) * delta)
+	elif gliding:
+		# Planando: a asa leva o kart na velocidade máxima dele (freando, mais devagar).
+		var glide_top := max_speed * speed_multiplier * coin_bonus * lerpf(1.0, GLIDE_SLOW_SPEED, _glide_pull)
+		speed = move_toward(speed, glide_top, GLIDE_SPEED_RATE * delta)
 	elif not on_floor:
 		pass # No ar não há chão para acelerar nem frear: a velocidade se mantém.
 	elif throttle > 0.05 and brake < 0.5:
@@ -565,7 +808,7 @@ func _physics_process(delta: float) -> void:
 		var high_speed := lerpf(1.0, high_speed_turn, clampf(absf(speed) / max_speed, 0.0, 1.0))
 		yaw = steer * turn_rate * turn_factor * high_speed * (1.0 if speed >= 0.0 else -1.0)
 	if not on_floor:
-		yaw *= 0.35
+		yaw *= GLIDE_TURN if gliding else 0.35
 	# Suaviza a velocidade de giro: o kart não dá trancos ao entrar/sair do drift.
 	_yaw_rate = lerpf(_yaw_rate, yaw, 1.0 - exp(-yaw_smoothing * delta))
 	rotate_y(_yaw_rate * delta)
@@ -575,7 +818,7 @@ func _physics_process(delta: float) -> void:
 	var horizontal := Vector3(velocity.x, 0.0, velocity.z)
 	var traction := drift_grip if drifting else grip
 	if not on_floor:
-		traction *= 0.4
+		traction *= GLIDE_TRACTION if gliding else 0.4
 	horizontal = horizontal.lerp(fwd * speed, 1.0 - exp(-traction * delta))
 	# Decolagem: quando a frente do kart passa da borda da rampa ele sai do chão
 	# com a inclinação da borda (só a gravidade age a partir daí).
@@ -586,6 +829,8 @@ func _physics_process(delta: float) -> void:
 			on_floor = false
 	if on_floor and _vertical <= 0.0:
 		_vertical = -2.0
+	elif gliding:
+		_vertical = move_toward(_vertical, -_glide_sink(), GLIDE_GRAVITY * delta)
 	else:
 		_vertical -= GRAVITY * delta
 	velocity = horizontal + Vector3.UP * _vertical
@@ -726,7 +971,14 @@ func _bump_kart(other: Kart, normal: Vector3, fwd: Vector3) -> void:
 	push = push.normalized()
 	var closing := maxf((fwd * speed - other.get_forward() * other.speed).dot(-push), 0.0)
 	var strength := clampf(closing / 12.0, 0.0, 1.0)
-	var my_share := float(other.weight_stat) / float(weight_stat + other.weight_stat)
+	# Encolhido (Deságio) o kart é leve: o grande empurra e ainda passa por cima.
+	var my_weight := _bump_weight()
+	var other_weight := other._bump_weight()
+	var my_share := other_weight / (my_weight + other_weight)
+	if is_shrunk() and not other.is_shrunk():
+		squash()
+	elif other.is_shrunk() and not is_shrunk():
+		other.squash()
 	var impulse := 3.0 + closing * 0.55
 	velocity += push * impulse * my_share * 2.0
 	other.velocity -= push * impulse * (1.0 - my_share) * 2.0
@@ -822,6 +1074,68 @@ func is_spinning() -> bool:
 	return _spin_t >= 0.0
 
 
+# --- Itens (RaceItems) -------------------------------------------------------------
+
+## Atingido pelo raio do Deságio: roda uma volta, perde velocidade (e o turbo/drift) e
+## fica pequeno por `duration` segundos. Não perde moedas.
+func zap(duration: float) -> void:
+	_want_drift = false
+	_cancel_drift()
+	boost_time = 0.0
+	_trick_boost = false
+	speed *= 0.45
+	_spin_t = 0.0
+	_spin_turns = 1.0
+	_spin_dir = 1.0 if randf() < 0.5 else -1.0
+	shrink(duration)
+	if driver:
+		driver.react_bump(1.0)
+		driver.set_face(&"face_surprised", 1.6)
+
+
+## Fica pequeno (mais lento e leve) por pelo menos `duration` segundos.
+func shrink(duration: float) -> void:
+	var was := is_shrunk()
+	shrink_time = maxf(shrink_time, duration)
+	if not was:
+		shrunk.emit(true)
+
+
+## Volta ao tamanho normal na hora (quem usa o Deságio estando pequeno).
+func grow() -> void:
+	if shrink_time > 0.0:
+		shrink_time = 0.0
+		shrunk.emit(false)
+
+
+func is_shrunk() -> bool:
+	return shrink_time > 0.0
+
+
+## Pequeno e atropelado por um kart grande: achata por um instante e quase para.
+func squash() -> void:
+	if _flat_t >= 0.0:
+		return
+	_flat_t = 0.0
+	speed *= FLAT_SLOW
+	_want_drift = false
+	_cancel_drift()
+	boost_time = 0.0
+	squashed.emit()
+	if driver:
+		driver.set_face(&"face_surprised", 1.4)
+
+
+## Fração da velocidade máxima pelo tamanho (acompanha a mola do modelo encolhendo).
+func _size_speed() -> float:
+	return lerpf(SHRINK_SPEED, 1.0, clampf((_size - SHRINK_SCALE) / (1.0 - SHRINK_SCALE), 0.0, 1.0))
+
+
+## Peso nas batidas entre karts (encolhido quase não pesa).
+func _bump_weight() -> float:
+	return maxf(weight_stat * 0.3, 0.6) if is_shrunk() else float(weight_stat)
+
+
 # --- Marcas de pneu ----------------------------------------------------------------
 
 ## No drift, cada roda de trás risca o chão: borracha escura no asfalto e a cor do
@@ -900,6 +1214,12 @@ func _launch(ramp: JumpRamp, horizontal: Vector3) -> Vector3:
 	# a manobra termina rápido ao aterrissar (veja _update_visuals).
 	var h := maxf(ramp.to_lip_space(global_position).y, 0.0)
 	_air_expected = (_vertical + sqrt(_vertical * _vertical + 2.0 * GRAVITY * h)) / GRAVITY
+	if ramp.glider:
+		# Rampa de asa-delta: sobe sempre igual e a asa abre logo depois (a manobra tem
+		# tempo de sobra: o voo é longo).
+		_vertical = GLIDE_LAUNCH_VY
+		_glide_pending = true
+		_air_expected = GLIDE_OPEN_DELAY + 1.0
 	_trick_window = TRICK_WINDOW
 	jumped.emit()
 	if _trick_buffer > 0.0:
@@ -995,8 +1315,54 @@ func _trick_transform(k: float) -> Transform3D:
 	return Transform3D(spin, pivot - spin * pivot)
 
 
+## A asa-delta abre: o kart passa a planar (veja GLIDE_*).
+func _open_glider() -> void:
+	_glide_pending = false
+	gliding = true
+	_glide_time = 0.0
+	# Sem manobra nova debaixo da asa; um drift carregado vira o turbo dele.
+	_trick_window = 0.0
+	_trick_buffer = 0.0
+	if drifting:
+		_release_drift()
+	if glider_visual:
+		glider_visual.set_open(true)
+	if driver:
+		driver.set_face(&"face_happy", 1.5)
+		driver.bounce(0.6)
+	glider_opened.emit()
+
+
+## A asa-delta fecha (tocou o chão, ou o kart foi reposicionado).
+func _close_glider() -> void:
+	_glide_pending = false
+	if not gliding:
+		return
+	gliding = false
+	_glide_pull = 0.0
+	if glider_visual:
+		glider_visual.set_open(false)
+	glider_closed.emit()
+
+
+## Velocidade de descida planando agora (m/s).
+func _glide_sink() -> float:
+	var sink := lerpf(GLIDE_SINK, GLIDE_SINK_SLOW, _glide_pull)
+	if _glide_time > GLIDE_TIRED_TIME:
+		sink += (_glide_time - GLIDE_TIRED_TIME) * GLIDE_TIRED_SINK
+	return sink
+
+
+## Fração do giro do chão que o kart tem agora (1 no chão, menos no ar).
+func get_turn_scale() -> float:
+	if is_on_floor():
+		return 1.0
+	return GLIDE_TURN if gliding else 0.35
+
+
 ## Tocou o chão. `fall_speed` = velocidade de queda (m/s) no toque.
 func _on_landed(fall_speed: float) -> void:
+	_close_glider()
 	var big := ramp_jump or _air_time > LONG_AIR_TIME
 	ramp_jump = false
 	_trick_window = 0.0
@@ -1062,8 +1428,13 @@ func _cancel_drift() -> void:
 func prewarm_effects(on: bool) -> void:
 	if boost_fx:
 		boost_fx.prewarm(on)
+	if glider_visual:
+		glider_visual.set_open(on, true)
+		if on:
+			_place_glider(visual.transform)
 	var emitters: Array[GPUParticles3D] = [sparks_left, sparks_right]
 	emitters.append_array(_dust_emitters)
+	emitters.append_array(_rev_smoke)
 	for p in emitters:
 		if on:
 			p.emitting = true
@@ -1096,6 +1467,10 @@ func _update_visuals(delta: float, steer: float) -> void:
 	if data and data.turn_lean_degrees > 0.0:
 		target_roll = _bike_lean(steer, speed_ratio)
 		roll_smooth = 1.0 - exp(-BIKE_LEAN_SHARPNESS * delta)
+	if gliding:
+		# Na asa o kart inclina para dentro da curva, como um avião.
+		target_roll = steer * GLIDE_BANK
+		roll_smooth = 1.0 - exp(-4.0 * delta)
 	var accel := (speed - _prev_speed) / maxf(delta, 0.0001)
 	var target_pitch := clampf(accel / 45.0, -0.05, 0.05)
 	_visual_yaw = lerpf(_visual_yaw, target_yaw, smooth)
@@ -1109,6 +1484,10 @@ func _update_visuals(delta: float, steer: float) -> void:
 		var n := get_floor_normal()
 		ground_pitch = -asin(clampf(n.dot(get_forward()), -1.0, 1.0))
 		ground_roll = -asin(clampf(n.dot(global_basis.x), -1.0, 1.0))
+	elif gliding:
+		# Planando: bico um pouco para baixo; freando, o bico sobe.
+		ground_pitch = GLIDE_NOSE + 0.22 * _glide_pull
+		ground_rate = 3.0
 	elif ramp_jump or _air_time > LONG_AIR_TIME:
 		# No pulo o bico acompanha o arco: sobe na decolagem e desce na queda.
 		var hs := Vector2(velocity.x, velocity.z).length()
@@ -1125,6 +1504,26 @@ func _update_visuals(delta: float, steer: float) -> void:
 	_squash = clampf(_squash + _squash_vel * delta, -0.16, 0.08)
 	var xf := Transform3D(Basis.from_euler(Vector3(_visual_pitch + _ground_pitch, _visual_yaw, _visual_roll + _ground_roll)),
 			Vector3(0.0, _squash, 0.0))
+	# Deságio: o modelo encolhe (e volta) numa mola com um balanço.
+	var size_goal := SHRINK_SCALE if shrink_time > 0.0 else 1.0
+	if _size != size_goal or _size_vel != 0.0:
+		_size_vel += ((size_goal - _size) * 120.0 - _size_vel * 11.0) * delta
+		_size = clampf(_size + _size_vel * delta, 0.3, 1.25)
+		if absf(_size - size_goal) < 0.002 and absf(_size_vel) < 0.01:
+			_size = size_goal
+			_size_vel = 0.0
+	_place_glider(xf)
+	# Acelerando parado na largada: a traseira escorrega de um lado para o outro (gira
+	# em volta do eixo da frente, num ritmo meio irregular), o motor faz o kart tremer
+	# e a traseira agacha com a força das rodas.
+	_update_rev(delta)
+	if _rev > 0.0:
+		var t := _rev_t
+		var sway := (sin(t * 12.0) * 0.75 + sin(t * 19.5 + 1.1) * 0.25) * REV_SWAY * _rev
+		var shake := sin(t * 47.0) * REV_SHAKE * _rev
+		var hop := absf(sin(t * 29.0)) * REV_BOUNCE * _rev
+		var rev_basis := Basis.from_euler(Vector3(REV_SQUAT * _rev, sway, shake))
+		xf = xf * Transform3D(rev_basis, _rev_pivot - rev_basis * _rev_pivot + Vector3(0.0, hop, 0.0))
 	# Rodopio de um obstáculo: uma volta inteira freando no fim (ou só um balanço).
 	if _spin_t >= 0.0:
 		_spin_t += delta
@@ -1142,6 +1541,19 @@ func _update_visuals(delta: float, steer: float) -> void:
 			trick = -1
 		else:
 			xf = xf * _trick_transform(k)
+	# Tamanho (Deságio) e amassado (atropelado pequeno: achata e volta num pulo).
+	var size_xz := _size
+	var size_y := _size
+	if _flat_t >= 0.0:
+		_flat_t += delta
+		var k := clampf(_flat_t / FLAT_TIME, 0.0, 1.0)
+		var flat := 1.0 - smoothstep(0.72, 1.0, k)
+		size_y *= lerpf(1.0, 0.22, flat)
+		size_xz *= lerpf(1.0, 1.3, flat)
+		if k >= 1.0:
+			_flat_t = -1.0
+	if size_xz != 1.0 or size_y != 1.0:
+		xf.basis = xf.basis * Basis.from_scale(Vector3(size_xz, size_y, size_xz))
 	visual.transform = xf
 
 	# Rodas, guidão/volante e piloto. Longe da câmera (veja _update_driver_detail) é
@@ -1150,7 +1562,7 @@ func _update_visuals(delta: float, steer: float) -> void:
 		_motion_delta += delta
 		_motion_skipped += 1
 		if _motion_skipped >= _motion_every:
-			kart_visual.update_motion(_motion_delta, speed, steer, drift_dir)
+			kart_visual.update_motion(_motion_delta, speed, steer, drift_dir, REV_WHEEL_SPEED * _rev)
 			_motion_skipped = 0
 			_motion_delta = 0.0
 
@@ -1171,6 +1583,17 @@ func _update_visuals(delta: float, steer: float) -> void:
 		var p := _dust_emitters[i]
 		if p.emitting != dusty:
 			p.emitting = dusty
+
+
+## Põe a asa-delta em cima do kart com a inclinação do modelo dele, mas sem as
+## manobras e o rodopio (ela fica fora do nó Visual).
+func _place_glider(xf: Transform3D) -> void:
+	if glider_visual == null or not (glider_visual.visible or glider_visual.is_open()):
+		return
+	var s := (data.race_scale if data else 1.0) * _size
+	var mount := _glider_mount * s
+	glider_visual.transform = Transform3D(xf.basis * Basis.from_scale(Vector3.ONE * s), xf.origin + xf.basis * mount)
+	glider_visual.lift = 0.18 * _glide_pull
 
 
 ## Inclinação de moto (rad, positivo = deita para a esquerda): para dentro da curva,
@@ -1262,7 +1685,9 @@ static func _engine_wave() -> PackedFloat32Array:
 func _engine_frequency() -> float:
 	var ratio := clampf(absf(speed) / max_speed, 0.0, 1.4)
 	var rev := maxf(ratio, _engine_rev * (0.35 if not controls_enabled else 0.0))
-	return 42.0 + rev * 92.0 + (16.0 if boost_time > 0.0 else 0.0)
+	# Pequeno (Deságio), o motor fica fininho.
+	var tiny := 1.0 + (1.0 - _size) * 0.9
+	return (42.0 + rev * 92.0 + (16.0 if boost_time > 0.0 else 0.0)) * tiny
 
 
 ## Piloto longe da câmera: a pose é refeita menos vezes (ninguém vê a diferença e o
