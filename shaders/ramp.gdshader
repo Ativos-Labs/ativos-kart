@@ -2,7 +2,9 @@ shader_type spatial;
 render_mode diffuse_burley, specular_schlick_ggx;
 // Rampa de pulo: topo azul com o logo "at" pintado no começo e setas amarelas no
 // formato da seta do logo apontando para a borda (na rampa de turbo, setas laranja
-// acesas correndo), faixas brancas nas laterais e zebrado na borda.
+// acesas correndo), faixas brancas nas laterais e zebrado na borda. Rampa de
+// asa-delta (`glider`): painel azul aceso com linhas de holograma e três colunas de
+// setas brancas correndo para a borda, moldura e saias amarelas.
 // COLOR.r = topo, COLOR.g = saias laterais, COLOR.b = face da borda.
 // Topo: UV.x = 0..1 da esquerda para a direita; UV.y = metros desde o começo.
 // Saias: UV.x = metros descendo a partir do topo; UV.y = metros desde o começo.
@@ -19,6 +21,9 @@ uniform vec3 turbo_b : source_color = vec3(1.0, 0.9, 0.2);
 uniform float ramp_length = 10.0;
 uniform float ramp_width = 13.6;
 uniform bool turbo = false;
+uniform bool glider = false;
+uniform vec3 glide_deep : source_color = vec3(0.01, 0.12, 0.62);
+uniform vec3 glide_cyan : source_color = vec3(0.05, 0.62, 1.0);
 uniform float turbo_glow = 1.3;
 uniform sampler2D logo : source_color, hint_default_transparent, filter_linear_mipmap_anisotropic, repeat_disable;
 uniform float logo_aspect = 1.643;
@@ -46,7 +51,34 @@ void fragment() {
 	vec3 col;
 	vec3 emit = vec3(0.0);
 	float rough = 0.55;
-	if (part.r > 0.5) {
+	if (part.r > 0.5 && glider) {
+		// --- Topo da rampa de asa-delta -------------------------------------------
+		float v = UV.y;
+		float x = (UV.x - 0.5) * ramp_width;
+		float to_edge = (0.5 - abs(UV.x - 0.5)) * ramp_width;
+		float frame_w = 0.8;
+		float inner = span(to_edge, frame_w, 99.0) * span(v, 1.0, ramp_length - 0.9);
+		// Painel: azul fundo no começo, ciano na borda; linhas de holograma subindo.
+		vec3 panel = mix(glide_deep, glide_cyan, clamp(v / ramp_length, 0.0, 1.0) * 0.85 + 0.1);
+		float scan = 0.5 + 0.5 * sin(v * 9.0 - TIME * 5.0);
+		// Três colunas de setas (bico para a borda) correndo.
+		float colw = (ramp_width - 2.0 * frame_w) / 3.0;
+		float cx = mod(x + ramp_width * 0.5 - frame_w, colw) - colw * 0.5;
+		float phase = fract((v + abs(cx) * 0.85) / 2.6 - TIME * 0.8);
+		float arrow = span(phase, 0.0, 0.3) * span(abs(cx), -1.0, colw * 0.34) * inner;
+		col = panel * (0.7 + 0.3 * scan);
+		emit += panel * inner * (0.25 + 0.25 * scan) * turbo_glow;
+		col = mix(col, white, arrow);
+		emit += white * arrow * 0.6;
+		// Moldura amarela e zebrado na borda.
+		float frame = 1.0 - inner;
+		col = mix(col, yellow, frame);
+		emit *= 1.0 - frame;
+		float lip = span(v, ramp_length - 0.6, ramp_length + 1.0);
+		col = mix(col, mix(navy, yellow, square((x + v) / 1.3)), lip);
+		emit *= 1.0 - lip;
+		rough = mix(0.35, 0.55, frame);
+	} else if (part.r > 0.5) {
 		// --- Topo -----------------------------------------------------------------
 		float v = UV.y;
 		float x = (UV.x - 0.5) * ramp_width;
@@ -81,9 +113,15 @@ void fragment() {
 		col *= mix(0.86, 1.04, grime);
 		rough = 0.5 + grime * 0.15;
 	} else if (part.g > 0.5) {
-		// --- Saias laterais: listras diagonais azuis e azul-marinho, filete amarelo.
-		col = mix(navy, base_color, square((UV.y + UV.x * 1.4) / 1.6));
-		col = mix(col, yellow, 1.0 - smoothstep(0.1, 0.13, UV.x));
+		// --- Saias laterais: listras diagonais azuis e azul-marinho, filete amarelo
+		// (na rampa de asa-delta, amarelas com listras laranja).
+		if (glider) {
+			col = mix(yellow * 0.8, vec3(1.0, 0.55, 0.08), square((UV.y + UV.x * 1.4) / 1.6) * 0.6);
+			col = mix(col, navy, 1.0 - smoothstep(0.1, 0.13, UV.x));
+		} else {
+			col = mix(navy, base_color, square((UV.y + UV.x * 1.4) / 1.6));
+			col = mix(col, yellow, 1.0 - smoothstep(0.1, 0.13, UV.x));
+		}
 		rough = 0.5;
 	} else {
 		// --- Face da borda: zebrado amarelo e azul-marinho.

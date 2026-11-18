@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="GliderData" format=3]
+
+[ext_resource type="Script" path="res://scripts/glider_data.gd" id="1_data"]
+[ext_resource type="Texture2D" path="res://assets/models/asas/asa_rubra.png" id="2_tex"]
+
+[resource]
+script = ExtResource("1_data")
+display_name = "Asa Rubra"
+description = "A clássica: vela vinho com a grande ave dourada, faixas verdes e douradas e moldura de madeira amarrada à mão."
+credits = "Modelo por jkimmel694 (Sketchfab) — CC BY 4.0, modificado"
+texture = ExtResource("2_tex")
+accent = Color(0.72, 0.16, 0.18, 1)

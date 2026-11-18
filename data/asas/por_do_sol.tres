@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="GliderData" format=3]
+
+[ext_resource type="Script" path="res://scripts/glider_data.gd" id="1_data"]
+[ext_resource type="Texture2D" path="res://assets/models/asas/por_do_sol.png" id="2_tex"]
+
+[resource]
+script = ExtResource("1_data")
+display_name = "Pôr do Sol"
+description = "O sol se pondo no horizonte entre raios cor-de-rosa e gaivotas, com moldura de madeira escura e cordas roxas."
+credits = "Modelo por jkimmel694 (Sketchfab) — CC BY 4.0, modificado"
+texture = ExtResource("2_tex")
+accent = Color(0.93, 0.36, 0.42, 1)

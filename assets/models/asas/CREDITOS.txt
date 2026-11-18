@@ -1,0 +1,9 @@
+Modelo: "Mario Kart 8 Deluxe - Paraglider"
+Autor: jkimmel694 (https://sketchfab.com/jkimmel694)
+Fonte: https://sketchfab.com/3d-models/mario-kart-8-deluxe-paraglider-5a193585d8bf412db0ea367c3b3d4414
+Licença: CC BY 4.0 (http://creativecommons.org/licenses/by/4.0/)
+No jogo: a asa-delta (asa_delta.glb) — modificado: sem esqueleto, na escala do jogo e
+com a vela de cada lado lendo a sua metade da textura. Texturas: "Asa Rubra"
+(asa_rubra.png, a original) e as variações "Asa Ativos", "Bandeirada" e "Pôr do Sol"
+(pintadas por tools/asas/build_asas.py a partir da original).
+O original fica em tools/asas/originais/.

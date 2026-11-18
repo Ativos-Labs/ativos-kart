@@ -16,6 +16,8 @@ var half_width := 6.8
 var height := 1.4
 ## Inclinação na borda (rad) = ângulo de saída do pulo.
 var launch_angle := 0.38
+## Rampa de asa-delta: o kart decola alto e plana (veja Kart._open_glider).
+var glider := false
 
 
 func _ready() -> void:

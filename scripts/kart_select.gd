@@ -1,6 +1,6 @@
 extends Node3D
 ## Tela de seleção de kart: o kart com o piloto escolhido girando no palco,
-## atributos (kart + piloto) e botões para voltar ou seguir para a escolha da pista.
+## atributos (kart + piloto) e botões para voltar ou seguir para a escolha da asa-delta.
 ## No multijogador cada jogador escolhe na vez dele (etiqueta "J2" no topo).
 
 @onready var turntable: Node3D = $Palco/Giro
@@ -148,7 +148,7 @@ func _confirm() -> void:
 		_start_turn()
 		return
 	GameState.picking_player = 0
-	GameState.goto_scene(GameState.SCENE_TRACK_SELECT)
+	GameState.goto_scene(GameState.SCENE_GLIDER_SELECT)
 
 
 func _back() -> void:

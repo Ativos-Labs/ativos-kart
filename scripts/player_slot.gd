@@ -1,7 +1,7 @@
 class_name PlayerSlot
 extends RefCounted
-## Um jogador humano (até 4 na mesma tela): o controle que ele usa, o piloto e o kart
-## escolhidos e a cor dele na interface (J1 azul, J2 vermelho, J3 verde, J4 amarelo).
+## Um jogador humano (até 4 na mesma tela): o controle que ele usa, o piloto, o kart e
+## a asa-delta escolhidos e a cor dele na interface (J1 azul, J2 vermelho, J3 verde, J4 amarelo).
 ##
 ## Jogando sozinho o jogador usa o teclado e todos os controles juntos (as ações de
 ## sempre: "acelerar", "frear"...). No multijogador cada um ganha cópias das ações só
@@ -20,7 +20,7 @@ const COLORS := [
 ]
 ## Ações do kart que cada jogador tem separadas. A pausa e os menus continuam valendo
 ## para todos os controles.
-const ACTIONS: Array[StringName] = [&"acelerar", &"frear", &"esquerda", &"direita", &"drift", &"reposicionar"]
+const ACTIONS: Array[StringName] = [&"acelerar", &"frear", &"esquerda", &"direita", &"drift", &"usar_item", &"reposicionar"]
 
 ## 0 = J1 ... 3 = J4.
 var index := 0
@@ -28,6 +28,7 @@ var index := 0
 var device := DEVICE_ALL
 var character_index := 0
 var kart_index := 0
+var glider_index := 0
 
 
 func _init(p_index := 0, p_device := DEVICE_ALL) -> void:

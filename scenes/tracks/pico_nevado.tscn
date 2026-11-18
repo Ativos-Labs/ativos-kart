@@ -93,6 +93,15 @@ length = 10.0
 height = 1.4
 angle = 22.0
 
+[sub_resource type="Resource" id="Resource_rampa_asa"]
+script = ExtResource("4_ramp")
+at = 0.815
+length = 14.0
+height = 2.2
+angle = 26.0
+glider = true
+glide_distance = 270.0
+
 [node name="PicoNevado" type="Node3D"]
 script = ExtResource("1_track")
 track_id = "pico_nevado"
@@ -103,7 +112,7 @@ river_width = 20.0
 river_depth = 2.0
 river_bank = 12.0
 river_valley = 1.4
-boost_pads = PackedFloat32Array(0.04, 0.28, 0.55, 0.83)
+boost_pads = PackedFloat32Array(0.04, 0.28, 0.55, 0.965)
 tree_count = 700
 grass_count = 1500
 flower_count = 0
@@ -113,9 +122,9 @@ water_level = -1.4
 hill_height = 16.0
 hill_bias = 3.0
 mountain_height = 230.0
-ramps = Array[ExtResource("4_ramp")]([SubResource("Resource_rampa0"), SubResource("Resource_rampa1")])
-item_rows = PackedFloat32Array(0.12, 0.4, 0.813)
-coin_lines = PackedVector3Array(0.055, -1, 4, 0.1, 5.3, 5, 0.171, -3, 5, 0.28, 4, 5, 0.36, 1, 4, 0.44, 1, 4, 0.545, -5.3, 4, 0.665, 1, 5, 0.73, -3.5, 5, 0.83, -4, 5, 0.93, -2, 5)
+ramps = Array[ExtResource("4_ramp")]([SubResource("Resource_rampa0"), SubResource("Resource_rampa1"), SubResource("Resource_rampa_asa")])
+item_rows = PackedFloat32Array(0.12, 0.4, 0.787)
+coin_lines = PackedVector3Array(0.055, -1, 4, 0.1, 5.3, 5, 0.171, -3, 5, 0.28, 4, 5, 0.36, 1, 4, 0.44, 1, 4, 0.545, -5.3, 4, 0.665, 1, 5, 0.73, -3.5, 5, 0.93, -2, 5)
 obstacle_zones = PackedFloat32Array(0.171, 0.73)
 
 [node name="Tracado" type="Path3D" parent="."]

@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="GliderData" format=3]
+
+[ext_resource type="Script" path="res://scripts/glider_data.gd" id="1_data"]
+[ext_resource type="Texture2D" path="res://assets/models/asas/bandeirada.png" id="2_tex"]
+
+[resource]
+script = ExtResource("1_data")
+display_name = "Bandeirada"
+description = "Quadriculado da bandeira de chegada com a estrela no medalhão vermelho e moldura de metal escuro."
+credits = "Modelo por jkimmel694 (Sketchfab) — CC BY 4.0, modificado"
+texture = ExtResource("2_tex")
+accent = Color(0.84, 0.14, 0.16, 1)

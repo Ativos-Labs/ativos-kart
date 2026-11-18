@@ -2,7 +2,8 @@
 class_name TrackRampBuilder
 extends RefCounted
 ## Monta as rampas de pulo da pista (veja track_ramp.gd): subida curva azul com o
-## logo "at" pintado e setas amarelas (ou setas de turbo acesas), saias inclinadas
+## logo "at" pintado e setas amarelas (ou setas de turbo acesas; na rampa de
+## asa-delta, painel azul aceso com setas brancas e moldura amarela), saias inclinadas
 ## nas laterais, zebrado na borda, a colisão (JumpRamp, que guarda a borda de onde o
 ## kart decola) e paredes invisíveis no trecho do pulo — no ar o kart passa da
 ## altura das muretas, e elas não deixam ele sair da pista.
@@ -20,6 +21,9 @@ const STEP := 0.5
 const GUARD_HEIGHT := 7.0
 const GUARD_BEFORE := 8.0
 const GUARD_AFTER := 75.0
+## Rampa de asa-delta: o kart voa bem mais alto (e mais longe, até
+## TrackRamp.glide_distance), então as paredes do voo vão até esta altura.
+const GLIDE_GUARD_HEIGHT := 32.0
 
 var track: Track
 var root: Node3D
@@ -119,6 +123,7 @@ func _build_ramp(ramp: TrackRamp) -> void:
 	mat.set_shader_parameter("ramp_length", ramp.length)
 	mat.set_shader_parameter("ramp_width", half * 2.0)
 	mat.set_shader_parameter("turbo", ramp.turbo)
+	mat.set_shader_parameter("glider", ramp.glider)
 	mat.set_shader_parameter("logo", LOGO_ICON)
 	mat.set_shader_parameter("logo_aspect", float(LOGO_ICON.get_width()) / LOGO_ICON.get_height())
 	var mi := MeshInstance3D.new()
@@ -142,6 +147,7 @@ func _build_ramp(ramp: TrackRamp) -> void:
 	body.half_width = half
 	body.height = ramp.height
 	body.launch_angle = ramp.lip_angle()
+	body.glider = ramp.glider
 	root.add_child(body)
 
 	if ramp.turbo:
@@ -158,15 +164,19 @@ func _build_ramp(ramp: TrackRamp) -> void:
 		area.body_entered.connect(track._on_boost_pad_body_entered)
 		root.add_child(area)
 
-	_build_guard_walls(start - GUARD_BEFORE, lip_dist + GUARD_AFTER)
+	if ramp.glider:
+		_build_guard_walls(start - GUARD_BEFORE, lip_dist + ramp.glide_distance, GLIDE_GUARD_HEIGHT)
+	else:
+		_build_guard_walls(start - GUARD_BEFORE, lip_dist + GUARD_AFTER, GUARD_HEIGHT)
 
 
-## Paredes invisíveis em cima das muretas no trecho do pulo (só colisão).
-func _build_guard_walls(from: float, to: float) -> void:
+## Paredes invisíveis em cima das muretas no trecho do pulo (só colisão), com `height`
+## m acima delas.
+func _build_guard_walls(from: float, to: float, height: float) -> void:
 	var offset := track.road_width * 0.5 + track.shoulder_width
 	var count := ceili((to - from) / 2.0)
 	var low := Vector3.UP * (track.wall_height - 0.2)
-	var high := Vector3.UP * (track.wall_height + GUARD_HEIGHT)
+	var high := Vector3.UP * (track.wall_height + height)
 	var faces := PackedVector3Array()
 	for side: float in [-1.0, 1.0]:
 		var prev := Vector3.ZERO

@@ -50,9 +50,11 @@ adjustment_saturation = 1.1
 [sub_resource type="Resource" id="Resource_rampa0"]
 script = ExtResource("4_ramp")
 at = 0.69
-length = 10.0
-height = 1.4
-angle = 22.0
+length = 14.0
+height = 2.2
+angle = 26.0
+glider = true
+glide_distance = 240.0
 
 [sub_resource type="Resource" id="Resource_rampa1"]
 script = ExtResource("4_ramp")
@@ -66,7 +68,7 @@ offset = 1.0
 [node name="CircuitoAtivos" type="Node3D"]
 script = ExtResource("1_track")
 ramps = Array[ExtResource("4_ramp")]([SubResource("Resource_rampa0"), SubResource("Resource_rampa1")])
-item_rows = PackedFloat32Array(0.166, 0.451, 0.745)
+item_rows = PackedFloat32Array(0.166, 0.451, 0.83)
 coin_lines = PackedVector3Array(0.065, -4.5, 5, 0.125, 1, 4, 0.22, 1, 5, 0.309, -5.3, 5, 0.39, 4, 4, 0.497, -3.5, 5, 0.59, 1, 4, 0.81, -4.5, 5, 0.955, 5, 4)
 
 [node name="Tracado" type="Path3D" parent="."]
