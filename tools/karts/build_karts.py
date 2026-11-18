@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Gera os karts novos em assets/models/karts/ a partir dos modelos originais.
+"""Gera os karts modificados em assets/models/karts/ a partir dos modelos originais.
 
-    python3 tools/karts/build_karts.py
+    python3 tools/karts/build_karts.py [bolido|cometa|motoca|bugre|padrao]
 
 O que faz em cada modelo (os originais ficam em tools/karts/originais/):
 - Troca os adesivos que vieram com o modelo pelas logos da Ativos (assets/logos/).
@@ -13,6 +13,9 @@ O que faz em cada modelo (os originais ficam em tools/karts/originais/):
 - Motoca: troca o emblema de espada do tanque pelo "at".
 - Bugre: apaga os adesivos (textos, mascotes, desenhos) e cola as logos da Ativos nas
   laterais, no capô, na asa e nas aletas da asa.
+- Kart Padrão (o primeiro do jogo): pinta de azul (o vermelho vira o azul da Ativos, os
+  canos rosa viram azul-claro) e troca a letra dos dois emblemas pelo "A" da Ativos,
+  na fonte dos títulos do jogo. Grava standard_kart.glb.
 - Renomeia as rodas (RodaFrenteEsq, RodaFrenteDir, RodaTrasEsq, RodaTrasDir) para os
   .tres de data/karts/ acharem.
 
@@ -24,7 +27,7 @@ import math
 import os
 import sys
 
-from PIL import Image, ImageChops, ImageDraw, ImageFilter
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from gltf_util import (Glb, add, cross, dot, mul, norm, sub, triangles, xf_dir,  # noqa: E402
@@ -628,6 +631,96 @@ def build_bugre(icon, mark, mark_white):
     return glb
 
 
+def _smooth(e0, e1, x):
+    t = min(max((x - e0) / (e1 - e0), 0.0), 1.0)
+    return t * t * (3.0 - 2.0 * t)
+
+
+def paint_blue(img):
+    """Pintura do Kart Padrão em azul: o vermelho vira o azul da Ativos, os canos cor-de-rosa
+    viram azul-claro metálico e a faixa azul original clareia (para não sumir no corpo
+    azul). Branco, cinza, preto, o marrom do banco e o amarelo continuam iguais."""
+    hsv = img.convert("RGB").convert("HSV")
+    src = hsv.tobytes()
+    out = bytearray(src)
+    for k in range(0, len(src), 3):
+        h = src[k] * 360.0 / 255.0
+        s = src[k + 1] / 255.0
+        v = src[k + 2] / 255.0
+        if s < 0.2 or v < 0.06:
+            continue
+        if h >= 300.0 or h <= 14.0 or (h < 26.0 and s > 0.8):
+            # Vermelho (saturado) -> azul da Ativos; rosa (pouco saturado) -> azul-claro.
+            t = _smooth(0.5, 0.7, s)
+            nh = 205.0 * (1.0 - t) + 231.0 * t
+            ns = s * (0.9 - 0.08 * t)
+            nv = v * (1.0 - 0.1 * t)
+        elif 180.0 <= h <= 250.0:
+            nh = h - 20.0
+            ns = s * 0.92
+            nv = min(1.0, v * 1.3 + 0.05)
+        else:
+            continue
+        out[k] = round(nh / 360.0 * 255.0) % 256
+        out[k + 1] = round(min(ns, 1.0) * 255.0)
+        out[k + 2] = round(min(nv, 1.0) * 255.0)
+    return Image.frombytes("HSV", hsv.size, bytes(out)).convert("RGB")
+
+
+def letter_badge(tex, center, radius, letter="A", color=ATIVOS_BLUE, flip=True, height=0.6):
+    """Troca a letra de um emblema redondo (disco branco) por `letter` na fonte dos títulos
+    do jogo. `radius`: raio do disco branco em pixels; `height`: altura da letra em fração
+    do diâmetro; `flip`: a UV do emblema é espelhada na vertical (a letra vai de ponta-cabeça
+    na textura para sair em pé no modelo)."""
+    ss = 4
+    cx, cy = center
+    px = tex.load()
+    whites = [px[x, y][:3] for y in range(int(cy - radius * 0.9), int(cy + radius * 0.9))
+              for x in range(int(cx - radius * 0.9), int(cx + radius * 0.9))
+              if math.hypot(x - cx, y - cy) < radius * 0.9 and min(px[x, y][:3]) > 215]
+    white = tuple(sorted(c[i] for c in whites)[len(whites) // 2] for i in range(3))
+    size = int(math.ceil(radius * 2 + 4))
+    x0, y0 = round(cx - size / 2), round(cy - size / 2)
+    # Disco branco por cima da letra antiga (um pouco menor que o branco: a borda fica a original).
+    mask = Image.new("L", (size * ss, size * ss), 0)
+    r = (radius - 1.0) * ss
+    c = size * ss / 2 + (cx - x0 - size / 2) * ss, size * ss / 2 + (cy - y0 - size / 2) * ss
+    ImageDraw.Draw(mask).ellipse((c[0] - r, c[1] - r, c[0] + r, c[1] + r), fill=255)
+    mask = mask.resize((size, size), Image.LANCZOS)
+    tex.paste(Image.new("RGBA", (size, size), white + (255,)), (x0, y0), mask)
+    # Letra.
+    font = ImageFont.truetype(os.path.join(ROOT, "assets", "fonts", "LilitaOne-Regular.woff2"), 100 * ss)
+    bb = font.getbbox(letter)
+    glyph = Image.new("L", (bb[2] - bb[0] + 8 * ss, bb[3] - bb[1] + 8 * ss), 0)
+    ImageDraw.Draw(glyph).text((4 * ss - bb[0], 4 * ss - bb[1]), letter, font=font, fill=255)
+    glyph = glyph.crop(glyph.getbbox())
+    scale = radius * 2 * height / glyph.height
+    glyph = glyph.resize((max(1, round(glyph.width * scale)), max(1, round(glyph.height * scale))), Image.LANCZOS)
+    if flip:
+        glyph = glyph.transpose(Image.FLIP_TOP_BOTTOM)
+    layer = Image.new("RGBA", glyph.size, color + (255,))
+    tex.paste(layer, (round(cx - glyph.width / 2), round(cy - glyph.height / 2)), glyph)
+    return tex
+
+
+def build_padrao():
+    """Kart Padrão (o primeiro do jogo): todo azul e com o "A" da Ativos no lugar do "M"
+    dos dois emblemas (no bico e na traseira). As texturas 0 e 1 têm o mesmo desenho
+    (uma para cada material da carroceria)."""
+    glb = Glb(os.path.join(ORIG, "standard_kart.glb"))
+    for index in (0, 1):
+        tex = paint_blue(image(glb, index)).convert("RGBA")
+        # Discos brancos medidos na textura (1024 px); a UV dos dois é espelhada na vertical.
+        letter_badge(tex, (919.0, 185.0), 64.5)
+        letter_badge(tex, (182.0, 930.5), 77.0)
+        glb.set_image(index, png_bytes(tex.convert("RGB")))
+    return glb
+
+
+# O .glb de saída tem outro nome (o .tres do kart aponta para ele desde o começo).
+OUT_NAMES = {"padrao": "standard_kart"}
+
+
 def main():
     icon = logo("ativos_icone.png")
     mark = logo("ativos_marca.png")
@@ -643,13 +736,14 @@ def main():
         "cometa": lambda: build_cometa(icon),
         "motoca": lambda: build_motoca(icon),
         "bugre": lambda: build_bugre(icon, mark, mark_white),
+        "padrao": build_padrao,
     }
     for name, job in jobs.items():
         if only and name not in only:
             continue
         glb = job()
         glb.compact()
-        path = os.path.join(out_dir, name + ".glb")
+        path = os.path.join(out_dir, OUT_NAMES.get(name, name) + ".glb")
         glb.save(path)
         print("ok", path, "%.1f MB" % (os.path.getsize(path) / 1e6))
 

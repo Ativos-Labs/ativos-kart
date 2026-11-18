@@ -2,7 +2,8 @@ Modelo: "standard kart"
 Autor: amogusstrikesback2 (https://sketchfab.com/amogusstrikesback2)
 Fonte: https://sketchfab.com/3d-models/standard-kart-2e0996e9b43e4a9385c4e0ee64cbb169
 Licença: CC BY 4.0 (http://creativecommons.org/licenses/by/4.0/)
-No jogo: "Kart Padrão" (standard_kart.glb)
+No jogo: "Kart Padrão" (standard_kart.glb) — modificado: pintado de azul e com o "A"
+da Ativos no lugar da letra dos emblemas (bico e traseira).
 
 Modelo: "jon arbuckle's kart (speed)"
 Autor: amogusstrikesback2 (https://sketchfab.com/amogusstrikesback2)
@@ -43,8 +44,8 @@ Licença: CC BY 4.0 (http://creativecommons.org/licenses/by/4.0/)
 No jogo: "Bugre" (bugre.glb) — modificado: adesivos originais trocados pelas logos
 da Ativos.
 
-Os quatro últimos são gerados a partir dos originais (tools/karts/originais/) pelo
-script tools/karts/build_karts.py.
+O Kart Padrão e os quatro últimos são gerados a partir dos originais
+(tools/karts/originais/) pelo script tools/karts/build_karts.py.
 
 As licenças CC BY 4.0 e CC BY-SA 4.0 exigem dar crédito ao autor. O crédito aparece no rodapé da
 tela inicial e, para cada kart, na tela de seleção de kart — mantenha-os se for
