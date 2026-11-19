@@ -23,6 +23,12 @@ const GLIDE_DISTANCE := 1.8
 const GLIDE_HEIGHT := 0.55
 const GLIDE_LOOK := 1.0
 const GLIDE_BLEND_SPEED := 1.5
+## Superpreferência (o kart vira o ofício gigante): a câmera sobe e se afasta para a
+## folha caber e o carimbo aparecer.
+const SUPER_DISTANCE := 0.9
+const SUPER_HEIGHT := 1.5
+const SUPER_LOOK := 0.2
+const SUPER_BLEND_SPEED := 2.0
 ## Campo de visão pela velocidade real (m/s), a mesma conta para todo kart e
 ## cilindrada (o 150cc abre mais que o 50cc): parado fica em `base_fov` e abre até
 ## SPEED_FOV graus em SPEED_FOV_FULL m/s (o 150cc no turbo); o turbo soma BOOST_FOV
@@ -45,6 +51,7 @@ var _dir := Vector3.FORWARD
 var _shake := 0.0
 ## 0 = no chão, 1 = planando (vai e volta suave).
 var _glide := 0.0
+var _super := 0.0
 
 
 ## Ajusta a câmera ao formato da tela. Numa faixa larga (2 jogadores, um em cima do
@@ -81,6 +88,7 @@ func _physics_process(delta: float) -> void:
 	if target == null or not is_instance_valid(target):
 		return
 	_glide = move_toward(_glide, 1.0 if target.gliding else 0.0, GLIDE_BLEND_SPEED * delta)
+	_super = move_toward(_super, 1.0 if target.is_super() else 0.0, SUPER_BLEND_SPEED * delta)
 	var fwd := target.get_forward()
 	var vel := target.velocity
 	vel.y = 0.0
@@ -132,12 +140,16 @@ func _desired_position() -> Vector3:
 	var g := _glide_amount()
 	dist += GLIDE_DISTANCE * g
 	h += GLIDE_HEIGHT * g
+	var su := _super * _super * (3.0 - 2.0 * _super)
+	dist += SUPER_DISTANCE * su
+	h += SUPER_HEIGHT * su
 	return target.global_position - dir * dist + Vector3.UP * h
 
 
 func _look_point() -> Vector3:
 	var ahead := look_ahead * (1.0 - intro)
-	return target.global_position + Vector3.UP * (look_height + GLIDE_LOOK * _glide_amount()) + _dir * ahead
+	var su := _super * _super * (3.0 - 2.0 * _super)
+	return target.global_position + Vector3.UP * (look_height + GLIDE_LOOK * _glide_amount() + SUPER_LOOK * su) + _dir * ahead
 
 
 func _glide_amount() -> float:

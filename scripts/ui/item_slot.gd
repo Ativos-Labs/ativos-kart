@@ -4,8 +4,11 @@ extends Control
 ## Ao pegar uma caixa ele aparece e gira uma roleta vertical: uma fita de ícones desce
 ## pela janela, rápida no começo, e freia até parar no item sorteado (um clique a cada
 ## ícone que passa). O item fica guardado até o jogador usar (a tecla aparece no canto).
+## Os de uso imediato (turbos, moedas) não mostram a tecla: somem logo depois de parar.
+## Na Antecipação Celer o slot fica com a maleta, a tecla e um anel dourado que esvazia
+## (start_timer); cada toque dá um pulinho (pulse).
 ##
-## Só a fita se mexe (posição): nada é redesenhado a cada quadro.
+## Só a fita se mexe (posição): nada é redesenhado a cada quadro (só o anel do tempo).
 
 const BACKGROUND := Color(0.03, 0.05, 0.12, 0.62)
 ## Ícones na fita da roleta (o último é o sorteado).
@@ -36,6 +39,30 @@ var _tick_wait := 0.0
 var _box_tween: Tween
 var _reel_tween: Tween
 var _caption_tween: Tween
+var _ring: Ring
+var _timer_t := 0.0
+var _timer_len := 1.0
+var _pulse_tween: Tween
+
+
+## Anel do tempo (Antecipação Celer): dourado, esvazia no sentido horário.
+class Ring:
+	extends Control
+
+	var frac := 1.0:
+		set(value):
+			if not is_equal_approx(value, frac):
+				frac = value
+				queue_redraw()
+
+	func _draw() -> void:
+		var c := size * 0.5
+		var w := maxf(size.x * 0.06, 4.0)
+		var r := size.x * 0.5 - w * 0.5 - size.x * 0.03
+		draw_arc(c, r, 0.0, TAU, 48, Color(0, 0, 0, 0.35), w, true)
+		if frac > 0.0:
+			var color := RaceItem.GOLD if frac > 0.25 else UiKit.ORANGE
+			draw_arc(c, r, -PI * 0.5, -PI * 0.5 + TAU * frac, maxi(int(48 * frac), 4), color, w, true)
 
 
 ## Moldura de vidro escuro com borda branca e a tecla de usar no canto.
@@ -120,6 +147,12 @@ func _init(p_box_size := 100.0) -> void:
 	_caption.size = Vector2(box_size * 4.0, box_size * 0.3)
 	_caption.visible = false
 	add_child(_caption)
+	_ring = Ring.new()
+	_ring.name = "Tempo"
+	_ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_ring.size = _frame.size
+	_ring.visible = false
+	_frame.add_child(_ring)
 	_frame.visible = false
 
 
@@ -131,6 +164,7 @@ func _ready() -> void:
 func roll(result: int, duration: float) -> void:
 	kind = result
 	_frame.show_key = false
+	_stop_timer()
 	_kill_reel_tween()
 	var prev := result
 	# A fita (de baixo para cima): sorteada no fim, sem dois iguais seguidos.
@@ -166,10 +200,33 @@ func show_item(value: int) -> void:
 	_appear()
 
 
+## Antecipação Celer: o item `value` fica no slot com a tecla e o anel do tempo, que
+## esvazia em `duration` s (o slot some com use()).
+func start_timer(value: int, duration: float) -> void:
+	if kind != value or not _frame.visible or _frame.modulate.a < 0.99:
+		show_item(value)
+	_timer_len = maxf(duration, 0.1)
+	_timer_t = _timer_len
+	_ring.frac = 1.0
+	_ring.visible = true
+	_frame.show_key = true
+	set_process(true)
+
+
+## Um toque (jato da Antecipação): o slot dá um pulinho.
+func pulse() -> void:
+	if _pulse_tween:
+		_pulse_tween.kill()
+	_frame.scale = Vector2.ONE * 1.14
+	_pulse_tween = create_tween()
+	_pulse_tween.tween_property(_frame, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
 ## Usou o item: o slot dá um estouro (cresce e some).
 func use() -> void:
 	kind = RaceItem.NONE
 	_roll_t = -1.0
+	_stop_timer()
 	set_process(false)
 	_frame.show_key = false
 	if _caption_tween:
@@ -187,6 +244,7 @@ func use() -> void:
 func stolen() -> void:
 	kind = RaceItem.NONE
 	_roll_t = -1.0
+	_stop_timer()
 	set_process(false)
 	_frame.show_key = false
 	_kill_reel_tween()
@@ -246,6 +304,7 @@ func show_caption(text: String, color: Color, hold := 1.2) -> void:
 func clear() -> void:
 	kind = RaceItem.NONE
 	_roll_t = -1.0
+	_stop_timer()
 	set_process(false)
 	_kill_reel_tween()
 	_kill_box_tween()
@@ -259,8 +318,12 @@ func get_box_center() -> Vector2:
 
 
 func _process(delta: float) -> void:
+	if _timer_t > 0.0:
+		_timer_t = maxf(_timer_t - delta, 0.0)
+		_ring.frac = _timer_t / _timer_len
 	if _roll_t < 0.0:
-		set_process(false)
+		if _timer_t <= 0.0:
+			set_process(false)
 		return
 	_roll_t += delta
 	_tick_wait -= delta
@@ -289,7 +352,8 @@ func _set_reel(s: float) -> void:
 ## Parou no item: pulinho, som e o nome embaixo.
 func _land() -> void:
 	_set_reel(REEL_COUNT - 1)
-	_frame.show_key = true
+	# Item de uso imediato: sem tecla (ele é usado sozinho).
+	_frame.show_key = not RaceItem.is_auto(kind)
 	Sfx.play(self, &"item_get", -9.0)
 	_kill_box_tween()
 	_frame.modulate.a = 1.0
@@ -327,6 +391,12 @@ func _kill_box_tween() -> void:
 		_box_tween.kill()
 		_box_tween = null
 	_frame.position = Vector2.ZERO
+
+
+func _stop_timer() -> void:
+	_timer_t = 0.0
+	if _ring:
+		_ring.visible = false
 
 
 func _kill_reel_tween() -> void:

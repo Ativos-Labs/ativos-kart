@@ -126,6 +126,10 @@ var menu_input: MenuInput
 var settings: GameSettings
 ## Música de fundo (menus, uma trilha por cenário, pódio).
 var music: MusicPlayer
+## Modo dev: na corrida, F1 abre o painel para testar os itens (DevPanel). Ligado ao
+## rodar pelo editor (build de debug), com `-- --dev` na linha de comando ou com `?dev`
+## no endereço da versão web.
+var dev_mode := false
 
 ## Kart e piloto do J1.
 var selected_kart_index: int:
@@ -153,6 +157,7 @@ var _changing_scene := false
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	dev_mode = _wants_dev_mode()
 	_records.load(RECORDS_PATH)
 	menu_input = MenuInput.new()
 	menu_input.name = "MenuInput"
@@ -200,6 +205,15 @@ func _ready() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
 		quit()
+
+
+## Modo dev (veja dev_mode): editor, `--dev` ou `?dev` na web.
+func _wants_dev_mode() -> bool:
+	if OS.is_debug_build() or OS.get_cmdline_user_args().has("--dev"):
+		return true
+	if OS.has_feature("web"):
+		return bool(JavaScriptBridge.eval("new URLSearchParams(window.location.search).has('dev')", true))
+	return false
 
 
 func _exit_tree() -> void:

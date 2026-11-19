@@ -70,6 +70,39 @@ static func get_stream(sound: StringName) -> AudioStreamWAV:
 			stream = _ink(0.5)
 		&"ghost":
 			stream = _ghost(1.2)
+		&"rocket":
+			stream = _rocket(1.0)
+		&"briefcase":
+			stream = _latches()
+		&"cash":
+			stream = _cloth(0.3, false)
+		&"paper":
+			stream = _cloth(0.5, true)
+		&"stamp":
+			stream = _stamp(0.32)
+		&"boing":
+			stream = _boing(0.3)
+		&"alarm":
+			stream = _tone([987.77, 739.99, 987.77, 739.99], 0.12, 0.34)
+		&"calc_beep":
+			stream = _tone([2793.83], 0.07, 0.3)
+		&"boom":
+			stream = _boom(1.3, 1.0)
+		&"slam":
+			stream = _boom(0.8, 0.45)
+		&"parcela":
+			stream = _tone([1567.98, 2093.0], 0.04, 0.24)
+		&"senha":
+			# "Plim-plom" do painel de senhas chamando.
+			stream = _tone([1318.5, 1046.5], 0.32, 0.42)
+		&"wrong":
+			stream = _tone([392.0, 293.66, 233.08], 0.11, 0.42)
+		&"julgado":
+			stream = _tone([783.99, 1046.5, 1318.5, 1567.98, 2093.0, 2637.0], 0.065, 0.34)
+		&"gavel":
+			stream = _gavel(0.28)
+		&"horn":
+			stream = _horn(0.85)
 		&"trick":
 			stream = _tone([987.77, 1318.5, 1975.5], 0.06, 0.32)
 		&"coin":
@@ -257,6 +290,147 @@ static func _ghost(length: float) -> AudioStreamWAV:
 		var env := smoothstep(0.0, 0.18, t) * (1.0 - smoothstep(0.6, 1.0, t))
 		samples.append((sin(phase) * 0.7 + sin(phase * 2.0) * 0.12 + air * 0.25) * env)
 	return _make_stream(_normalized(samples, 0.7))
+
+
+## Foguete da RPV: ignição seca e o ronco de ar que sobe de tom, com estalinhos.
+static func _rocket(length: float) -> AudioStreamWAV:
+	var samples := PackedFloat32Array()
+	var count := int(length * MIX_RATE)
+	var low := 0.0
+	var phase := 0.0
+	for i in count:
+		var t := float(i) / count
+		var st := t * length
+		var noise := randf_range(-1.0, 1.0)
+		low = lerpf(low, noise, 0.12 + t * 0.2)
+		phase += TAU * lerpf(110.0, 420.0, sqrt(t)) / MIX_RATE
+		var env := minf(t * 30.0, 1.0) * pow(1.0 - t, 1.5)
+		var crackle := noise * (1.0 if randf() < 0.004 else 0.0) * 0.8
+		var ignition := noise * exp(-st * 30.0) * 0.6
+		samples.append((low * 0.8 + sin(phase) * 0.3 + crackle) * env + ignition)
+	return _make_stream(_normalized(samples, 0.85))
+
+
+## Maleta da Antecipação abrindo: dois fechos ("clac, clac") e um brilho de moedas.
+static func _latches() -> AudioStreamWAV:
+	var samples := PackedFloat32Array()
+	var count := int(0.5 * MIX_RATE)
+	var phase := 0.0
+	for i in count:
+		var st := float(i) / MIX_RATE
+		var s := 0.0
+		for at: float in [0.0, 0.09]:
+			var d := st - at
+			if d >= 0.0:
+				s += (randf_range(-1.0, 1.0) * 0.6 + sin(TAU * 1900.0 * d) * 0.5) * exp(-d * 160.0)
+		if st > 0.17:
+			var d := st - 0.17
+			var f := 1568.0 if d < 0.07 else (2093.0 if d < 0.14 else 2637.0)
+			phase += TAU * f / MIX_RATE
+			s += (sin(phase) * 0.7 + signf(sin(phase)) * 0.15) * exp(-fmod(d, 0.07) * 18.0) * 0.35 * (1.0 - d / 0.33)
+		samples.append(s)
+	return _make_stream(_normalized(samples, 0.8))
+
+
+## Carimbo batendo: um "tum" grave e seco com o estalo da madeira.
+static func _stamp(length: float) -> AudioStreamWAV:
+	var samples := PackedFloat32Array()
+	var count := int(length * MIX_RATE)
+	var phase := 0.0
+	var low := 0.0
+	for i in count:
+		var t := float(i) / count
+		var st := t * length
+		phase += TAU * lerpf(150.0, 50.0, minf(st * 8.0, 1.0)) / MIX_RATE
+		var noise := randf_range(-1.0, 1.0)
+		low = lerpf(low, noise, 0.3)
+		var body := sin(phase) * exp(-st * 14.0)
+		var knock := (noise * 0.7 + sin(TAU * 900.0 * st) * 0.4) * exp(-st * 90.0)
+		samples.append(body + knock + low * 0.15 * exp(-st * 20.0))
+	return _make_stream(_normalized(samples, 0.95))
+
+
+## Carimbo batendo na mureta: "boing" de mola (o tom treme e cai) com um toque seco.
+static func _boing(length: float) -> AudioStreamWAV:
+	var samples := PackedFloat32Array()
+	var count := int(length * MIX_RATE)
+	var phase := 0.0
+	for i in count:
+		var t := float(i) / count
+		var st := t * length
+		var f := 330.0 + 260.0 * exp(-st * 9.0) * sin(st * TAU * 14.0) - 80.0 * t
+		phase += TAU * f / MIX_RATE
+		var env := minf(t * 60.0, 1.0) * pow(1.0 - t, 1.6)
+		var knock := randf_range(-1.0, 1.0) * exp(-st * 120.0) * 0.5
+		samples.append((sin(phase) * 0.8 + signf(sin(phase)) * 0.12) * env + knock)
+	return _make_stream(_normalized(samples, 0.8))
+
+
+## Explosão (calculadora) ou baque enorme (a Constituição caindo): estalo, ronco grave e
+## o chiado que some. `crack` = força do estalo e do chiado (o livro é mais abafado).
+static func _boom(length: float, crack: float) -> AudioStreamWAV:
+	var samples := PackedFloat32Array()
+	var count := int(length * MIX_RATE)
+	var low := 0.0
+	var low2 := 0.0
+	var phase := 0.0
+	for i in count:
+		var t := float(i) / count
+		var st := t * length
+		var noise := randf_range(-1.0, 1.0)
+		low = lerpf(low, noise, 0.06)
+		low2 = lerpf(low2, low, 0.12)
+		phase += TAU * lerpf(90.0, 32.0, minf(st * 3.0, 1.0)) / MIX_RATE
+		var body := sin(phase) * exp(-st * 5.0) * 1.2
+		var rumble := low2 * 3.0 * pow(1.0 - t, 1.5)
+		var hiss := noise * exp(-st * 7.0) * 0.35 * crack
+		var snap := noise * exp(-st * 60.0) * 0.8 * crack
+		samples.append(body + rumble + hiss + snap)
+	return _make_stream(_normalized(samples, 0.95))
+
+
+## Martelo de juiz: duas batidas secas de madeira ("toc-toc"), a segunda mais forte.
+static func _gavel(length: float) -> AudioStreamWAV:
+	var samples := PackedFloat32Array()
+	var count := int(length * MIX_RATE)
+	var hits := [0.0, 0.11]
+	for i in count:
+		var st := float(i) / MIX_RATE
+		var s := 0.0
+		for j in hits.size():
+			var t: float = st - hits[j]
+			if t < 0.0:
+				continue
+			var amp := 0.6 if j == 0 else 1.0
+			# Corpo de madeira (tom que cai rápido) e o estalo.
+			s += amp * (sin(TAU * lerpf(820.0, 520.0, minf(t * 30.0, 1.0)) * t) * exp(-t * 38.0)
+					+ randf_range(-1.0, 1.0) * exp(-t * 160.0) * 0.6
+					+ sin(TAU * 180.0 * t) * exp(-t * 22.0) * 0.5)
+		samples.append(s)
+	return _make_stream(_normalized(samples, 0.9))
+
+
+## Buzina da Liminar: acorde de metais (dente de serra suave com vibrato) que entra forte
+## e some, com um sopro de ar.
+static func _horn(length: float) -> AudioStreamWAV:
+	var samples := PackedFloat32Array()
+	var count := int(length * MIX_RATE)
+	var freqs := [233.08, 293.66, 349.23, 466.16]
+	var phases := [0.0, 0.0, 0.0, 0.0]
+	var low := 0.0
+	for i in count:
+		var t := float(i) / count
+		var st := t * length
+		var vib := 1.0 + 0.008 * sin(TAU * 6.0 * st)
+		var s := 0.0
+		for j in freqs.size():
+			phases[j] = fmod(phases[j] + freqs[j] * vib / MIX_RATE, 1.0)
+			var saw: float = phases[j] * 2.0 - 1.0
+			s += (saw * 0.55 + sin(phases[j] * TAU) * 0.45) * (0.8 if j == 3 else 1.0)
+		low = lerpf(low, randf_range(-1.0, 1.0), 0.15)
+		var env := minf(st * 25.0, 1.0) * (1.0 - smoothstep(0.55, 1.0, t))
+		samples.append(s * env * 0.3 + low * 0.25 * exp(-st * 6.0))
+	return _make_stream(_normalized(samples, 0.85))
 
 
 ## Ajusta o pico das amostras para `peak` (ruído filtrado sai baixo demais).

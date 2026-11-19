@@ -18,6 +18,8 @@ uniform float saturation = 0.85;
 uniform float spin_speed = 1.25;
 uniform float bob = 0.1;
 uniform float glow = 0.55;
+// Caixa falsa (Fila do tribunal): o logo de cabeça para baixo (meia volta).
+uniform bool upside_down = false;
 
 varying float v_frame;
 varying float v_hue;
@@ -80,6 +82,9 @@ void fragment() {
 	// Logo centralizado, com contorno (8 amostras em volta).
 	vec2 lsz = vec2(logo_size, logo_size / logo_aspect);
 	vec2 luv = c / lsz + 0.5;
+	if (upside_down) {
+		luv = vec2(1.0) - luv;
+	}
 	vec4 l = texture(logo, clamp(luv, 0.0, 1.0));
 	l.a *= step(0.0, luv.x) * step(luv.x, 1.0) * step(0.0, luv.y) * step(luv.y, 1.0);
 	float halo = 0.0;

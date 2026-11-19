@@ -28,6 +28,9 @@ const SHARD_GRAVITY := 16.0
 
 ## false enquanto a caixa está estourada (esperando para voltar).
 var active := true
+## false = depois de estourar não volta sozinha (a caixa falsa da Fila do tribunal;
+## restore() a mostra de novo).
+var respawns := true
 
 var _box: MeshInstance3D
 var _shadow: MeshInstance3D
@@ -94,7 +97,20 @@ func shatter(push := Vector3.ZERO) -> void:
 	if _area:
 		_area.set_deferred("monitoring", false)
 	_spawn_shards(push)
-	get_tree().create_timer(RESPAWN_TIME, false, true).timeout.connect(_respawn)
+	if respawns:
+		get_tree().create_timer(RESPAWN_TIME, false, true).timeout.connect(_respawn)
+
+
+## Mostra a caixa inteira de novo, na hora (caixa falsa reaproveitada).
+func restore() -> void:
+	active = true
+	_box.visible = true
+	_shadow.visible = true
+	_box.scale = Vector3.ONE
+	_shadow.scale = Vector3.ONE
+	_burst = -1.0
+	for shard in _shards:
+		shard.visible = false
 
 
 func _respawn() -> void:
@@ -213,8 +229,16 @@ static func make_mesh() -> ArrayMesh:
 	return mesh
 
 
-## Vidro de fora (desenhado por último) com o de dentro como segunda passada.
-static func make_material() -> ShaderMaterial:
+## A malha da caixa falsa (Fila do tribunal): a mesma, com o logo de cabeça para baixo.
+static func make_fake_mesh() -> ArrayMesh:
+	var mesh := make_mesh()
+	mesh.surface_set_material(0, make_material(true))
+	return mesh
+
+
+## Vidro de fora (desenhado por último) com o de dentro como segunda passada. Com
+## `upside_down` o logo fica de cabeça para baixo (a caixa falsa da Fila do tribunal).
+static func make_material(upside_down := false) -> ShaderMaterial:
 	var back := ShaderMaterial.new()
 	back.shader = INNER_SHADER
 	back.render_priority = 0
@@ -226,6 +250,7 @@ static func make_material() -> ShaderMaterial:
 	for m: ShaderMaterial in [front, back]:
 		m.set_shader_parameter("logo", LOGO_ICON)
 		m.set_shader_parameter("logo_aspect", aspect)
+		m.set_shader_parameter("upside_down", upside_down)
 	return front
 
 

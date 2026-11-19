@@ -167,6 +167,11 @@ func _ready() -> void:
 	items = RaceItems.new()
 	add_child(items)
 	items.setup(self)
+	if GameState.dev_mode:
+		# F1: painel para testar os itens (DevPanel).
+		var dev := DevPanel.new()
+		add_child(dev)
+		dev.setup(self)
 	if mode == GameState.Mode.TIME_TRIAL:
 		_load_ghost()
 	_update_places()
@@ -513,7 +518,7 @@ func warm_up() -> void:
 	# A câmera de sempre (atrás do J1): o grid inteiro com os efeitos ligados.
 	cam.global_transform = _chase_view(humans[0])
 	cam.reset_physics_interpolation()
-	# Efeitos dos itens (raio, "−%", "§", Celerino-fantasma e o contrato) à vista.
+	# Efeitos dos itens (raio, "deságio −%", "§", Celerino-fantasma e o contrato) à vista.
 	items.prewarm(true)
 	for i in 3:
 		await RenderingServer.frame_post_draw
@@ -732,13 +737,16 @@ func _update_racer(r: Racer, delta: float, lead: float) -> void:
 		_respawn(r)
 	elif r.ai:
 		r.ai.gap_to_player = r.progress - lead
-		_check_rescue(r, lateral, delta)
+		# Parado de propósito (rivais parados do modo dev) não precisa de resgate.
+		if k.controls_enabled:
+			_check_rescue(r, lateral, delta)
 
 
 ## Adversário encalhado, fora da pista ou caído de uma ponte: volta para a pista.
 func _check_rescue(r: Racer, lateral: float, delta: float) -> void:
 	var k := r.kart
-	var lost := absf(k.speed) < 2.0 \
+	# Parado na fila do tribunal (esperando a senha) não está encalhado.
+	var lost := (absf(k.speed) < 2.0 and not k.is_waiting()) \
 			or absf(lateral) > track.road_width * 0.5 + track.shoulder_width + 1.0 \
 			or k.global_position.y < (track.global_transform * track.samples[r.index]).y - 5.0
 	r.rescue = r.rescue + delta if lost else 0.0
@@ -850,8 +858,10 @@ func _on_human_finished(r: Racer) -> void:
 			r.kart.driver.set_face(&"face_confused", 2.5)
 			r.kart.driver.play_gesture(&"gesture_shrug", 1.8)
 	var best_lap: float = r.lap_times.min()
-	r.record_total = GameState.submit_record(track.track_id, GameState.record_key("total"), race_time)
-	r.record_lap = GameState.submit_record(track.track_id, GameState.record_key("lap"), best_lap)
+	# Com itens do painel de dev (DevPanel) a corrida não vale recorde.
+	if not items.dev_used:
+		r.record_total = GameState.submit_record(track.track_id, GameState.record_key("total"), race_time)
+		r.record_lap = GameState.submit_record(track.track_id, GameState.record_key("lap"), best_lap)
 	if r.record_total and r.recording:
 		r.recording.capture(r.kart, race_time)
 		r.recording.total_time = race_time

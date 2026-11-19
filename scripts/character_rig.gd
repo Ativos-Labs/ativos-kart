@@ -695,6 +695,17 @@ func play_gesture(gesture_name: StringName, duration := 1.5, arms := 0) -> void:
 	_gesture_arms = 3 if arms == 0 else arms
 
 
+## Posição global da mão (`side`: 0 = esquerda, 1 = direita) na pose atual, para prender
+## coisas nela (a senha da Fila do tribunal). Vector3.INF sem esqueleto ou sem o osso.
+func hand_global(side: int) -> Vector3:
+	if skeleton == null:
+		return Vector3.INF
+	var hand := _arm_bones[side][2]
+	if hand < 0:
+		return Vector3.INF
+	return skeleton.global_transform * skeleton.get_bone_global_pose(hand).origin
+
+
 func blink() -> void:
 	if _blink:
 		_blink.time = 0.0
@@ -792,6 +803,9 @@ func _process(delta: float) -> void:
 		_pose_arms(delta)
 		if not fit:
 			_update_bounce(delta)
+	elif has_hand_targets:
+		# Em pé segurando alguma coisa (a maleta da Antecipação Celer).
+		_pose_arms(delta)
 	for i in _pos.size():
 		skeleton.set_bone_pose_position(i, _pos[i])
 		skeleton.set_bone_pose_rotation(i, _rot[i])

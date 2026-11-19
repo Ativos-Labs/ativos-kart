@@ -65,6 +65,8 @@ var lap_pill: HudPill
 var item_slot: ItemSlot
 var contract_card: ContractCard
 var ink_overlay: InkOverlay
+## Aviso de item vindo atrás do jogador (PEC dos Precatórios, Intimação).
+var alert: ItemAlert
 var _flash: ColorRect
 var _flash_tween: Tween
 var _coins := -1
@@ -147,6 +149,18 @@ func _build_item_widgets(slot_size: float, slot_pos: Vector2) -> void:
 	root.add_child(contract_card)
 	root.move_child(contract_card, results.get_index())
 	contract_card.set_home(slot_pos + Vector2(slot_size + 16.0, 0.0))
+	alert = ItemAlert.new()
+	alert.name = "AvisoItem"
+	root.add_child(alert)
+	root.move_child(alert, results.get_index())
+	_place_alert(22.0)
+
+
+## Aviso de item no alto, no meio da tela, a `top` px da borda.
+func _place_alert(top: float) -> void:
+	alert.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	var w := alert.custom_minimum_size.x
+	_set_offsets(alert, -w * 0.5, top, w * 0.5, top + alert.custom_minimum_size.y)
 
 
 ## `karts` = todos os karts da corrida (para o mini-mapa), incluindo `p_kart`.
@@ -201,6 +215,9 @@ func _setup_compact(slot: PlayerSlot) -> void:
 	# Slot do item menor, ao lado da etiqueta "J2"; contrato e tinta menores também.
 	_rebuild_item_slot(78.0, Vector2(88.0, 12.0))
 	ink_overlay.text_size = 9
+	# Aviso menor, abaixo da contagem do fim da corrida.
+	alert.radius = 34.0
+	_place_alert(58.0)
 	_set_offsets(place_badge, -230.0, -110.0, -20.0, -14.0)
 	coin_pill.height = 46.0
 	lap_pill.height = 46.0
@@ -255,6 +272,16 @@ func use_item() -> void:
 	item_slot.use()
 
 
+## Antecipação Celer: o slot fica com a maleta e um anel de tempo de `duration` s.
+func item_timer(kind: int, duration: float) -> void:
+	item_slot.start_timer(kind, duration)
+
+
+## Um toque no item que está em uso (jato da Antecipação Celer).
+func item_pulse() -> void:
+	item_slot.pulse()
+
+
 ## Um rival levou o item do jogador (Cessão de crédito).
 func item_stolen() -> void:
 	item_slot.stolen()
@@ -270,6 +297,20 @@ func receive_item(kind: int, from_name: String, to_name: String, duration: float
 ## Tecla (ou botão) de usar o item, no canto do slot.
 func set_item_key(text: String) -> void:
 	item_slot.key_text = text
+
+
+## O perigo de `kind` passou (a Liminar suspendeu a PEC): o aviso do alto fica verde
+## com `text` um instante.
+func item_resolved(kind: int, text: String) -> void:
+	if alert:
+		alert.show_resolved(kind, text)
+
+
+## Um item vem atrás do jogador (`kind`: PEC dos Precatórios ou Intimação;
+## RaceItem.NONE esconde o aviso).
+func item_alert(kind: int) -> void:
+	if alert:
+		alert.show_alert(kind)
 
 
 ## Juridiquês: tinta na tela por `duration` s.
@@ -300,6 +341,8 @@ func clear_items() -> void:
 		contract_card.clear()
 	if ink_overlay:
 		ink_overlay.clear()
+	if alert:
+		alert.show_alert(RaceItem.NONE)
 
 
 ## HUD por cima das telas divididas: só o mapa da pista (com todos os karts) e a tela

@@ -33,7 +33,8 @@ rodapé mostra as teclas ou os botões do controle, conforme o último que foi u
   giro), mais o kart perde: virando tudo na velocidade máxima ele cai uns 12% (menos com
   boa manobrabilidade). Derrapando ele perde bem menos (uns 5%) — e ainda ganha o
   mini-turbo —, então o drift é o jeito certo de fazer as curvas longas.
-- **Moedas Ativos:** espalhadas em fileiras pela pista, quase sempre fora da trajetória
+- **Moedas Ativos (Correção monetária):** com o "at" na frente e um **"%" gravado** no
+  verso, espalhadas em fileiras pela pista, quase sempre fora da trajetória
   ideal (dentro, fora ou no meio da curva, nas pontes, no arco dos pulos de rampa e no
   meio dos obstáculos). Cada moeda soma 0,6% na velocidade máxima, até 10 moedas (+6%).
   O contador fica no canto inferior esquerdo, ao lado da volta; as moedas voltam a
@@ -63,12 +64,15 @@ rodapé mostra as teclas ou os botões do controle, conforme o último que foi u
 - **Caixas de item** (com o logo "at"): passe por elas para pegar um item. Elas estouram e
   voltam depois de alguns segundos. O item aparece no **slot do canto superior esquerdo**
   (como no Mario Kart) depois de uma **roleta vertical** (os ícones descem e freiam até
-  parar no sorteado) e fica guardado até você usar (**E**, **Enter** ou **LB**; a tecla
-  aparece no canto do slot). Com item guardado, a caixa não dá outro. Veja **Itens** abaixo.
+  parar no sorteado). Os de Caos, Ataque, Armadilha e Defesa ficam guardados até você
+  usar (**E**, **Enter** ou **LB**; a tecla aparece no canto do slot) — segurando o
+  **freio** na hora, o carimbo e a calculadora vão **para trás**; os de Velocidade (turbos
+  e moedas) são usados assim que a roleta para. Com item guardado, a caixa não dá outro. Veja **Itens**
+  abaixo.
 - **Turbo de largada:** comece a acelerar logo depois do "2" da contagem (o kart dispara
   com uma arrancada fortíssima, sem bater no kart da frente do grid).
 - **Adversários:** você corre contra 7 pilotos do computador e larga em último, como num
-  Grand Prix. A cada corrida a ordem do grid e os karts dos adversários são sorteados. A sua posição aparece no canto de baixo, à esquerda (1º, 2º... ouro, prata e
+  Grand Prix. A cada corrida a ordem do grid e os karts dos adversários são sorteados. A sua posição aparece no canto de baixo, à direita (só o número: 1º, 2º...; ouro, prata e
   bronze), e cada kart é um ponto colorido no mini-mapa. Encostar em outro kart empurra os
   dois para o lado — o mais pesado empurra mais.
 - Na grama o kart fica mais lento. A corrida tem 3 voltas e os recordes ficam salvos
@@ -76,22 +80,102 @@ rodapé mostra as teclas ou os botões do controle, conforme o último que foi u
 
 ## Itens
 
-Poderes de **Caos** — o sorteio depende da posição: quem está atrás tem mais chance do
-Deságio e o líder nunca o recebe. Os pilotos do computador também pegam e usam itens
-(esperam um pouco; cada item tem um tempo mínimo entre usos do computador, para ninguém
-levar um poder atrás do outro). No contra-relógio e numa corrida sem rivais as caixas não
-dão item.
+O sorteio depende da posição: quem está na frente tira mais moedas, carimbos, Juridiquês
+e armadilhas (pilhas de papel e caixas falsas); no meio saem mais Intimações e
+calculadoras; quem está atrás tira mais turbos, Deságio, Antecipação, a PEC dos
+Precatórios e o Trânsito em julgado, e só os últimos tiram a Superpreferência (o líder
+nunca recebe Deságio, Antecipação, Superpreferência, Intimação, PEC, calculadora nem
+Trânsito em julgado). A Liminar é rara em qualquer posição, um pouco menos para o líder.
+Deságio, Antecipação, Superpreferência e a PEC existem um de cada vez na pista: não saem
+na roleta enquanto alguém tem um nem logo depois de alguém usar. Os pilotos do computador também
+pegam e usam itens (esperam um pouco; cada item tem um tempo mínimo entre usos do
+computador, para ninguém levar um poder atrás do outro). No contra-relógio e numa corrida
+sem rivais as caixas não dão item.
+
+**Caos** — ficam guardados no slot até você usar:
 
 | Item | O que faz |
 |------|-----------|
-| **Deságio** (o raio) | Todo mundo encolhe, menos você. Um **"−%" gigante aparece no céu**, um raio cai em cada rival (rodam e perdem velocidade) e eles ficam pequenos de 4,5 a 7,5 s (quem está mais na frente fica mais tempo): 20% mais lentos, leves nas batidas e com o motor fininho. Um kart grande que encosta num pequeno **amassa** ele. Se você estiver pequeno, volta ao normal. |
+| **Deságio** (o raio) | Todo mundo encolhe, menos você. Um **"deságio" vermelho gigante aparece no céu** (com um "−%" pequeno embaixo), um raio cai em cada rival (rodam e perdem velocidade) e eles ficam pequenos de 4,5 a 7,5 s (quem está mais na frente fica mais tempo): 20% mais lentos, leves nas batidas e com o motor fininho. Um kart grande que encosta num pequeno **amassa** ele. Se você estiver pequeno, volta ao normal. |
 | **Juridiquês** (a tinta na tela) | Cobre a visão dos rivais à frente com borrões de tinta cheios de **texto jurídico miúdo** ("Outrossim, data venia, considerando-se…") por 5 s; depois a tinta escorre e some. Quem leva fica com um "§" flutuando em cima do kart; os pilotos do computador ziguezagueiam e aliviam o pé. Usado pelo líder, pega quem vem atrás. |
 | **Cessão de crédito** (o fantasma) | Rouba o item do rival mais perto à frente (ou atrás, se não houver ninguém à frente). **O Celerino, de fantasma, assina um contrato no ar** em cima do rival — no seu HUD aparece o contrato com cedente, cessionário, a assinatura e o carimbo "CEDIDO" — e o item muda de dono. Não rouba outra Cessão; se ninguém tiver item, o crédito vem novo (a roleta gira de novo). |
+
+**Velocidade** — usados assim que a roleta para (o slot mostra o item um instante e some):
+
+| Item | O que faz |
+|------|-----------|
+| **RPV** (o cogumelo) | Turbo curto (1,7 s). **Uma guia de pagamento verde vira foguete embaixo do kart**: a guia aparece esticada, enrola num tubo, ganha bico, aletas e fogo, e o kart sobe em cima dela; no fim o foguete solta e fica para trás. A RPV é paga em uns 60 dias, então é o crédito rápido (está escrito na guia). |
+| **Antecipação Celer** (o cogumelo dourado) | Turbo à vontade por 7 s. **O Celerino aparece voando ao lado do kart com uma maleta dourada**, a maleta abre (com os maços de notas dentro) e solta o primeiro jato; depois **cada toque no botão de item solta um jato de notas atrás do kart** e um turbo. O slot fica com a maleta, a tecla e um anel dourado que esvazia. No fim ele fecha a maleta, acena e vai embora. |
+| **Superpreferência** (o Bill Bala) | Piloto automático que fura a fila, de 4,5 s (meio do pelotão) a 6,5 s (último). **O kart vira um ofício gigante** (folha A4 de 3 m voando como um tapete, com o texto do ofício) e **o carimbo PRIORIDADE bate em cima** — idosos e doentes graves furam a ordem de pagamento. Ele anda sozinho pela pista a 1,6× a velocidade máxima, perto da trajetória ideal, sem bater em nada e sem levar raio, tinta ou obstáculo, e **passa por cima de todo mundo**: quem ele alcança fica achatado e é jogado para o lado. A câmera sobe para mostrar a folha; no fim ela sai voando e o kart volta com um turbo. |
+| **Correção monetária** (as moedas) | **Três moedas com "%" gravado** aparecem em cima do kart e caem dentro dele, uma por uma: cada uma aumenta um pouco a velocidade máxima, como as da pista (até 10). Sai menos para quem já tem quase todas. |
+
+**Ataque** — ficam guardados no slot até você usar; acertam os rivais (quem leva roda,
+perde velocidade e 3 moedas):
+
+| Item | O que faz |
+|------|-----------|
+| **Carimbo INDEFERIDO** (o casco verde) | Um **carimbo de borracha** (cabo vermelho, base de madeira, etiqueta "INDEFERIDO") sai voando baixo, girando, em linha reta, e **ricocheteia nas muretas** até 5 vezes (ou 7 s). Segurando o freio, sai para trás. Depois da primeira batida pode acertar você mesmo. O rival atingido fica com a **marca vermelha "INDEFERIDO" estampada** atrás do kart por alguns segundos. |
+| **Intimação** (o casco vermelho) | Um **envelope oficial com asinhas** (verso com o lacre de cera e "INTIMAÇÃO"; na frente, PODER JUDICIÁRIO e o carimbo URGENTE) voa pela pista atrás do kart que está logo à sua frente e, chegando perto, vai direto nele ("INTIMADO!"). Acerta quem estiver no caminho. Quem é o alvo vê o aviso **INTIMAÇÃO!** no alto da tela. |
+| **PEC dos Precatórios** (o casco azul) | Uma **Constituição gigante** (livro de 4 × 5,4 m, capa azul com letras douradas e um post-it "PEC DOS PRECATÓRIOS") sobe com asas de penas e voa alto pela pista até o **1º lugar**, para em cima dele, recolhe as asas e **cai de chapa**: o líder fica amassado e depois **parcelado** — avança aos pedacinhos, em 6 trancos com um pulinho cada ("PARCELA 1/6"… "6/6"), por 3 s. Quem está perto do líder roda. O líder vê o aviso **PEC A CAMINHO!**. Só uma por vez na pista. |
+| **Impugnação dos cálculos** (a bomba) | Uma **calculadora** é jogada num arco para a frente (ou largada atrás, segurando o freio). No chão ela **apita em contagem regressiva** — o visor mostra 3, 2, 1 e "ERRO", o LED pisca e um anel vermelho marca o alcance — e **estoura numa chuva de números** (algarismos, "%", "R$", sinais): todo mundo a até 7 m (você também) roda e voa para o alto. Estoura antes se um kart encostar nela ou se um carimbo ou envelope passar por ela. |
+
+**Armadilha** — ficam guardadas no slot até você usar; são largadas atrás do kart e ficam
+na pista (até 80 s, no máximo 14 ao mesmo tempo — a mais velha some):
+
+| Item | O que faz |
+|------|-----------|
+| **Pendência documental** (a banana) | Uma **pilha de papel com um clipe gigante** cai atrás do kart; a folha de cima é a lista do que falta (procuração, certidão negativa, RG autenticado…, cada um com um "X" vermelho) e o carimbo PENDENTE. Quem bate **escorrega e roda numa chuva de folhas** (perde velocidade e 3 moedas). |
+| **Fila do tribunal** (a caixa falsa) | Uma caixa **igual à de item, só que com o logo de cabeça para baixo**, flutuando e girando como as de verdade. Quem pega vê a caixa estourar normalmente... e **fica parado na fila** por 2,4 s, **segurando no alto a senha "AGUARDE SUA VEZ"**, enquanto um painel vermelho chama as senhas ("CHAMANDO 084", "085"…) até chegar na dele — o painel fica verde, toca o "plim-plom" e a senha voa longe. |
+
+**Defesa** — ficam guardados no slot até você usar:
+
+| Item | O que faz |
+|------|-----------|
+| **Trânsito em julgado** (a estrela) | **Invencível por 7,5 s**: o kart e o piloto ficam **banhados de dourado** (com um reflexo varrendo), uma aura e um brilho no chão os envolvem, brilhos sobem em espiral e **um martelo de juiz gigante gira em volta, batendo** — nada mais muda a decisão. Nenhum item, obstáculo, raio, tinta ou PEC pega; quem encosta **roda** (martelada); o kart corre 18% mais, acelera mais forte e a grama não segura. Cura o que estava pegando (pequeno, amassado, parcelado, na fila). Pisca nos últimos segundos. |
+| **Liminar** (a super buzina) | **Uma onda verde sai do kart** (buzina de metais) e um **escudo-documento com LIMINAR DEFERIDA** aparece em cima dele: tudo a até 7 m é destruído — carimbos, envelopes, calculadoras (desarmadas, sem estourar), pilhas de papel e caixas falsas — e quem está em volta roda. **A PEC dos Precatórios também**: voando por perto, parada em cima de você ou caindo, ela sai voando girando e não parcela ninguém — o aviso **PEC A CAMINHO!** fica verde: **PEC SUSPENSA!** |
+
+Os pilotos do computador miram: jogam o carimbo e a calculadora quando há alguém na
+frente (ou colado atrás, e aí jogam para trás), a Intimação quando não estão em primeiro e
+a PEC sempre que não lideram. Largam armadilhas quando há alguém colado atrás, usam o
+Trânsito em julgado quando um ataque vem neles (ou para alcançar quem está na frente) e a
+Liminar quando a PEC ou um tiro chega perto, ou com rivais em volta — o líder guarda a
+Liminar para a PEC. Eles desviam das pilhas de papel (os bons quase sempre), mas quase
+ninguém percebe a caixa falsa.
 
 Para criar um item novo: acrescente-o em `RaceItem` (`Kind`, `INFO` e o desenho do ícone
 em `draw_icon`), o peso no sorteio em `RaceItems._draw_item` e o efeito em
 `RaceItems._use`. Item de uso imediato (um turbo, por exemplo) leva `"auto": true` em
-`INFO`: sai da roleta e já é usado, sem ficar no slot.
+`INFO`: sai da roleta e já é usado, sem ficar no slot; `"single": true` deixa só um na
+pista por vez. Itens que voam ou ficam na pista (Ataque, Armadilha e a onda da Liminar)
+ficam em `ItemAttacks`. Os
+efeitos 3D ficam em `ItemEffects` e mexem só em passos de física
+(tweens de física); todo visual novo também aparece em `ItemEffects.prewarm` (os shaders
+compilam atrás da tela de carregamento).
+
+As texturas da guia da RPV, do ofício, do carimbo PRIORIDADE, da nota, da marca
+INDEFERIDO, do envelope, da asa, da capa da Constituição, da calculadora, dos números da
+explosão, da folha da Pendência, da senha e do escudo da Liminar são geradas por
+`python3 tools/itens/build_item_textures.py` (Pillow e as fontes do macOS). A caixa falsa
+usa o mesmo shader das caixas de verdade (`upside_down` vira o logo).
+
+### Modo dev (testar os itens)
+
+Rodando pelo editor (F5) o modo dev já vem ligado; na build exportada, use `-- --dev` na
+linha de comando ou `?dev` no endereço da versão web. Numa corrida com rivais, **F1** ou a
+tecla à esquerda do **1** (no Mac o F1 pede o `fn`) abre o painel (`DevPanel`, etiqueta
+"DEV" no alto da tela):
+
+- **1–9, 0, −** (ou clique): você ganha o item na hora, com uma roleta curta. As
+  Armadilhas e Defesas ficam nas letras: **B** Pendência documental (a banana), **F** Fila
+  do tribunal, **J** Trânsito em julgado, **L** Liminar.
+- **Alt/Option + tecla** (ou clique direito): um rival usa o item em você — quem está logo
+  atrás para Juridiquês, Intimação, PEC e Superpreferência; o mais perto para os outros. Os
+  ataques miram em você (a PEC cai em você mesmo sem você ser o líder, a calculadora corrige
+  o voo no ar) e as armadilhas caem na pista logo à sua frente. Na Cessão sem item, você
+  ganha um carimbo e o rival o rouba logo depois.
+- **I** item infinito · **N** rivais sem itens · **T** rivais parados (alvos).
+
+Usou o painel, a corrida não vale recorde. Só o J1 recebe os itens.
 
 ## Modos de jogo
 
@@ -295,24 +379,48 @@ scripts/
   race.gd               Grid com os adversários, contagem, voltas e posições de cada kart,
                         contramão, chegada e classificação
   kart_ai.gd            Piloto do computador (trajetória, drift, manobras, ultrapassagem)
-  race_item.gd          Os itens (Deságio, Juridiquês, Cessão de crédito): nomes, cores e ícones
+  race_item.gd          Os itens (Deságio, Juridiquês, Cessão de crédito, RPV, Antecipação
+                        Celer, Superpreferência, Correção monetária, Carimbo INDEFERIDO,
+                        Intimação, PEC dos Precatórios, Impugnação dos cálculos, Pendência
+                        documental, Fila do tribunal, Trânsito em julgado, Liminar): nomes,
+                        cores e ícones
   race_items.gd         Itens na corrida: sorteio, item guardado de cada kart, uso e poderes
-  item_effects.gd       Efeitos 3D dos itens: raio, "−%" no céu, "§" de tinta
+                        (com o trilho do ofício da Superpreferência)
+  item_effects.gd       Efeitos 3D dos itens: raio, "−%" no céu, "§" de tinta, chuva de
+                        moedas da Correção monetária, aura do Trânsito em julgado
   cessao_ghost.gd       Celerino-fantasma que assina o contrato da Cessão de crédito
+  rpv_rocket.gd         Guia da RPV que enrola e vira foguete embaixo do kart
+  antecipacao_celer.gd  Celerino voando com a maleta dourada que solta jatos de notas
+  oficio_super.gd       Ofício gigante com o carimbo PRIORIDADE (Superpreferência)
+  item_attacks.gd       Itens de Ataque em jogo: voo, ricochete nas muretas, perseguição pela
+                        pista, a PEC até o líder, a calculadora e os acertos (marca
+                        INDEFERIDO, "INTIMADO!", "PARCELA 2/6", aviso no HUD); as
+                        armadilhas na pista e a onda da Liminar
+  carimbo_indeferido.gd Carimbo de borracha voador e a marca INDEFERIDO atrás do kart
+  intimacao_envelope.gd Envelope da Intimação com asinhas
+  pec_constituicao.gd   Constituição gigante com asas (PEC dos Precatórios)
+  impugnacao_calculadora.gd  Calculadora com visor, LED, anel de perigo e chuva de números
+  pendencia_papelada.gd Pilha de papel com clipe da Pendência documental
+  chuva_de_folhas.gd    Folhas voando de quem escorrega na pilha
+  senha_tribunal.gd     Senha "AGUARDE SUA VEZ" na mão do piloto e o painel CHAMANDO
+  transito_julgado.gd   Aura dourada e martelo de juiz girando (Trânsito em julgado)
+  liminar_escudo.gd     Escudo LIMINAR DEFERIDA e a onda verde
+  item_wings.gd         Par de asinhas de penas que batem (envelope e Constituição)
   racing_line.gd        Trajetória de corrida dos adversários (calculada a cada corrida)
   chase_camera.gd       Câmera que segue o kart (e se ajusta à faixa larga do 2 jogadores)
   ui/                   Interface: ui_kit.gd (cores, fontes, desenho), botões, faixas,
                         barras de atributos, retratos, pílulas do HUD (hud_pill.gd), slot do item com a roleta
-                        (item_slot.gd), tinta do Juridiquês (ink_overlay.gd), contrato da Cessão
-                        (contract_card.gd), semáforo, HUD, pausa,
+                        (item_slot.gd), aviso de item vindo (item_alert.gd), tinta do Juridiquês (ink_overlay.gd), contrato da Cessão
+                        (contract_card.gd), painel do modo dev (dev_panel.gd), semáforo, HUD, pausa,
                         posição na corrida (place_badge.gd), linhas da classificação,
                         tela dividida (split_screen.gd), cartões de modo, seletor de
                         opção, etiqueta do jogador, o painel "Quem vai jogar?" e a janela
                         de opções (options_panel.gd, volume_slider.gd, key_button.gd)
 shaders/                Céu com nuvens, terreno, água (e gelo), asfalto, zebras, muretas com placas,
                         vegetação (com neve), pedra em blocos, painéis com logo, placas de curva,
-                        turbos, rampas de pulo, caixas de item, moedas, obstáculos, ondas,
-                        marcas de pneu e fundos da interface
+                        turbos, rampas de pulo, caixas de item, moedas (com o "%" gravado no
+                        verso), obstáculos, ondas, marcas de pneu, foguete da RPV, ofício da
+                        Superpreferência e fundos da interface
 assets/logos/           Logos da Ativos usadas na pista e nas telas
 data/karts/standard_kart.tres        Dados do Kart Padrão
 data/karts/relampago.tres            Dados do Relâmpago (jon_arbuckles_kart_speed.glb)
@@ -352,7 +460,10 @@ tools/asas/                          Gera a asa-delta do jogo e as texturas das 
                                      mede os voos (veja o README.md de lá)
 tools/moeda/                         Gera a moeda do jogo a partir de original/MOEDA.glb
                                      (textura de 2048 → 512 px, sem os mapas de normal e
-                                     rugosidade, malha centralizada: 2,4 MB → 198 KB)
+                                     rugosidade, malha centralizada: 2,4 MB → 198 KB; o
+                                     "$" do verso vira um disco liso para o "%" do shader)
+assets/textures/itens/               Guia da RPV, ofício, carimbo PRIORIDADE e nota de
+                                     dinheiro, gerados por tools/itens/build_item_textures.py
 assets/music/                        Músicas (.ogg em loop, geradas por tools/music/)
 default_bus_layout.tres              Canais de áudio: Master, Musica e Efeitos
 tools/music/build_music.mjs          Compõe e sintetiza as músicas (Node + ffmpeg)
@@ -629,10 +740,8 @@ voo passa por cima do rio, do mar ou do vale. Para conferir, rode a sonda de voo
 
 No nó raiz, em **Caixas de item**: `item_rows` são as posições das fileiras (frações da
 volta) e `item_boxes_per_row` quantas caixas cada fileira tem. Quando o kart pega uma caixa,
-ele emite o sinal `item_box_collected`; a corrida (`race.gd`, `_on_item_box_collected`) é o
-lugar para ligar a lógica dos itens. Os adversários também estouram as caixas, mas por
-enquanto só o sinal do kart do jogador está ligado — quando os itens existirem, ligue o
-sinal de cada kart (`racers` em `race.gd`) e ensine o `KartAI` a usar o item.
+ele emite o sinal `item_box_collected`; os itens (sorteio, uso, computador) ficam em
+`RaceItems` (veja **Itens**). O kart virado ofício (Superpreferência) não pega caixa.
 
 ### Moedas
 

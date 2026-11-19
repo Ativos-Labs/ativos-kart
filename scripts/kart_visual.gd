@@ -27,6 +27,12 @@ class Part:
 			skeleton.set_bone_pose_rotation(bone, local.basis.get_rotation_quaternion())
 
 
+## Mão direita levantada (Fila do tribunal, segurando a senha): onde fica o punho em
+## relação ao banco (KartData.seat_position) e para onde aponta o polegar (para cima: a
+## mão fechada segura a borda de baixo da senha, em pé).
+const RAISED_HAND := Vector3(0.34, 0.92, -0.02)
+const RAISED_THUMB := Vector3.UP
+
 var kart_data: KartData
 var character: CharacterData
 var model: Node3D
@@ -34,6 +40,9 @@ var driver: CharacterRig
 
 ## Ângulo atual do volante (rad, positivo = esquerda).
 var wheel_turn := 0.0
+## 0 = mão direita no volante, 1 = levantada em raised_hand_point() (a Fila do tribunal
+## leva de um ao outro).
+var hand_raise := 0.0
 
 var _spin_front := 0.0
 var _spin_rear := 0.0
@@ -135,11 +144,19 @@ func _update_steering(angle: float) -> void:
 		var hand_turn := angle if not _steering.is_empty() else 0.0
 		var left := hand_grip(-1, hand_turn)
 		var right := hand_grip(1, hand_turn)
+		if hand_raise > 0.0:
+			right[0] = right[0].lerp(raised_hand_point(), hand_raise)
+			right[1] = right[1].lerp(RAISED_THUMB, hand_raise).normalized()
 		driver.hand_target_l = left[0]
 		driver.hand_grip_l = left[1]
 		driver.hand_target_r = right[0]
 		driver.hand_grip_r = right[1]
 		driver.has_hand_targets = true
+
+
+## Onde fica o punho direito levantado (espaço deste nó), ao lado da cabeça do piloto.
+func raised_hand_point() -> Vector3:
+	return kart_data.seat_position + RAISED_HAND
 
 
 ## Pegada de uma mão (`side`: -1 = esquerda, 1 = direita) com o volante girado `turn`

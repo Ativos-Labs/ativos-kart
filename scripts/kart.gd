@@ -12,7 +12,13 @@ extends CharacterBody3D
 ## (desce mais devagar, mas perde velocidade). Ao tocar o chão a asa fecha.
 ## Itens (a lógica fica em RaceItems): o raio do Deságio faz o kart rodar e encolher
 ## (mais lento, leve, motor fininho; um kart grande que encosta o amassa) e a tinta do
-## Juridiquês marca `blind_time` (o piloto do computador ziguezagueia).
+## Juridiquês marca `blind_time` (o piloto do computador ziguezagueia). Na
+## Superpreferência o kart vira o ofício gigante: anda sozinho num trilho que a corrida
+## calcula (start_super), sem bater em nada e sem levar golpe, e quem ele alcança fica
+## achatado (run_over). O foguete da RPV levanta o modelo (`visual_lift`).
+## Os itens de Ataque (carimbo, envelope, calculadora) acertam com hit_by_item (roda,
+## perde moedas; a explosão joga o kart para o alto) e a Constituição da PEC dos
+## Precatórios deixa o kart "parcelado" (parcel): ele anda aos pedacinhos, em trancos.
 
 signal bumped(strength: float)
 signal boost_started(power: int)
@@ -40,6 +46,10 @@ signal glider_closed
 signal shrunk(on: bool)
 ## Encolhido, foi atropelado por um kart de tamanho normal (ficou amassado).
 signal squashed
+## Parcelado (PEC dos Precatórios): andou mais um pedacinho (`paid` de `total`).
+signal parcel_paid(paid: int, total: int)
+## Com o Trânsito em julgado, passou por cima de outro kart e o derrubou.
+signal knocked(other: Kart)
 
 const GRAVITY := 32.0
 const HOP_VELOCITY := 4.6
@@ -142,6 +152,20 @@ const SHRINK_SPEED := 0.8
 const FLAT_TIME := 1.4
 const FLAT_LOCK := 0.45
 const FLAT_SLOW := 0.3
+## PEC dos Precatórios (parcelado): duração de cada parcela (s), a fração dela em que o
+## kart anda, a velocidade desse tranco (× a máxima) e o pulinho no começo de cada uma
+## (m/s). No resto da parcela ele quase para.
+const PARCEL_STEP := 0.5
+const PARCEL_MOVE := 0.4
+const PARCEL_SPEED := 0.7
+const PARCEL_HOP := 2.6
+## Trânsito em julgado (invencível): velocidade máxima (×), aceleração (×) e o empurrão
+## (m/s) em quem ele derruba. Fora do asfalto ele não perde velocidade.
+const JUDGED_SPEED := 1.18
+const JUDGED_ACCEL := 2.4
+const JUDGED_PUSH := 9.0
+## Fila do tribunal: freada (m/s²) até parar esperando a senha.
+const QUEUE_BRAKE := 42.0
 ## --- Atrito nas curvas ---
 ## Desaceleração (m/s²) quando a curva segura o kart abaixo da velocidade dele.
 const CORNER_SCRUB := 4.5
@@ -326,11 +350,25 @@ var shrink_time := 0.0
 ## Juridiquês: segundos com a visão coberta de tinta. O jogador vê a tinta no HUD; o
 ## piloto do computador ziguezagueia e alivia o pé (KartAI).
 var blind_time := 0.0
+## Altura extra do modelo (m): o foguete da RPV passa embaixo dele.
+var visual_lift := 0.0
 ## Tamanho do modelo (1 = normal; mola até SHRINK_SCALE e de volta, com um balanço).
 var _size := 1.0
 var _size_vel := 0.0
 ## Tempo desde que foi amassado (-1 = não está).
 var _flat_t := -1.0
+## Parcelado: tempo que falta (s), o que falta da parcela atual (s) e as parcelas pagas.
+var _parcel_left := 0.0
+var _parcel_phase := 0.0
+var _parcel_count := 0
+var _parcel_paid := 0
+## Superpreferência: devolve a posição do kart neste passo (veja start_super).
+var _super_rail: Callable
+var _super_layer := 1
+## Trânsito em julgado: tempo (s) que falta invencível.
+var judged_time := 0.0
+## Fila do tribunal: tempo (s) que falta parado, esperando a senha ser chamada.
+var queue_time := 0.0
 ## Perda de velocidade (fração) pela curva neste quadro.
 var _corner_loss := 0.0
 ## Rodas de trás (espaço do kart, no chão): uma trilha de marca e uma poeira por roda.
@@ -653,6 +691,8 @@ func apply_boost(duration: float, power := 1, instant := true) -> void:
 
 ## Coloca o kart numa posição e zera o movimento.
 func teleport(xform: Transform3D) -> void:
+	if is_super():
+		end_super(false)
 	# O corpo do kart fica sempre em pé (só gira no eixo vertical); numa rampa a
 	# inclinação aparece só no modelo (veja _update_visuals).
 	var fwd := -xform.basis.z
@@ -680,6 +720,8 @@ func teleport(xform: Transform3D) -> void:
 	_trick_buffer = 0.0
 	_spin_t = -1.0
 	_flat_t = -1.0
+	_parcel_left = 0.0
+	queue_time = 0.0
 	_corner_loss = 0.0
 	_glide_pending = false
 	_glide_pull = 0.0
@@ -701,13 +743,19 @@ func _physics_process(delta: float) -> void:
 	var drift_pressed: bool = input.drift_pressed
 	_hit_cooldown = maxf(_hit_cooldown - delta, 0.0)
 	blind_time = maxf(blind_time - delta, 0.0)
+	judged_time = maxf(judged_time - delta, 0.0)
+	queue_time = maxf(queue_time - delta, 0.0)
 	if shrink_time > 0.0:
 		shrink_time -= delta
 		if shrink_time <= 0.0:
 			shrink_time = 0.0
 			shrunk.emit(false)
-	if (_spin_t >= 0.0 and _spin_t < SPIN_LOCK) or (_flat_t >= 0.0 and _flat_t < FLAT_LOCK):
-		# Rodando depois de um obstáculo (ou amassado): sem controle por um instante.
+	if _super_rail.is_valid():
+		_super_step(delta)
+		return
+	if (_spin_t >= 0.0 and _spin_t < SPIN_LOCK) or (_flat_t >= 0.0 and _flat_t < FLAT_LOCK) or queue_time > 0.0:
+		# Rodando depois de um obstáculo (ou amassado, ou na fila do tribunal): sem
+		# controle por um instante.
 		throttle = 0.0
 		brake = 0.0
 		raw_steer = 0.0
@@ -757,7 +805,12 @@ func _physics_process(delta: float) -> void:
 	# Moedas somam na velocidade máxima; a curva (atrito) e o Deságio (encolhido) tiram.
 	var coin_bonus := (1.0 + coins * COIN_SPEED_BONUS) * _size_speed()
 	_corner_loss = _corner_slowdown() if on_floor else 0.0
-	var top := max_speed * speed_multiplier * coin_bonus * (offroad_factor if is_offroad and on_floor else 1.0)
+	# Trânsito em julgado: mais rápido e a grama não segura.
+	var judged := judged_time > 0.0
+	var offroad := is_offroad and on_floor and not judged
+	var top := max_speed * speed_multiplier * coin_bonus * (offroad_factor if offroad else 1.0)
+	if judged:
+		top *= JUDGED_SPEED
 	top *= 1.0 - _corner_loss
 	if boost_time > 0.0:
 		boost_time -= delta
@@ -779,10 +832,11 @@ func _physics_process(delta: float) -> void:
 		var target := top * throttle
 		if speed < target:
 			var ratio := clampf(speed / max_speed, 0.0, 1.0)
-			speed = move_toward(speed, target, acceleration * lerpf(1.5, 0.45, ratio) * delta)
+			var accel := acceleration * lerpf(1.5, 0.45, ratio) * (JUDGED_ACCEL if judged else 1.0)
+			speed = move_toward(speed, target, accel * delta)
 		else:
 			# Acima do alvo: na grama freia forte; na curva o atrito segura aos poucos.
-			var drag := 16.0 if is_offroad else coast_drag + (CORNER_SCRUB if _corner_loss > 0.005 else 0.0)
+			var drag := 16.0 if offroad else coast_drag + (CORNER_SCRUB if _corner_loss > 0.005 else 0.0)
 			speed = move_toward(speed, target, drag * delta)
 	elif brake > 0.05:
 		if speed > 0.5:
@@ -790,7 +844,13 @@ func _physics_process(delta: float) -> void:
 		else:
 			speed = move_toward(speed, -reverse_speed * brake, acceleration * 0.6 * delta)
 	else:
-		speed = move_toward(speed, 0.0, (coast_drag + (10.0 if is_offroad else 0.0)) * delta)
+		speed = move_toward(speed, 0.0, (coast_drag + (10.0 if offroad else 0.0)) * delta)
+	if _parcel_left > 0.0:
+		on_floor = _update_parcel(delta, throttle, on_floor)
+	if queue_time > 0.0:
+		# Fila do tribunal: para e espera a senha.
+		boost_time = 0.0
+		speed = move_toward(speed, 0.0, QUEUE_BRAKE * delta)
 
 	# --- Curva ----------------------------------------------------------------
 	var turn_factor := clampf(absf(speed) / 7.0, 0.0, 1.0)
@@ -969,6 +1029,15 @@ func _bump_kart(other: Kart, normal: Vector3, fwd: Vector3) -> void:
 	if push.length_squared() < 0.0001:
 		push = global_basis.x
 	push = push.normalized()
+	if is_judged() != other.is_judged():
+		# Trânsito em julgado: quem está invencível derruba o outro e segue sem perder nada.
+		var winner: Kart = self if is_judged() else other
+		var loser: Kart = other if is_judged() else self
+		if loser.hit_by_item((-push if winner == self else push) * JUDGED_PUSH, 0.35, 1.0):
+			winner.knocked.emit(loser)
+		_kart_bump_cooldown = 0.3
+		other._kart_bump_cooldown = 0.3
+		return
 	var closing := maxf((fwd * speed - other.get_forward() * other.speed).dot(-push), 0.0)
 	var strength := clampf(closing / 12.0, 0.0, 1.0)
 	# Encolhido (Deságio) o kart é leve: o grande empurra e ainda passa por cima.
@@ -1047,7 +1116,7 @@ func lose_coins(count: int) -> int:
 ## (pneu, fardo, bola de neve); sem `spin` o kart só balança (onda). Perde moedas.
 ## Devolve false se o kart ainda estava protegido do acerto anterior.
 func hit_by_obstacle(push: Vector3, slow := 0.35, spin := true) -> bool:
-	if _hit_cooldown > 0.0:
+	if _hit_cooldown > 0.0 or is_immune():
 		return false
 	_hit_cooldown = HIT_COOLDOWN
 	_want_drift = false
@@ -1074,11 +1143,75 @@ func is_spinning() -> bool:
 	return _spin_t >= 0.0
 
 
+## Atingido por um item de Ataque (RaceItems): como um obstáculo (perde velocidade, o
+## turbo e moedas), rodando `turns` voltas (0 = só balança) e, com `lift` (m/s), jogado
+## para o alto (a explosão da Impugnação dos cálculos). Devolve false se o kart estava
+## protegido (acabou de levar outro golpe, é o ofício da Superpreferência ou está com o
+## Trânsito em julgado).
+func hit_by_item(push: Vector3, slow := 0.3, turns := 1.0, lift := 0.0) -> bool:
+	if not hit_by_obstacle(push, slow, true):
+		return false
+	_spin_turns = turns
+	if lift > 0.0:
+		_vertical = lift
+		ramp_jump = false
+		_close_glider()
+	return true
+
+
+## PEC dos Precatórios: o kart fica parcelado por `count` parcelas (PARCEL_STEP cada) —
+## anda aos trancos, um pedacinho por vez, com um pulinho no começo de cada parcela.
+func parcel(count: int) -> void:
+	if is_immune():
+		return
+	_parcel_count = count
+	_parcel_paid = 0
+	_parcel_phase = 0.0
+	_parcel_left = count * PARCEL_STEP
+	_want_drift = false
+	_cancel_drift()
+	boost_time = 0.0
+
+
+func is_parceled() -> bool:
+	return _parcel_left > 0.0
+
+
+## Um passo parcelado: no começo de cada parcela o kart dá um pulinho e um tranco para a
+## frente; no resto dela freia quase até parar. O turbo não escapa. Devolve se o kart
+## continua no chão.
+func _update_parcel(delta: float, throttle: float, on_floor: bool) -> bool:
+	_want_drift = false
+	if drifting:
+		_cancel_drift()
+	if _parcel_phase <= 0.0 and _parcel_paid < _parcel_count:
+		_parcel_phase = PARCEL_STEP
+		_parcel_paid += 1
+		parcel_paid.emit(_parcel_paid, _parcel_count)
+		if on_floor and throttle > 0.05:
+			_vertical = PARCEL_HOP
+			on_floor = false
+			_squash_vel -= 0.5
+	_parcel_phase -= delta
+	_parcel_left -= delta
+	var moving := _parcel_phase > PARCEL_STEP * (1.0 - PARCEL_MOVE)
+	var cap := max_speed * speed_multiplier * (PARCEL_SPEED if moving else 0.04)
+	if speed > cap:
+		speed = move_toward(speed, cap, 60.0 * delta)
+	elif moving and throttle > 0.05:
+		speed = move_toward(speed, cap * throttle, 80.0 * delta)
+	if _parcel_left <= 0.0:
+		_parcel_left = 0.0
+	return on_floor
+
+
 # --- Itens (RaceItems) -------------------------------------------------------------
 
 ## Atingido pelo raio do Deságio: roda uma volta, perde velocidade (e o turbo/drift) e
 ## fica pequeno por `duration` segundos. Não perde moedas.
 func zap(duration: float) -> void:
+	if is_immune():
+		return
 	_want_drift = false
 	_cancel_drift()
 	boost_time = 0.0
@@ -1114,7 +1247,7 @@ func is_shrunk() -> bool:
 
 ## Pequeno e atropelado por um kart grande: achata por um instante e quase para.
 func squash() -> void:
-	if _flat_t >= 0.0:
+	if _flat_t >= 0.0 or is_immune():
 		return
 	_flat_t = 0.0
 	speed *= FLAT_SLOW
@@ -1124,6 +1257,149 @@ func squash() -> void:
 	squashed.emit()
 	if driver:
 		driver.set_face(&"face_surprised", 1.4)
+
+
+## Está achatado (atropelado)?
+func is_flat() -> bool:
+	return _flat_t >= 0.0
+
+
+## Atropelado pelo ofício da Superpreferência: achata, quase para e é jogado para o lado
+## (`push`, m/s no plano).
+func run_over(push: Vector3) -> void:
+	if is_immune() or is_flat():
+		return
+	squash()
+	push.y = 0.0
+	velocity += push
+	_spin_t = 0.0
+	_spin_turns = 0.5
+	_spin_dir = -1.0 if push.dot(global_basis.x) > 0.0 else 1.0
+
+
+## Fila do tribunal: pegou a caixa falsa. Para e fica esperando a senha ser chamada por
+## `duration` s, sem controle. Devolve false se o kart estava protegido.
+func hold_in_line(duration: float) -> bool:
+	if _hit_cooldown > 0.0 or is_immune():
+		return false
+	_hit_cooldown = HIT_COOLDOWN
+	queue_time = duration
+	_want_drift = false
+	_cancel_drift()
+	boost_time = 0.0
+	_trick_boost = false
+	if driver:
+		driver.react_bump(0.6)
+		driver.set_face(&"face_confused", duration)
+	return true
+
+
+## Está parado na fila do tribunal?
+func is_waiting() -> bool:
+	return queue_time > 0.0
+
+
+# --- Trânsito em julgado ---------------------------------------------------------------
+
+## Fica invencível por `duration` s: nada o atinge, ele derruba quem encosta, corre mais
+## e a grama não o segura. Cura o que estava pegando (pequeno, amassado, parcelado, na
+## fila) e dá um tranco de turbo.
+func start_judged(duration: float) -> void:
+	judged_time = maxf(judged_time, duration)
+	grow()
+	_spin_t = -1.0
+	_flat_t = -1.0
+	_parcel_left = 0.0
+	queue_time = 0.0
+	blind_time = 0.0
+	apply_boost(0.45, 2)
+
+
+func is_judged() -> bool:
+	return judged_time > 0.0
+
+
+## Nada o atinge agora (ofício da Superpreferência ou Trânsito em julgado)?
+func is_immune() -> bool:
+	return is_super() or judged_time > 0.0
+
+
+# --- Superpreferência ----------------------------------------------------------------
+
+## Vira o ofício: a cada passo de física `rail.call(kart, delta)` devolve onde o kart
+## está (Transform3D global, base só girando no eixo vertical). O modelo some (o ofício
+## é desenhado por ItemEffects), o corpo sai da colisão (ninguém bate nele, ele não pega
+## caixas) e drift, pulo, asa-delta e encolhimento acabam.
+func start_super(rail: Callable) -> void:
+	if not is_super():
+		_super_layer = collision_layer
+	_super_rail = rail
+	_want_drift = false
+	_cancel_drift()
+	ramp_jump = false
+	_trick_t = -1.0
+	trick = -1
+	_trick_boost = false
+	_trick_window = 0.0
+	_glide_pending = false
+	if gliding:
+		gliding = false
+		glider_closed.emit()
+	if glider_visual:
+		glider_visual.set_open(false, true)
+	_spin_t = -1.0
+	_flat_t = -1.0
+	_parcel_left = 0.0
+	queue_time = 0.0
+	grow()
+	_break_skid_marks()
+	collision_layer = 0
+	visual.visible = false
+
+
+## Volta a ser kart (com um turbo curto, se `boost`), andando para a frente.
+func end_super(boost := true) -> void:
+	if not is_super():
+		return
+	_super_rail = Callable()
+	collision_layer = _super_layer
+	visual.visible = true
+	velocity = get_forward() * speed
+	_vertical = 0.0
+	_was_on_floor = true
+	if boost:
+		apply_boost(0.8, 2)
+
+
+func is_super() -> bool:
+	return _super_rail.is_valid()
+
+
+## Velocidade de giro do kart (rad/s, + = esquerda), suavizada.
+func get_yaw_rate() -> float:
+	return _yaw_rate
+
+
+## Um passo no trilho da Superpreferência (veja start_super).
+func _super_step(delta: float) -> void:
+	var before := get_forward()
+	var xf: Transform3D = _super_rail.call(self, delta)
+	if not is_super():
+		return
+	var moved := xf.origin - global_position
+	velocity = moved / maxf(delta, 0.0001)
+	speed = Vector2(velocity.x, velocity.z).length()
+	global_transform = xf
+	_yaw_rate = lerpf(_yaw_rate, before.signed_angle_to(get_forward(), Vector3.UP) / maxf(delta, 0.0001), 1.0 - exp(-8.0 * delta))
+	steer_input = 0.0
+	throttle_input = 1.0
+	boost_time = 0.0
+	_vertical = 0.0
+	_air_time = 0.0
+	_was_on_floor = true
+	_corner_loss = 0.0
+	if boost_fx:
+		boost_fx.update(delta, false)
 
 
 ## Fração da velocidade máxima pelo tamanho (acompanha a mola do modelo encolhendo).
@@ -1503,7 +1779,7 @@ func _update_visuals(delta: float, steer: float) -> void:
 	_squash_vel += (-_squash * 170.0 - _squash_vel * 13.0) * delta
 	_squash = clampf(_squash + _squash_vel * delta, -0.16, 0.08)
 	var xf := Transform3D(Basis.from_euler(Vector3(_visual_pitch + _ground_pitch, _visual_yaw, _visual_roll + _ground_roll)),
-			Vector3(0.0, _squash, 0.0))
+			Vector3(0.0, _squash + visual_lift, 0.0))
 	# Deságio: o modelo encolhe (e volta) numa mola com um balanço.
 	var size_goal := SHRINK_SCALE if shrink_time > 0.0 else 1.0
 	if _size != size_goal or _size_vel != 0.0:

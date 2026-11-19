@@ -40,6 +40,10 @@ var track: Track
 var line: RacingLine
 ## Todos os karts da corrida (para desviar e ultrapassar).
 var karts: Array[Kart] = []
+## Armadilhas dos itens paradas na pista (ItemAttacks.trap_spots, o mesmo array): x, y,
+## z e w = um número de 0 a 1 da armadilha (+1 na caixa falsa). Cada piloto vê ou não
+## cada uma pelo nível dele; a caixa falsa quase ninguém percebe.
+var traps: Array[Vector4] = []
 
 var _index := -1
 var _last_along := 0.0
@@ -377,6 +381,20 @@ func _avoid_offset(k: Kart, lat: float, lat_now: float) -> float:
 		var w := 1.0 if ahead < 3.0 else clampf(1.0 - (ahead - 3.0) / 15.0, 0.0, 1.0)
 		w *= 1.0 if ahead < 3.0 else clampf(0.4 + wants / 6.0, 0.4, 1.5)
 		others.append(Vector3(lat_now + side, w, 0.0))
+	# Armadilhas à frente (as que este piloto percebeu) ocupam a faixa delas.
+	for t in traps:
+		var d := Vector3(t.x, t.y, t.z) - k.global_position
+		var ahead := d.dot(fwd)
+		if ahead < 1.0 or ahead > 28.0 or absf(d.y) > 3.0:
+			continue
+		var side := d.dot(right)
+		if absf(side) > 8.0:
+			continue
+		var fake := t.w >= 1.0
+		var chance := lerpf(0.12, 0.5, skill) if fake else lerpf(0.45, 0.95, skill)
+		if fmod(t.w * 7.31 + _phase, 1.0) > chance:
+			continue
+		others.append(Vector3(lat_now + side, 1.4 * clampf(1.4 - ahead / 28.0, 0.4, 1.0), 0.0))
 	if others.is_empty() and hazards.is_empty():
 		return 0.0
 	var best := 0.0
