@@ -11,17 +11,7 @@
 [ext_resource type="Script" path="res://scripts/ui/hint_bar.gd" id="11_hints"]
 [ext_resource type="Script" path="res://scripts/ui/place_badge.gd" id="12_place"]
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_map"]
-bg_color = Color(0.04, 0.07, 0.18, 0.4)
-border_width_left = 3
-border_width_top = 3
-border_width_right = 3
-border_width_bottom = 3
-border_color = Color(1, 1, 1, 0.35)
-corner_radius_top_left = 28
-corner_radius_top_right = 28
-corner_radius_bottom_right = 28
-corner_radius_bottom_left = 28
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_map"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_results"]
 shader = ExtResource("10_checker")
@@ -135,7 +125,7 @@ offset_bottom = 56.0
 grow_horizontal = 0
 grow_vertical = 2
 mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_map")
+theme_override_styles/panel = SubResource("StyleBoxEmpty_map")
 
 [node name="Minimap" type="Control" parent="Root/MapPanel"]
 unique_name_in_owner = true

@@ -1,6 +1,6 @@
 class_name PlaceBadge
 extends Control
-## Posição do jogador na corrida ("1º", "2º"...): ouro, prata e bronze no pódio.
+## Posição do jogador na corrida (só "1º", "2º"..., sem o total): ouro, prata e bronze no pódio.
 ## Só redesenha quando a posição mostrada muda; a troca espera a posição ficar
 ## estável um instante (dois karts lado a lado não fazem o número piscar) e entra
 ## com um "pulo".
@@ -65,17 +65,11 @@ func _draw() -> void:
 	var outline := UiKit.NAVY
 	var baseline := size.y * 0.5 + (font.get_ascent(big) - font.get_descent(big)) * 0.5
 	var w := font.get_string_size(number, HORIZONTAL_ALIGNMENT_LEFT, -1, big).x
-	var of_text := "de %d" % total
 	var x := 6.0
 	if align_right:
-		var tail := maxf(font.get_string_size("º", HORIZONTAL_ALIGNMENT_LEFT, -1, small).x + 2.0,
-				UiKit.FONT_BODY.get_string_size(of_text, HORIZONTAL_ALIGNMENT_LEFT, -1, int(small * 0.55)).x + 4.0)
-		x = size.x - 10.0 - w - tail
+		x = size.x - 10.0 - w - font.get_string_size("º", HORIZONTAL_ALIGNMENT_LEFT, -1, small).x - 2.0
 	# Sombra, contorno e número; o "º" fica no alto, à direita.
 	draw_string_outline(font, Vector2(x + 3.0, baseline + 6.0), number, HORIZONTAL_ALIGNMENT_LEFT, -1, big, 22, Color(0, 0, 0, 0.35))
 	UiKit.draw_outlined(self, font, Vector2(x, baseline), number, big, color, outline, 22)
 	var sup := Vector2(x + w + 2.0, baseline - big * 0.42)
 	UiKit.draw_outlined(self, font, sup, "º", small, color, outline, 14)
-	# "de 8" embaixo do º.
-	UiKit.draw_outlined(self, UiKit.FONT_BODY, Vector2(x + w + 4.0, baseline - 4.0), of_text, int(small * 0.55),
-			Color(0.9, 0.93, 1.0), outline, 8)
