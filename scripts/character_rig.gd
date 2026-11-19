@@ -142,6 +142,8 @@ var _arm_bones: Array[PackedInt32Array] = [PackedInt32Array([-1, -1, -1]), Packe
 var _leg_chain: Array[PackedInt32Array] = [PackedInt32Array([-1, -1, -1]), PackedInt32Array([-1, -1, -1])]
 var _hips_bone := -1
 var _neck_bones := PackedInt32Array()
+## Ossos auxiliares (CharacterSkeleton.follow_bones): x = auxiliar, y = osso seguido.
+var _followers: Array[Vector2i] = []
 ## Pálpebras que giram: eixo e ângulo de fechar de cada uma (tirados da piscada).
 var _lid_axis := {}
 var _lid_closed := {}
@@ -254,6 +256,14 @@ func _setup_skeleton() -> void:
 	_neck_bones.clear()
 	for k in range(maxi(sd.body.size() - 2, 0), sd.body.size()):
 		_neck_bones.append(_bone.get(StringName(sd.body[k]), -1))
+	_followers.clear()
+	for helper in sd.follow_bones:
+		var h: int = _bone.get(StringName(helper), -1)
+		var s: int = _bone.get(StringName(sd.follow_bones[helper]), -1)
+		if h >= 0 and s >= 0:
+			_followers.append(Vector2i(h, s))
+		else:
+			push_warning("Osso auxiliar não encontrado: %s → %s" % [helper, sd.follow_bones[helper]])
 
 	var body := Array(sd.body)
 	var arms := Array(sd.arm_left) + Array(sd.arm_right)
@@ -806,10 +816,21 @@ func _process(delta: float) -> void:
 	elif has_hand_targets:
 		# Em pé segurando alguma coisa (a maleta da Antecipação Celer).
 		_pose_arms(delta)
+	_pose_followers()
 	for i in _pos.size():
 		skeleton.set_bone_pose_position(i, _pos[i])
 		skeleton.set_bone_pose_rotation(i, _rot[i])
 		skeleton.set_bone_pose_scale(i, _scl[i])
+
+
+## Ossos auxiliares: a fração `follow_share` do giro do osso seguido (a partir do
+## repouso, como a restrição do Blender) e a mesma escala (o braço que estica).
+func _pose_followers() -> void:
+	var share := skeleton_data.follow_share
+	for f in _followers:
+		var turn := (_rest_rot[f.y].inverse() * _rot[f.y]).normalized()
+		_rot[f.x] = _rest_rot[f.x] * Quaternion.IDENTITY.slerp(turn, share)
+		_scl[f.x] = _scl[f.y]
 
 
 func _update_timers(delta: float) -> void:

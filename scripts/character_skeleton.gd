@@ -33,6 +33,14 @@ extends Resource
 ## Pálpebras que fecham descendo (deslocamento em Y, como no Celerino): quanto descem
 ## até fechar. 0 = pálpebras que fecham girando; o limite sai da animação `blink`.
 @export var eyelid_closed_offset := -0.332
+## Ossos auxiliares que levam uma fração (`follow_share`) do giro de outro osso: osso
+## auxiliar → osso seguido. No Blender é uma restrição (Copy Rotation com influência),
+## que o glb não leva. O Ulysses tem um no meio do cotovelo, do joelho e de cada lado do
+## quadril, seguindo metade do giro do antebraço, da canela e da coxa: a malha da dobra
+## gira só a metade e não murcha. O CharacterRig refaz o giro deles a cada quadro,
+## depois do IK de braços e pernas.
+@export var follow_bones := {}
+@export_range(0.0, 1.0, 0.05) var follow_share := 0.5
 
 @export_group("Animações")
 ## Animações que completam ou substituem as do modelo (mesmos nomes do Celerino:
