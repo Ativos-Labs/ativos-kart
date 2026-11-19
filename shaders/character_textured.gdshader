@@ -6,6 +6,9 @@ render_mode cull_disabled, diffuse_burley, specular_schlick_ggx;
 //
 // Recoloração (jogador repetindo o personagem): só os pontos com matiz parecida com a de
 // referência (o azul do macacão) trocam de matiz; pele, cabelo e branco ficam.
+//
+// CUSTOM0.a = rugosidade, + 2 nas partes recoloríveis, + 4 nas que não projetam sombra
+// (a aba do boné do Henrique, que escurecia o rosto): no passe de sombra elas somem.
 
 uniform sampler2D albedo_texture : source_color, filter_linear_mipmap_anisotropic, repeat_disable;
 uniform bool tint_enabled = false;
@@ -21,16 +24,22 @@ uniform float specular_value = 0.5;
 varying vec3 color_value;
 varying float roughness_value;
 varying float tintable_value;
+varying float no_shadow_value;
 
 #include "res://shaders/character_common.gdshaderinc"
 
 void vertex() {
 	color_value = CUSTOM0.rgb;
-	tintable_value = step(1.5, CUSTOM0.a);
-	roughness_value = CUSTOM0.a - tintable_value * 2.0;
+	no_shadow_value = step(3.5, CUSTOM0.a);
+	float flags = CUSTOM0.a - no_shadow_value * 4.0;
+	tintable_value = step(1.5, flags);
+	roughness_value = flags - tintable_value * 2.0;
 }
 
 void fragment() {
+	if (IN_SHADOW_PASS && no_shadow_value > 0.5) {
+		discard;
+	}
 	vec4 tex = texture(albedo_texture, UV);
 	// As contas de cor são em sRGB, como a cor do vértice. O Compatibility (web) usa as
 	// cores como estão, igual ao StandardMaterial3D (veja character.gdshader).

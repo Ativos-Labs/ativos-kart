@@ -52,6 +52,16 @@ ossos, skin, `JOINTS_0`/`WEIGHTS_0`), e saem as cores de vértice e o segundo UV
 jogo não usa. Materiais que usam a mesma imagem (o corpo e a pele da boca do Henrique)
 viram uma peça só do atlas; mapas de normal e metal/rugosidade saem.
 
+**Aba do boné sem sombra (Henrique).** Com sombras ligadas, a aba projetava uma sombra
+grande em diagonal sobre olho, testa e bochecha (na tela de seleção e na corrida). Os 76
+triângulos dela vão para uma primitiva com uma cópia do material do corpo chamada
+`SemSombra_Aba_Bone` (`no_shadow` em `CHARACTERS`: centro do triângulo acima de y 0,87,
+algum vértice à frente de z 0,075 e azul no centro; a pele da testa, no mesmo lugar, tem
+outra matiz, e a copa é azul-marinho e fica atrás). Mesma textura, mesma peça do atlas:
+a aparência não muda. No jogo, o `CharacterMesh` marca os materiais `SemSombra_*` (+ 4 em
+`CUSTOM0.a`) e o `character_textured.gdshader` descarta esses pixels no passe de sombra
+(`IN_SHADOW_PASS`). O resto do corpo continua fazendo sombra no chão e no kart.
+
 - Tira o volante e o guidão de referência (`Ref_*`) e os desenhos de controle (`WGT_*`).
 - Tira os 25 ossos sem peso (IK, polos, alvos do olhar, pontas dos dedos e dos pés):
   sobram 68. No Godot eles não fazem nada e o `CharacterRig` percorre todos os ossos a

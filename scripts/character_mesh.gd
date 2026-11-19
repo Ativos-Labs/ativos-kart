@@ -19,6 +19,8 @@ extends RefCounted
 ## Modelos com textura (o Jarbas) também juntam se todas as partes usarem a mesma
 ## textura (um atlas; as partes de cor lisa apontam para um ponto branco dele). Aí o
 ## material é `character_textured.gdshader`, com UV e recorte pela transparência.
+## Nesses, os materiais com nome começando em `NO_SHADOW_PREFIX` (feitos pelo
+## tools/personagens/build_personagem.py) ganham + 4 em CUSTOM0.a e não projetam sombra.
 ##
 ## A malha junta é feita uma vez por modelo e fica guardada. Se o modelo não servir
 ## (texturas diferentes, transparência com mistura, esqueletos diferentes...), nada
@@ -29,6 +31,8 @@ const SHADER_TEXTURED := preload("res://shaders/character_textured.gdshader")
 ## Ângulo para juntar normais ao simplificar (o mesmo do importador do Godot).
 const LOD_NORMAL_MERGE_ANGLE := 60.0
 const LOD_NORMAL_SPLIT_ANGLE := 25.0
+## Materiais (com textura) que não projetam sombra: a aba do boné do Henrique.
+const NO_SHADOW_PREFIX := "SemSombra_"
 
 ## Desligado, os personagens usam as malhas originais (para comparar ou depurar).
 static var enabled := true
@@ -230,6 +234,10 @@ static func _build(meshes: Array[MeshInstance3D], tint_names: PackedStringArray,
 			ref = mat.albedo_color
 		var c := mat.albedo_color
 		var rough := mat.roughness + (2.0 if tintable else 0.0)
+		# Partes que não projetam sombra (a aba do boné do Henrique escurecia o rosto): + 4.
+		# Só o shader com textura lê essa marca.
+		if textured and mat.resource_name.begins_with(NO_SHADOW_PREFIX):
+			rough += 4.0
 		var c_arr := PackedFloat32Array()
 		c_arr.resize(count * 4)
 		for v in count:

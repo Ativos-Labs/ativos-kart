@@ -18,7 +18,9 @@ assets/models/personagens/<nome>.glb:
   esqueleto custa um passe de GPU por quadro). Mapas de normal, rugosidade e metal
   saem (o shader dos pilotos não usa);
 - logos: transparência recortada (alpha scissor) em vez de mistura, para caberem na
-  mesma superfície.
+  mesma superfície;
+- Henrique: a aba do boné vai para um material próprio ("SemSombra_Aba_Bone", mesma
+  textura), que no jogo não projeta sombra (ela escurecia o rosto).
 
 As animações do arquivo do Jarbas (expressões, piscada, POSE_Kart, POSE_Moto) vão
 junto. As que o jogo usa são montadas no Godot por gerar_animacoes.gd (veja o README
@@ -26,6 +28,7 @@ desta pasta); as do Henrique saem das do Jarbas.
 
 Uso: python3 tools/personagens/build_personagem.py jarbas|henrique
 """
+import colorsys
 import io
 import json
 import math
@@ -42,7 +45,14 @@ from gltf_util import Glb  # noqa: E402
 PROJ = os.path.abspath(os.path.join(HERE, "..", ".."))
 CHARACTERS = {
     "jarbas": {"src": "jarbas-piloto.glb", "skeleton": None, "root": None},
-    "henrique": {"src": "henrique-piloto.glb", "skeleton": "henrique_esqueleto.json", "root": "Henrique"},
+    "henrique": {
+        "src": "henrique-piloto.glb", "skeleton": "henrique_esqueleto.json", "root": "Henrique",
+        # A aba do boné fazia uma sombra grande no rosto (medido na tela de seleção e na
+        # corrida). Ela é azul e fica na frente da testa; a pele da testa, na mesma
+        # altura e profundidade, tem matiz ~0,03 (o azul do boné, ~0,6).
+        "no_shadow": [{"name": "Aba_Bone", "mesh": "Henrique_Corpo", "material": "tripo_mat_4699cc3b",
+                       "min_y": 0.87, "min_front_z": 0.075, "hue": (0.5, 0.75), "min_saturation": 0.3}],
+    },
 }
 
 ATLAS = 2048
@@ -50,6 +60,9 @@ PAD = 6  # pixels entre retângulos no atlas (já na escala final)
 WHITE = 8  # lado do quadradinho branco das cores lisas
 DROP_NODES = ("Ref_Guidao_Moto", "Ref_Volante_Kart", "WGT_Circulo", "WGT_Olhar_Alvo")
 KEEP_UNWEIGHTED = ("Raiz",)  # raiz do esqueleto (pai do quadril)
+## Materiais com este prefixo não projetam sombra no jogo (CharacterMesh e
+## character_textured.gdshader).
+NO_SHADOW_PREFIX = "SemSombra_"
 
 
 def main():
@@ -68,6 +81,8 @@ def main():
             _add_skeleton(g, json.load(f), cfg["root"])
     _clean_skeleton(g)
     _rename_bones(js)
+    for rule in cfg.get("no_shadow", []):
+        _split_no_shadow(g, rule)
     _build_atlas(g)
     js["asset"]["generator"] = "Ativos Kart build_personagem.py (de: %s)" % js["asset"].get("generator", "")
     js.pop("extensionsUsed", None)
@@ -188,9 +203,11 @@ def _add_skeleton(g, data, root_name):
                 weights.append(tuple(v / total for v in q))
             p["attributes"]["JOINTS_0"] = g.add_accessor(joints, "VEC4", component=5123)
             p["attributes"]["WEIGHTS_0"] = g.add_accessor(weights, "VEC4")
-            # O jogo não usa cor de vértice nem o segundo UV.
-            for attr in ("COLOR_0", "COLOR_1", "TEXCOORD_1"):
-                p["attributes"].pop(attr, None)
+            # O jogo não usa cor de vértice (o Blender exporta uma camada por atributo
+            # de cor, COLOR_0 a COLOR_n) nem o segundo UV.
+            for attr in list(p["attributes"]):
+                if attr.startswith("COLOR_") or attr == "TEXCOORD_1":
+                    p["attributes"].pop(attr)
     print("esqueleto: %d ossos, %d malhas com pesos" % (len(bones), len(meshes)))
 
 
@@ -254,6 +271,73 @@ def _rename_bones(js):
         name = n.get("name", "")
         if name.startswith("mixamorig:"):
             n["name"] = name[len("mixamorig:"):]
+
+
+# --- Partes sem sombra ------------------------------------------------------------------
+
+def _split_no_shadow(g, rule):
+    """Passa os triângulos de uma parte (a aba do boné do Henrique) para uma primitiva
+    própria, com uma cópia do material chamada NO_SHADOW_PREFIX + nome. A cópia usa a
+    mesma textura (vai para a mesma peça do atlas), então nada muda na aparência; no
+    jogo ela só deixa de projetar sombra.
+
+    Um triângulo é da parte se o centro dele fica acima de `min_y`, se algum vértice
+    passa de `min_front_z` para a frente e se a cor da textura no centro tem a matiz em
+    `hue` e saturação de `min_saturation` para cima. (A aba tem poucos triângulos, que vão
+    da borda até a raiz, já em cima da testa e da copa: por isso o vértice mais à frente
+    e a cor no centro, e não todos os vértices.)"""
+    js = g.js
+    mesh = next(m for m in js["meshes"] if m["name"] == rule["mesh"])
+    mat_index = next(i for i, m in enumerate(js["materials"]) if m.get("name") == rule["material"])
+    prim = next(p for p in mesh["primitives"] if p.get("material") == mat_index)
+    tex = js["materials"][mat_index]["pbrMetallicRoughness"]["baseColorTexture"]["index"]
+    img = Image.open(io.BytesIO(g.image_bytes(js["textures"][tex]["source"]))).convert("RGB")
+    w, h = img.size
+
+    pos = g.read_accessor(prim["attributes"]["POSITION"])
+    uv = g.read_accessor(prim["attributes"]["TEXCOORD_0"])
+    idx = [i[0] for i in g.read_accessor(prim["indices"])]
+    keep, moved = [], []
+    for t in range(0, len(idx), 3):
+        tri = idx[t:t + 3]
+        y = sum(pos[i][1] for i in tri) / 3.0
+        ok = y > rule["min_y"] and max(pos[i][2] for i in tri) > rule["min_front_z"]
+        if ok:
+            u = sum(uv[i][0] for i in tri) / 3.0
+            v = sum(uv[i][1] for i in tri) / 3.0
+            r, gr, b = img.getpixel((min(w - 1, max(0, int(u * w))), min(h - 1, max(0, int(v * h)))))
+            hue, sat, _ = colorsys.rgb_to_hsv(r / 255.0, gr / 255.0, b / 255.0)
+            ok = rule["hue"][0] <= hue <= rule["hue"][1] and sat >= rule["min_saturation"]
+        (moved if ok else keep).extend(tri)
+    if not moved:
+        raise SystemExit("%s: nenhum triângulo da parte sem sombra" % rule["name"])
+
+    def subset(tris):
+        """Primitiva só com os vértices que os triângulos usam (todos os atributos,
+        inclusive o esqueleto)."""
+        used = sorted(set(tris))
+        remap = {old: new for new, old in enumerate(used)}
+        attrs = {}
+        for name, acc in prim["attributes"].items():
+            a = js["accessors"][acc]
+            vals = g.read_accessor(acc, raw=True)
+            attrs[name] = g.add_accessor([vals[i] for i in used], a["type"], a["componentType"],
+                                         minmax=(name == "POSITION"))
+            if a.get("normalized"):
+                js["accessors"][attrs[name]]["normalized"] = True
+        return attrs, g.add_indices([remap[i] for i in tris])
+
+    mat = json.loads(json.dumps(js["materials"][mat_index]))
+    mat["name"] = NO_SHADOW_PREFIX + rule["name"]
+    js["materials"].append(mat)
+    part_attrs, part_indices = subset(moved)
+    prim["attributes"], prim["indices"] = subset(keep)
+    mesh["primitives"].append({"attributes": part_attrs, "indices": part_indices,
+                               "material": len(js["materials"]) - 1})
+    ys = [pos[i][1] for i in moved]
+    zs = [pos[i][2] for i in moved]
+    print("sem sombra: %s, %d triângulos (y %.3f a %.3f, z %.3f a %.3f)" % (
+        mat["name"], len(moved) // 3, min(ys), max(ys), min(zs), max(zs)))
 
 
 # --- Atlas de texturas ------------------------------------------------------------------
