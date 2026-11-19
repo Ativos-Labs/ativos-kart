@@ -7,7 +7,9 @@ com uns 100 px na tela, então:
 - a textura de cor vira um JPEG de 512x512;
 - o mapa de normais e o de rugosidade/metal saem (o brilho é constante no shader);
 - a malha é centralizada (origem no meio da moeda, em pé, de frente para +Z), para
-  ela girar no próprio eixo no shader (shaders/coin.gdshader).
+  ela girar no próprio eixo no shader (shaders/coin.gdshader);
+- o "$" em relevo do verso é aplainado (o miolo dentro do anel vira um disco liso):
+  ali o shader grava o "%" da Correção monetária.
 
 Uso: python3 tools/moeda/build_moeda.py   (precisa do Pillow)
 O Godot ignora esta pasta (tools/.gdignore).
@@ -24,6 +26,10 @@ SRC = os.path.join(HERE, "original", "MOEDA.glb")
 DST = os.path.join(HERE, "..", "..", "assets", "models", "moeda", "moeda.glb")
 TEXTURE_SIZE = 512
 JPEG_QUALITY = 88
+# Verso (-Z, depois de centralizar): o fundo liso fica em z = BACK_FIELD_Z e o "$" sobe
+# até -0,135; o anel começa em r ~0,33. Tudo dentro de FLAT_RADIUS vira o fundo liso.
+FLAT_RADIUS = 0.325
+BACK_FIELD_Z = -0.06
 
 
 def read_glb(path):
@@ -78,6 +84,15 @@ def main():
     positions = [tuple(p[i] - center[i] for i in range(3)) for p in positions]
     new_lo = [lo[i] - center[i] for i in range(3)]
     new_hi = [hi[i] - center[i] for i in range(3)]
+
+    # Verso: tira o "$" (o "%" é desenhado no shader, em cima do disco liso; lá o shader
+    # também troca a textura por uma cor só, senão o desenho do "$" continuaria na cor).
+    flat = 0
+    for i, p in enumerate(positions):
+        if p[2] < BACK_FIELD_Z + 0.02 and (p[0] * p[0] + p[1] * p[1]) ** 0.5 < FLAT_RADIUS:
+            positions[i] = (p[0], p[1], BACK_FIELD_Z)
+            normals[i] = (0.0, 0.0, -1.0)
+            flat += 1
 
     material = gltf["materials"][prim["material"]]
     color_tex = gltf["textures"][material["pbrMetallicRoughness"]["baseColorTexture"]["index"]]
@@ -154,6 +169,7 @@ def main():
         f.write(js)
         f.write(struct.pack("<II", len(blob), 0x004E4942))
         f.write(blob)
+    print("verso aplainado: %d vértices" % flat)
     print("moeda.glb: %d triângulos, tamanho %.2f x %.2f x %.2f m, %d KB (original %d KB)" % (
         len(indices) // 3, new_hi[0] - new_lo[0], new_hi[1] - new_lo[1], new_hi[2] - new_lo[2],
         total // 1024, os.path.getsize(SRC) // 1024))
