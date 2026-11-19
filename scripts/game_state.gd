@@ -70,6 +70,7 @@ var characters: Array[CharacterData] = [
 	preload("res://data/personagens/celerino.tres"),
 	preload("res://data/personagens/jarbas.tres"),
 	preload("res://data/personagens/henrique.tres"),
+	preload("res://data/personagens/ulysses.tres"),
 ]
 ## Quantas vagas "?" (em breve) aparecem na grade de personagens.
 var character_slots := 8

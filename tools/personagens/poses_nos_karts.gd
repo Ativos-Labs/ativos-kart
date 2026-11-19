@@ -9,7 +9,7 @@ extends SceneTree
 ##
 ##   Godot --headless --path . -s res://tools/personagens/poses_nos_karts.gd -- <pasta> <personagem>
 ##
-## <personagem> = nome do .tres em res://data/personagens/ (henrique, jarbas...).
+## <personagem> = nome do .tres em res://data/personagens/ (henrique, jarbas, ulysses...).
 
 var _f := 0
 var _out := "/tmp"

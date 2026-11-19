@@ -1,6 +1,6 @@
 extends SceneTree
 ## Monta as animações que o jogo usa para um piloto com esqueleto estilo Mixamo (Jarbas,
-## Henrique) e grava em res://assets/models/personagens/<nome>_animacoes.res
+## Henrique, Ulysses) e grava em res://assets/models/personagens/<nome>_animacoes.res
 ## (AnimationLibrary), com os mesmos nomes das do Celerino (idle, gesture_*, hand_*,
 ## face_*, body_*, eyes_look_*, blink), mais as poses sentadas drive_kart e drive_moto e o
 ## idle_stand (parado em pé nas telas de seleção).
@@ -28,6 +28,7 @@ extends SceneTree
 ## Celerino (o Henrique também depois de mudar as do Jarbas):
 ##   Godot --headless --path . -s res://tools/personagens/gerar_animacoes.gd -- jarbas
 ##   Godot --headless --path . -s res://tools/personagens/gerar_animacoes.gd -- henrique
+##   Godot --headless --path . -s res://tools/personagens/gerar_animacoes.gd -- ulysses
 
 const CELERINO := "res://assets/models/personagens/celerino.glb"
 ## Modelo e saída de cada personagem. `from`: modelo de onde vêm as expressões e as poses
@@ -42,6 +43,10 @@ const CHARACTERS := {
 		"out": "res://assets/models/personagens/henrique_animacoes.res",
 		"from": "res://assets/models/personagens/jarbas.glb",
 		"rig": "res://tools/personagens/henrique_esqueleto.json",
+	},
+	"ulysses": {
+		"model": "res://assets/models/personagens/ulysses.glb",
+		"out": "res://assets/models/personagens/ulysses_animacoes.res",
 	},
 }
 ## Animações do modelo (do Blender) que o gerador usa.

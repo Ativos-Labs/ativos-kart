@@ -1,4 +1,4 @@
-"""Prepara o modelo de um piloto com textura (Jarbas, Henrique) para o jogo.
+"""Prepara o modelo de um piloto com textura (Jarbas, Henrique, Ulysses) para o jogo.
 
 Lê o modelo original de tools/personagens/originais/ (exportado do Blender) e grava
 assets/models/personagens/<nome>.glb:
@@ -11,8 +11,9 @@ assets/models/personagens/<nome>.glb:
   olhar, pontas dos dedos e dos pés) — no Godot eles não fazem nada e o CharacterRig
   percorre todos os ossos a cada quadro;
 - renomeia os ossos "mixamorig:Xxx" para "Xxx";
-- junta as texturas (as 27 da Tripo no Jarbas, a única do Henrique) e os logos num
-  atlas só (2048 x 2048). As partes de cor lisa (olhos, boca, luvas, pálpebras)
+- junta as texturas (as 27 da Tripo no Jarbas, a única do Henrique, as duas do Ulysses)
+  e os logos num atlas só (2048 x 2048). No Ulysses cada textura entra recortada por ilha
+  de UV (as dele usam só 27% e 40% da área). As partes de cor lisa (olhos, boca, luvas, pálpebras)
   apontam para um quadradinho branco do atlas e mantêm a cor no material. Assim o
   CharacterMesh junta o piloto inteiro numa superfície só (na web cada superfície com
   esqueleto custa um passe de GPU por quadro). Mapas de normal, rugosidade e metal
@@ -26,7 +27,7 @@ As animações do arquivo do Jarbas (expressões, piscada, POSE_Kart, POSE_Moto)
 junto. As que o jogo usa são montadas no Godot por gerar_animacoes.gd (veja o README
 desta pasta); as do Henrique saem das do Jarbas.
 
-Uso: python3 tools/personagens/build_personagem.py jarbas|henrique
+Uso: python3 tools/personagens/build_personagem.py jarbas|henrique|ulysses
 """
 import colorsys
 import io
@@ -53,6 +54,9 @@ CHARACTERS = {
         "no_shadow": [{"name": "Aba_Bone", "mesh": "Henrique_Corpo", "material": "tripo_mat_4699cc3b",
                        "min_y": 0.87, "min_front_z": 0.075, "hue": (0.5, 0.75), "min_saturation": 0.3}],
     },
+    # Duas texturas de 4096 (cabeça da Tripo e corpo refeito) usando só 27% e 40% da área:
+    # inteiras, cada uma viraria ~1000 px no atlas; por ilha de UV, o dobro.
+    "ulysses": {"src": "ulysses-piloto.glb", "skeleton": None, "root": None, "islands": True},
 }
 
 ATLAS = 2048
@@ -83,7 +87,7 @@ def main():
     _rename_bones(js)
     for rule in cfg.get("no_shadow", []):
         _split_no_shadow(g, rule)
-    _build_atlas(g)
+    _build_atlas(g, cfg.get("islands", False))
     js["asset"]["generator"] = "Ativos Kart build_personagem.py (de: %s)" % js["asset"].get("generator", "")
     js.pop("extensionsUsed", None)
     g.compact()
@@ -342,7 +346,9 @@ def _split_no_shadow(g, rule):
 
 # --- Atlas de texturas ------------------------------------------------------------------
 
-def _build_atlas(g):
+def _build_atlas(g, islands=False):
+    """Junta as texturas num atlas. `islands`: cada textura entra recortada por ilha de UV
+    (veja _island_pieces) em vez de pelo retângulo que todos os UVs dela ocupam."""
     js = g.js
     mats = js["materials"]
     # Primitivas por material e o retângulo de UV que cada textura usa.
@@ -384,6 +390,9 @@ def _build_atlas(g):
             canvas = Image.new("RGBA", (rect[2] - rect[0], rect[3] - rect[1]), (0, 0, 0, 0))
             canvas.paste(img, (-rect[0], -rect[1]))
             pieces.append({"mats": group, "img": canvas, "rect": rect, "scale": (w, h), "logo": True})
+            continue
+        if islands:
+            pieces += _island_pieces(g, group, [p for mi in group for p in users[mi]], img)
             continue
         rect = (max(0, math.floor(lo[0]) - 4), max(0, math.floor(lo[1]) - 4),
                 min(w, math.ceil(hi[0]) + 4), min(h, math.ceil(hi[1]) + 4))
@@ -463,6 +472,7 @@ def _build_atlas(g):
     atlas = Image.new("RGBA", (ATLAS, ATLAS), (0, 0, 0, 255))
     atlas.paste((255, 255, 255, 255), (0, 0, WHITE, WHITE))
     uv_xf = {}  # material -> (função de remapear UV)
+    vert_xf = {}  # id(primitiva) -> {vértice: (função de remapear UV)} (ilhas de UV)
     for i, pc in enumerate(pieces):
         x, y, bw, bh = placed[i]
         img = pc["img"].resize((bw, bh), Image.LANCZOS)
@@ -475,8 +485,25 @@ def _build_atlas(g):
         w, h = pc["scale"]
         sx = bw / (rect[2] - rect[0])
         sy = bh / (rect[3] - rect[1])
-        for mi in pc["mats"]:
-            uv_xf[mi] = (x, y, rect[0], rect[1], sx, sy, w, h)
+        xf = (x, y, rect[0], rect[1], sx, sy, w, h)
+        if "verts" in pc:
+            # Ilha de UV: o remapeamento é por vértice.
+            for pid, verts in pc["verts"].items():
+                per_vertex = vert_xf.setdefault(pid, {})
+                for v in verts:
+                    per_vertex[v] = xf
+        else:
+            for mi in pc["mats"]:
+                uv_xf[mi] = xf
+    if islands:
+        # Os vãos entre as peças pegam a cor das bordas (senão os mipmaps de longe puxam
+        # o preto do fundo para as costuras de tantas ilhas pequenas).
+        occupied = Image.new("L", (ATLAS, ATLAS), 0)
+        occupied.paste(255, (0, 0, WHITE, WHITE))
+        for x, y, bw, bh in placed.values():
+            occupied.paste(255, (x, y, x + bw, y + bh))
+        rgb = _dilate(atlas.convert("RGB"), occupied)
+        atlas = Image.merge("RGBA", rgb.split() + (atlas.getchannel("A"),))
 
     # Atlas como textura 0 (PNG, com transparência por causa dos logos).
     buf = io.BytesIO()
@@ -505,7 +532,15 @@ def _build_atlas(g):
             mat["alphaMode"] = "MASK"
             mat["alphaCutoff"] = 0.5
         for p in users.get(mi, []):
-            if textured:
+            if textured and id(p) in vert_xf:
+                per_vertex = vert_xf[id(p)]
+                fallback = next(iter(per_vertex.values()))  # vértice sem triângulo
+                uv = g.read_accessor(p["attributes"]["TEXCOORD_0"])
+                new = []
+                for k, (u, v) in enumerate(uv):
+                    x, y, cx, cy, sx, sy, w, h = per_vertex.get(k, fallback)
+                    new.append(((x + (u * w - cx) * sx) / ATLAS, (y + (v * h - cy) * sy) / ATLAS))
+            elif textured:
                 x, y, cx, cy, sx, sy, w, h = uv_xf[mi]
                 uv = g.read_accessor(p["attributes"]["TEXCOORD_0"])
                 new = [((x + (u * w - cx) * sx) / ATLAS, (y + (v * h - cy) * sy) / ATLAS) for u, v in uv]
@@ -513,6 +548,101 @@ def _build_atlas(g):
                 count = g.js["accessors"][p["attributes"]["POSITION"]]["count"]
                 new = [white_uv] * count
             p["attributes"]["TEXCOORD_0"] = g.add_accessor(new, "VEC2")
+
+
+def _island_pieces(g, group, prims, img, margin=4):
+    """Peças do atlas por ilha de UV de uma textura: os triângulos ligados (vértices em
+    comum, ou no mesmo ponto do UV, nas costuras) formam uma ilha. Ilhas cujos retângulos
+    juntos não ocupam mais área que separados (uma dentro da outra, ou quase) viram uma
+    peça só. Cada peça leva os vértices que usam ela ("verts": id(primitiva) -> índices)."""
+    w, h = img.size
+    parent = {}
+
+    def find(a):
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+
+    def union(a, b):
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[rb] = ra
+
+    data = []
+    same_uv = {}
+    for pi, p in enumerate(prims):
+        uv = g.read_accessor(p["attributes"]["TEXCOORD_0"])
+        idx = [i[0] for i in g.read_accessor(p["indices"])] if "indices" in p else list(range(len(uv)))
+        for k in range(len(uv)):
+            parent[(pi, k)] = (pi, k)
+        for t in range(0, len(idx), 3):
+            union((pi, idx[t]), (pi, idx[t + 1]))
+            union((pi, idx[t]), (pi, idx[t + 2]))
+        for k, (u, v) in enumerate(uv):
+            key = (round(u * w * 8), round(v * h * 8))
+            if key in same_uv:
+                union(same_uv[key], (pi, k))
+            else:
+                same_uv[key] = (pi, k)
+        data.append((p, uv, idx))
+
+    by_root = {}
+    for pi, (p, uv, idx) in enumerate(data):
+        for t in range(0, len(idx), 3):
+            tri = idx[t:t + 3]
+            isl = by_root.setdefault(find((pi, tri[0])), {"tris": [], "verts": {}, "box": [math.inf, math.inf, -math.inf, -math.inf]})
+            pts = [(uv[i][0] * w, uv[i][1] * h) for i in tri]
+            isl["tris"].append(pts)
+            isl["verts"].setdefault(id(p), set()).update(tri)
+            box = isl["box"]
+            for x, y in pts:
+                box[0], box[1] = min(box[0], x), min(box[1], y)
+                box[2], box[3] = max(box[2], x), max(box[3], y)
+    found = len(by_root)
+
+    def area(b):
+        return (b[2] - b[0] + 2 * margin) * (b[3] - b[1] + 2 * margin)
+
+    boxes = list(by_root.values())
+    merged = True
+    while merged:
+        merged = False
+        boxes.sort(key=lambda b: -area(b["box"]))
+        i = 0
+        while i < len(boxes):
+            a = boxes[i]
+            j = i + 1
+            while j < len(boxes):
+                b = boxes[j]
+                ab, bb = a["box"], b["box"]
+                u = [min(ab[0], bb[0]), min(ab[1], bb[1]), max(ab[2], bb[2]), max(ab[3], bb[3])]
+                if area(u) <= area(ab) + area(bb):
+                    a["box"] = u
+                    a["tris"] += b["tris"]
+                    for pid, verts in b["verts"].items():
+                        a["verts"].setdefault(pid, set()).update(verts)
+                    del boxes[j]
+                    merged = True
+                    j = i + 1  # a caixa cresceu: confere de novo as que ficaram
+                    continue
+                j += 1
+            i += 1
+
+    pieces = []
+    for isl in boxes:
+        lo_x, lo_y, hi_x, hi_y = isl["box"]
+        rect = (max(0, math.floor(lo_x) - margin), max(0, math.floor(lo_y) - margin),
+                min(w, math.ceil(hi_x) + margin), min(h, math.ceil(hi_y) + margin))
+        mask = Image.new("L", (rect[2] - rect[0], rect[3] - rect[1]), 0)
+        draw = ImageDraw.Draw(mask)
+        for tri in isl["tris"]:
+            draw.polygon([(x - rect[0], y - rect[1]) for x, y in tri], fill=255, outline=255)
+        pieces.append({"mats": group, "img": img.crop(rect), "mask": mask, "rect": rect, "scale": (w, h),
+                       "logo": False, "verts": isl["verts"]})
+    used = sum((p["rect"][2] - p["rect"][0]) * (p["rect"][3] - p["rect"][1]) for p in pieces)
+    print("ilhas: %d -> %d peças, %.0f%% da textura %dx%d" % (found, len(pieces), 100.0 * used / (w * h), w, h))
+    return pieces
 
 
 def _dilate(img, mask):

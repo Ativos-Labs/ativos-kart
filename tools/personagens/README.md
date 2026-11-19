@@ -1,6 +1,6 @@
-# Jarbas e Henrique — modelos e animações
+# Jarbas, Henrique e Ulysses — modelos e animações
 
-O Jarbas e o Henrique são os pilotos jogáveis de proporção de gente. Ao contrário do
+O Jarbas, o Henrique e o Ulysses são os pilotos jogáveis de proporção de gente. Ao contrário do
 Celerino (folha de papel, braço elástico), eles têm esqueleto estilo Mixamo, textura e
 cotovelos. Esta pasta guarda os modelos originais e os passos que os preparam para o
 jogo. O Godot ignora `tools/` (`.gdignore`).
@@ -9,6 +9,7 @@ jogo. O Godot ignora `tools/` (`.gdignore`).
 |---|---|
 | `originais/jarbas-piloto.glb` | Modelo do Jarbas como veio do Blender: 93 ossos (com controles de IK), 27 texturas da Tripo, 2 logos, 10 animações (`ANIM_Piscar`, `EXP_*`, `POSE_Kart`, `POSE_Moto`) e o volante/guidão de referência das poses |
 | `originais/henrique-piloto.glb` | Modelo do Henrique como veio do Blender: **só as malhas**, em pose T (sem esqueleto e sem animações), 1 textura de 4096 px (+ normal, metal/rugosidade), 2 logos e o volante/guidão de referência |
+| `originais/ulysses-piloto.glb` | Modelo do Ulysses como veio do Blender: esqueleto de 99 ossos (o do Jarbas + 6 auxiliares de cotovelo, joelho e quadril), as mesmas 10 animações do Jarbas, 2 texturas de 4096 px (cabeça da Tripo e corpo), 2 logos e o volante/guidão de referência |
 | `rig_henrique.py` | Passo 0, só do Henrique (Python do Blender + Blender): monta o esqueleto e os pesos e grava `henrique_esqueleto.json` (veja "Henrique: o esqueleto") |
 | `blender_pesos.py` | Roda dentro do Blender, chamado pelo `rig_henrique.py`: pesos automáticos (bone heat) e cores da textura |
 | `henrique_esqueleto.json` | Esqueleto e pesos do Henrique (gerado; o passo 1 lê daqui, sem precisar do Blender) |
@@ -31,7 +32,16 @@ Godot --headless --path . -s res://tools/personagens/gerar_animacoes.gd -- jarba
 python3 tools/personagens/build_personagem.py henrique
 Godot --headless --path . --import
 Godot --headless --path . -s res://tools/personagens/gerar_animacoes.gd -- henrique
+
+# Ulysses
+python3 tools/personagens/build_personagem.py ulysses
+Godot --headless --path . --import
+Godot --headless --path . -s res://tools/personagens/gerar_animacoes.gd -- ulysses
 ```
+
+Personagem novo: o import extrai o atlas sem compressão de VRAM na primeira vez; copie
+as opções de `henrique_atlas.png.import` (`compress/mode=2`, `detect_3d/compress_to=0`)
+para o `.import` do atlas novo e rode o `--import` de novo.
 
 O passo 2 lê o modelo importado e o `celerino.glb` (o do Henrique lê também o
 `jarbas.glb`, de onde vêm as expressões e as poses dele): rode de novo depois de mudar
@@ -46,7 +56,7 @@ Blender -b --factory-startup -P tools/personagens/render_poses.py -- /tmp/poses/
 
 ## Passo 1: `build_personagem.py`
 
-Igual para os dois (o que muda está no início do arquivo, em `CHARACTERS`). No Henrique,
+Igual para todos (o que muda está no início do arquivo, em `CHARACTERS`). No Henrique,
 antes de tudo, entram o esqueleto e os pesos do `henrique_esqueleto.json` (nós dos
 ossos, skin, `JOINTS_0`/`WEIGHTS_0`), e saem as cores de vértice e o segundo UV, que o
 jogo não usa. Materiais que usam a mesma imagem (o corpo e a pele da boca do Henrique)
@@ -266,23 +276,66 @@ marinho e o azul-claro do macacão e do boné trocarem juntos.
 Resultado: 38 mil vértices numa superfície só (o Jarbas tem 29 mil, o Celerino 40 mil);
 o rig custa o mesmo que o do Jarbas (~87 µs por quadro com o kart, M4).
 
+## Ulysses
+
+O modelo do Ulysses veio pronto como o do Jarbas: o mesmo esqueleto estilo Mixamo, as
+mesmas peças (`Boca`, `Olhos`, `Palpebras`, `Mao.L/R`, `Logos_Ativos`) e as mesmas 10
+animações (`EXP_*`, `ANIM_Piscar`, `POSE_Kart`, `POSE_Moto`), feitas para ele. Passos 1 e 2
+como os do Jarbas; o que muda:
+
+- **Ossos auxiliares.** São 6 a mais, com peso no corpo: `Cotovelo_Meio.L/R` (filhos do
+  braço, no lugar do antebraço), `Joelho_Meio.L/R` (filhos da coxa, no lugar da canela) e
+  `Quadril_Meio.L/R` (filhos do quadril, no lugar da coxa). No Blender eles têm uma
+  restrição que copia metade do giro do osso seguinte (medido nas poses do arquivo:
+  exatamente 50%, erro de 0,02°): a pele da dobra gira só a metade e o cotovelo, o
+  joelho e a virilha não murcham. O glb não leva restrições, então o `CharacterRig` refaz
+  esse giro a cada quadro, depois do IK (`follow_bones` e `follow_share` no
+  `ulysses_esqueleto.tres`; `_pose_followers` no rig). Sobram 74 ossos (os 68 do Jarbas
+  + os 6).
+- **Atlas por ilha de UV** (`"islands": True` em `CHARACTERS`). São duas texturas de
+  4096 px: a da cabeça é a textura da Tripo do modelo inteiro original (só 27% dela é
+  usada, em 216 ilhas espalhadas) e a do corpo, refeita (40% usada). Recortadas inteiras,
+  cada uma viraria ~1000 px no atlas de 2048. Recortadas por ilha (os triângulos ligados
+  pelos vértices ou pelo mesmo ponto do UV; ilhas cujos retângulos juntos não ocupam mais
+  que separados viram uma peça), 250 peças entram na escala 0,392 (4096 → 1605 px). Os
+  vãos entre as peças pegam a cor das bordas (senão, de longe, os mipmaps puxariam o preto
+  do fundo para tantas costuras). O Jarbas e o Henrique continuam saindo iguais (sem a
+  opção).
+- **Pegada:** as luvas são a mesma malha das do Jarbas, na escala 0,682 e giradas 5° no
+  espaço do osso da mão (erro médio de 1,9 mm por vértice): `grip_point` e `grip_axis`
+  são os do Jarbas com essa escala e esse giro.
+- **Medidas do assento** na proporção das do Jarbas, medidas no corpo (coxa, quadril até
+  a parte de trás, pé e tornozelo): quadril 0,086 acima do apoio, 0,092 à frente das
+  costas, pé 0,143, tornozelo 0,056.
+
+Em `data/personagens/ulysses.tres`: `kart_scale` 1,4 (o modelo tem 0,93 m; fica com
+1,30 m no kart, como os outros), `showcase_scale` 2,05, retrato `portrait_scale` 2,85 e
+`portrait_offset` −0,7 (a cabeça fica do tamanho e na altura das do Jarbas e do Henrique
+na grade, conferido na build web). Recoloração: referência no azul das faixas do macacão
+(matiz 0,64); o preto e o branco ficam. `idle_stand`: joelhos de 13° a 34°, quadril até o
+pé 99,3% da perna.
+
+Resultado: 61 mil vértices numa superfície só (a cabeça e o corpo da Tripo são bem mais
+densos que os do Jarbas).
+
 ## Pose em cada veículo (`poses_nos_karts.gd`)
 
 Medido em 2026-11-18, mãos com erro 0,0 cm nos 7 veículos e nenhum braço esticado com o
 volante reto. Ângulos de cotovelo e joelho são o ângulo interno (180° = reto); "do aro"
 é a distância do centro do joelho ao aro do volante.
 
-| Veículo | Henrique | Jarbas |
-|---|---|---|
-| Kart Padrão | inclina 21°, desliza 0,11; pés no assoalho, joelho 147°, 14 cm do aro | 21°, 0,11; assoalho, 147°, 16 cm |
-| Relâmpago | 20°, 0; no fundo da "banheira", joelho 147°, 13 cm | 16°, 0; 147°, 15 cm |
-| Kart de Treino | 29°, 0,04; pés nos pedais, joelho 130°, 5 cm (logo abaixo do aro) | 24°, 0,05; assoalho, 147°, 7 cm |
-| Bólido | 21°, 0,03; pés nos pedais, joelho 82° (joelhos altos: o banco fica longe dos pedais para a perna dele) | 21°, 0,02; pedais, 97° |
-| Cometa | 22°, 0,02; pés nos pedais embaixo do painel, joelho 86°, 5 cm do aro | 19°, 0; pedais, 110°, 5 cm |
-| Motoca | 32° (pose da moto); deitado sobre o tanque, a barba encosta no suporte do guidão | 32°, igual (a barba dele também encosta) |
-| Bugre | 24°, 0,12; pés nos pedais, joelho 145°, 7 cm do manche | 21°, 0,13; assoalho, 147°, 11 cm |
+| Veículo | Henrique | Jarbas | Ulysses (2026-11-19) |
+|---|---|---|---|
+| Kart Padrão | inclina 21°, desliza 0,11; pés no assoalho, joelho 147°, 14 cm do aro | 21°, 0,11; assoalho, 147°, 16 cm | 21°, 0,09; assoalho, 147°, 17 cm |
+| Relâmpago | 20°, 0; no fundo da "banheira", joelho 147°, 13 cm | 16°, 0; 147°, 15 cm | 15°, 0; 147°, 17 cm |
+| Kart de Treino | 29°, 0,04; pés nos pedais, joelho 130°, 5 cm (logo abaixo do aro) | 24°, 0,05; assoalho, 147°, 7 cm | 21°, 0,05; assoalho, 147°, 7 cm |
+| Bólido | 21°, 0,03; pés nos pedais, joelho 82° (joelhos altos: o banco fica longe dos pedais para a perna dele) | 21°, 0,02; pedais, 97° | 21°, 0,01; pedais, 114°, 26 cm |
+| Cometa | 22°, 0,02; pés nos pedais embaixo do painel, joelho 86°, 5 cm do aro | 19°, 0; pedais, 110°, 5 cm | 18°, 0; pedais, 127°, 6 cm |
+| Motoca | 32° (pose da moto); deitado sobre o tanque, a barba encosta no suporte do guidão | 32°, igual (a barba dele também encosta) | 22° (pose da moto); a barba também encosta no suporte |
+| Bugre | 24°, 0,12; pés nos pedais, joelho 145°, 7 cm do manche | 21°, 0,13; assoalho, 147°, 11 cm | 21°, 0,10; assoalho, 147°, 13 cm |
 
 Com o volante todo virado (0,85 rad), o braço de fora estica no Kart Padrão (1,38) e no
 Bólido (1,33): o volante desses dois fica longe e baixo. O Jarbas estica mais (1,46 e
-1,38); nos outros veículos nenhum dos dois estica. Na Motoca, o guidão é largo (manoplas
+1,38) e o Ulysses um pouco mais que o Henrique (1,40 e 1,32); nos outros veículos
+nenhum deles estica. Na Motoca, o guidão é largo (manoplas
 a 42 cm do meio) e o selim não deixa deslizar: só deitando o tronco os braços alcançam.
