@@ -61,6 +61,17 @@ func device_name() -> String:
 	return device_label(device)
 
 
+## De que aparelho veio o evento: o id do controle, DEVICE_KEYBOARD para teclado e
+## mouse ou DEVICE_ALL quando não dá para saber (toque na tela...). As ações `ui_*`
+## que o MenuInput manda pelo analógico levam o id do controle.
+static func event_device(event: InputEvent) -> int:
+	if event is InputEventJoypadButton or event is InputEventJoypadMotion or event is InputEventAction:
+		return event.device
+	if event is InputEventKey or event is InputEventMouse or event is InputEventGesture:
+		return DEVICE_KEYBOARD
+	return DEVICE_ALL
+
+
 static func device_label(id: int) -> String:
 	if id == DEVICE_ALL:
 		return "Teclado e controles"

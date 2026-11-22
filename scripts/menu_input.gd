@@ -33,6 +33,10 @@ const ACTIONS := {
 
 ## O último aparelho usado foi um controle (e não teclado ou mouse).
 var using_pad := false
+## Só este aparelho mexe nos menus agora (PlayerSlot: id do controle ou
+## DEVICE_KEYBOARD); DEVICE_ALL = qualquer um. O menu de pausa liga no multijogador,
+## para só quem pausou mexer nele (quem barra os outros eventos é o próprio menu).
+var exclusive_device := PlayerSlot.DEVICE_ALL
 
 ## Direção segurada em cada controle (id do controle -> _Held).
 var _held := {}
@@ -126,7 +130,18 @@ func _on_joy_connection_changed(device: int, connected: bool) -> void:
 	_held.erase(device)
 
 
+## O evento vem de quem pode mexer nos menus agora (ver `exclusive_device`).
+func accepts(event: InputEvent) -> bool:
+	if exclusive_device == PlayerSlot.DEVICE_ALL:
+		return true
+	var from := PlayerSlot.event_device(event)
+	return from == PlayerSlot.DEVICE_ALL or from == exclusive_device
+
+
 func _on_window_input(event: InputEvent) -> void:
+	# Os outros jogadores mexendo no controle não trocam as dicas de botões da tela.
+	if not accepts(event):
+		return
 	var pad := using_pad
 	if event is InputEventJoypadButton:
 		pad = pad or event.pressed

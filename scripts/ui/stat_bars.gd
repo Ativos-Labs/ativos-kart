@@ -15,6 +15,9 @@ const MAX_VALUE := 5.0
 @export var dark_text := true
 @export var row_height := 36.0
 @export var label_width := 150.0
+## Largura mínima das barras (menor nos cartões do multijogador).
+@export var bar_min_width := 220.0
+@export var font_size := 19
 
 var _values := {}
 var _targets := {}
@@ -28,7 +31,7 @@ func _ready() -> void:
 
 
 func _get_minimum_size() -> Vector2:
-	return Vector2(label_width + 220.0, row_height * ROWS.size())
+	return Vector2(label_width + bar_min_width, row_height * ROWS.size())
 
 
 func set_stats(stats: Dictionary, animate := true) -> void:
@@ -56,7 +59,7 @@ func _process(delta: float) -> void:
 
 func _draw() -> void:
 	var font: Font = UiKit.FONT_BODY
-	var fs := 19
+	var fs := font_size
 	var text_color := UiKit.INK if dark_text else Color.WHITE
 	var bar_x := label_width
 	var bar_w := size.x - label_width - 6.0

@@ -237,6 +237,7 @@ func _build_grid() -> void:
 		else:
 			humans.append(r)
 	humans.sort_custom(func(a: Racer, b: Racer): return a.slot.index < b.slot.index)
+	pause_menu.players.assign(humans.map(func(r: Racer): return r.slot))
 	player = humans[0]
 	kart = player.kart
 	for r in humans:
@@ -1123,9 +1124,8 @@ func _next_race() -> void:
 	GameState.goto_scene(GameState.SCENE_RACE)
 
 
-## Trocar piloto ou kart: todos os jogadores escolhem de novo, um depois do outro.
+## Trocar piloto ou kart: todos os jogadores escolhem de novo (ao mesmo tempo).
 func _change_selection(scene: String) -> void:
-	GameState.picking_player = 0
 	GameState.goto_scene(scene)
 
 

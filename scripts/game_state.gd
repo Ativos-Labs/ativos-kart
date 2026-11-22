@@ -101,8 +101,6 @@ var speed_class := 1
 var cpu_enabled := true
 ## Jogadores humanos (1 a 4). O primeiro é o J1.
 var players: Array[PlayerSlot] = [PlayerSlot.new()]
-## Jogador escolhendo agora nas telas de piloto e de kart (uma vez cada um).
-var picking_player := 0
 ## Copa em andamento (null fora do Grand Prix).
 var grand_prix: GrandPrix
 
@@ -304,7 +302,6 @@ func set_players(devices: Array[int]) -> void:
 			slot.glider_index = old[i].glider_index
 		slot.apply_input_map()
 		players.append(slot)
-	picking_player = 0
 	_tinted.clear()
 
 

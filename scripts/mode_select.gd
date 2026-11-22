@@ -2,7 +2,7 @@ extends Control
 ## Tela "Modo de jogo": Grand Prix, Corrida ou Contra-relógio, quantos jogadores (até
 ## 4, um por controle conectado mais o teclado), cilindrada (50/100/150cc),
 ## dificuldade e adversários. Com 2 ou mais jogadores o painel "Quem vai jogar?"
-## pergunta qual controle é de quem; depois cada um escolhe piloto e kart.
+## pergunta qual controle é de quem; depois todos escolhem piloto, kart e asa ao mesmo tempo.
 
 const MODES := [
 	{

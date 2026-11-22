@@ -203,10 +203,23 @@ Opções da mesma tela:
 Até 4 pessoas na mesma tela, cada uma com um controle (o teclado conta como um). Com 2
 ou mais jogadores, depois de "Continuar" aparece o painel **Quem vai jogar?**: cada um aperta
 **A** (ou Start) no próprio controle — ou **Enter** no teclado — e fica com a próxima vaga
-(J1 azul, J2 vermelho, J3 verde, J4 amarelo). **B/Esc** sai da vaga. Daí cada jogador escolhe
-o piloto e o kart na sua vez (a etiqueta "J2" aparece no topo); quem repete um piloto já
-escolhido corre com ele recolorido na cor do jogador, e o adversário do computador dessa
-cor fica de fora da corrida.
+(J1 azul, J2 vermelho, J3 verde, J4 amarelo). **B/Esc** sai da vaga. Daí todos escolhem
+piloto, kart e asa-delta **ao mesmo tempo**, cada um no próprio controle:
+
+- **Pilotos:** a grade fica no meio e cada jogador tem um cursor na cor dele (etiqueta
+  J1/J2/J3/J4 num canto do quadradinho); o cartão de cada um, nos cantos da tela, mostra o
+  piloto dele no palco, o nome e os atributos.
+- **Karts e asas:** um cartão por jogador (lado a lado com 2, quadrantes com 3 ou 4), com
+  o kart dele girando no palco; **←/→** troca.
+- **A/Enter** confirma (selo "PRONTO!" e aro amarelo), **B/Esc** desfaz; B de quem ainda
+  não confirmou volta para a tela anterior. Quando todos confirmam, a tela segue sozinha.
+  O mouse vale pelo jogador do teclado (ou pelo J1): clique no quadradinho ou nas setas, e
+  no palco do próprio cartão para confirmar.
+- Quem repete um piloto já escolhido por um jogador anterior corre com ele recolorido na
+  cor do jogador, e o adversário do computador dessa cor fica de fora da corrida.
+- Cada cartão tem o próprio mundo 3D (`PickStage`, uma SubViewport no tamanho real do
+  cartão); a janela principal desliga o 3D nessas telas. A entrada de cada controle e o
+  "todos prontos" ficam no `MultiPick`.
 
 - **2 jogadores:** uma tela em cima da outra (a câmera fica mais afastada nessa faixa larga).
 - **3 ou 4:** quatro quadrantes; com 3, o quarto mostra o mapa grande da pista.
@@ -216,7 +229,11 @@ cor fica de fora da corrida.
 - O elástico dos adversários se mede pelo jogador mais adiantado.
 - A corrida acaba quando todos os jogadores chegam; depois que o primeiro chega, quem falta
   tem 30 s (contagem na tela). Quem não chegou ganha um tempo estimado.
-- Se o controle de alguém desconecta no meio da corrida, o jogo pausa.
+- Só quem pausou mexe na pausa (e nos painéis de Controles e Opções dentro dela); uma
+  etiqueta "J2 pausou" ao lado do título mostra quem é. Os outros controles, o teclado e o
+  mouse ficam de fora até a pausa fechar.
+- Se o controle de alguém desconecta no meio da corrida, o jogo pausa, e aí qualquer um
+  mexe (o mesmo vale se o controle de quem pausou desconecta).
 - No navegador o controle só aparece depois de apertar um botão nele.
 - No navegador (WebGL) 2 jogadores rodam a ~90 fps e 4 jogadores a ~70 fps num MacBook M4
   (medido sem o limite de 60 fps); numa máquina mais fraca o 4 jogadores fica perto de 30.
