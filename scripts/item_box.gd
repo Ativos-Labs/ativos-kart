@@ -14,17 +14,20 @@ signal collected(kart: Node3D)
 const SHADER := preload("res://shaders/item_box.gdshader")
 const INNER_SHADER := preload("res://shaders/item_box_inner.gdshader")
 const LOGO_ICON := preload("res://assets/logos/ativos_icone.png")
-## Aresta do cubo e chanfro das quinas (m).
-const SIZE := 1.4
-const BEVEL := 0.12
+## Aresta do cubo e chanfro das quinas (m). As medidas foram feitas para os karts de antes
+## do encaixe piloto × kart e encolheram com eles (KartScale.ITEMS).
+const SIZE := 1.4 * KartScale.ITEMS
+const BEVEL := 0.12 * KartScale.ITEMS
 ## Altura do centro da caixa acima do asfalto (m).
-const FLOAT_HEIGHT := 1.3
+const FLOAT_HEIGHT := 1.3 * KartScale.ITEMS
+## Largura (e comprimento) da área de toque (m).
+const TOUCH_SIZE := 1.9 * KartScale.ITEMS
 ## Tempo até a caixa voltar depois de pega (s).
 const RESPAWN_TIME := 2.5
 ## Pedaços do estouro: quantidade, duração (s) e gravidade.
 const SHARD_COUNT := 9
 const SHARD_LIFE := 0.6
-const SHARD_GRAVITY := 16.0
+const SHARD_GRAVITY := 16.0 * KartScale.ITEMS
 
 ## false enquanto a caixa está estourada (esperando para voltar).
 var active := true
@@ -61,13 +64,15 @@ func setup(mesh: Mesh, shadow_mesh: Mesh, with_collision: bool, ground_tilt := 0
 		_area = Area3D.new()
 		_area.name = "Toque"
 		# Área do chão até acima da caixa (o kart é baixo: uma esfera na altura da
-		# caixa quase não o alcançaria). 1,9 m de largura: com as caixas a 3,6 m uma
-		# da outra, a fileira toda pega o kart (1,8 m de largura) em qualquer ponto.
+		# caixa quase não o alcançaria). Com as caixas a Track.ITEM_BOX_SPACING uma da
+		# outra, a fileira toda pega qualquer kart (0,7 m de largura ou mais) em qualquer
+		# ponto.
 		var shape := BoxShape3D.new()
-		shape.size = Vector3(1.9, FLOAT_HEIGHT + 1.2, 1.9)
+		var top := 1.2 * KartScale.ITEMS
+		shape.size = Vector3(TOUCH_SIZE, FLOAT_HEIGHT + top, TOUCH_SIZE)
 		var col := CollisionShape3D.new()
 		col.shape = shape
-		col.position.y = (1.2 - FLOAT_HEIGHT) * 0.5
+		col.position.y = (top - FLOAT_HEIGHT) * 0.5
 		_area.add_child(col)
 		_area.body_entered.connect(_on_body_entered)
 		add_child(_area)
@@ -145,7 +150,7 @@ func _spawn_shards(push: Vector3) -> void:
 	var carry := global_basis.inverse() * Vector3(push.x, 0.0, push.z) * 0.7
 	for i in SHARD_COUNT:
 		var dir := Vector3(randf_range(-1.0, 1.0), randf_range(0.25, 1.0), randf_range(-1.0, 1.0)).normalized()
-		_shard_vel[i] = dir * randf_range(4.5, 8.0) + carry
+		_shard_vel[i] = dir * randf_range(4.5, 8.0) * KartScale.ITEMS + carry
 		_shard_size[i] = randf_range(0.16, 0.28)
 		var shard := _shards[i]
 		shard.position = dir * SIZE * 0.25
@@ -249,6 +254,7 @@ static func make_material(upside_down := false) -> ShaderMaterial:
 	var aspect := float(LOGO_ICON.get_width()) / LOGO_ICON.get_height()
 	for m: ShaderMaterial in [front, back]:
 		m.set_shader_parameter("logo", LOGO_ICON)
+		m.set_shader_parameter("bob", 0.1 * KartScale.ITEMS)
 		m.set_shader_parameter("logo_aspect", aspect)
 		m.set_shader_parameter("upside_down", upside_down)
 	return front
@@ -272,6 +278,6 @@ static func make_shadow_mesh() -> PlaneMesh:
 	mat.albedo_color = Color(0.02, 0.03, 0.08, 0.4)
 	mat.albedo_texture = tex
 	var plane := PlaneMesh.new()
-	plane.size = Vector2(1.9, 1.9)
+	plane.size = Vector2.ONE * TOUCH_SIZE
 	plane.material = mat
 	return plane

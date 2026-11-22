@@ -16,6 +16,11 @@ const LOGO_ICON := preload("res://assets/logos/ativos_icone.png")
 const WORDMARK := preload("res://assets/logos/ativos_marca.png")
 const WORDMARK_DARK := preload("res://assets/logos/ativos_marca_branca.png")
 
+## Distância máxima entre as caixas de item de uma fileira (m): com a área de toque delas
+## (ItemBox.TOUCH_SIZE), a fileira não deixa vão por onde um kart de 0,7 m passe sem pegar
+## nenhuma.
+const ITEM_BOX_SPACING := 1.7
+
 @export var track_id := "circuito_ativos"
 @export var track_name := "Circuito Ativos"
 
@@ -54,7 +59,7 @@ const WORDMARK_DARK := preload("res://assets/logos/ativos_marca_branca.png")
 		item_rows = value
 		_queue_rebuild()
 ## Caixas em cada fileira, espalhadas na largura do asfalto.
-@export_range(1, 6) var item_boxes_per_row := 4:
+@export_range(1, 6) var item_boxes_per_row := 6:
 	set(value):
 		item_boxes_per_row = value
 		_queue_rebuild()
@@ -970,7 +975,7 @@ func _build_item_boxes() -> void:
 	_generated.add_child(holder)
 	var count := item_boxes_per_row
 	var usable := road_width - 2.0 * curb_min_width - ItemBox.SIZE - 0.6
-	var spacing := minf(3.6, usable / maxf(count - 1, 1))
+	var spacing := minf(ITEM_BOX_SPACING, usable / maxf(count - 1, 1))
 	for frac in item_rows:
 		var d := wrapf(frac, 0.0, 1.0) * length
 		var dir := get_direction_at(d)

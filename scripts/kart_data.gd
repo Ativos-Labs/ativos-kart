@@ -3,8 +3,26 @@ extends Resource
 ## Dados de um kart: modelo 3D, ajustes de escala e atributos.
 ## Para criar um kart novo: duplique res://data/karts/standard_kart.tres,
 ## troque o modelo e os atributos, e adicione-o na lista em GameState.
+##
+## Tamanho: padrão "Encaixe piloto × kart". Os pilotos (Jarbas, Henrique, Ulysses) nunca
+## mudam de escala: o veículo é que se ajusta a eles, pela distância do assento
+## (`seat_point`) ao centro do volante (`steering_wheel_center`), igual à do kart de
+## referência (o Kart Padrão, com o modelo original na escala 0,06). Kart novo: meça o
+## assento e rode tools/karts/encaixe_karts.py, que escala o modelo e todas as medidas
+## deste recurso (veja "Encaixe piloto × kart" no README do jogo).
 
 const STAT_KEYS := ["speed", "acceleration", "handling", "weight"]
+
+## Kart de referência do encaixe (espaço do kart: frente = -Z, Y para cima, em metros):
+## S · assento (vinco entre o fundo do banco e o encosto, na linha central) e W · centro
+## do volante. Com o piloto em escala 1 e a origem dele na origem do kart, a POSE_Kart
+## põe o quadril sobre S e as mãos no aro em volta de W (aro de Ø 0,217 m na linha de
+## pega, inclinado 59°, mãos a 70° do topo).
+const REF_SEAT := Vector3(0.0, 0.111, 0.118)
+const REF_WHEEL := Vector3(0.0, 0.307, -0.196)
+## Na moto (POSE_Moto, média dos pilotos): o selim embaixo do quadril e o meio do guidão.
+const REF_SADDLE := Vector3(0.0, 0.282, 0.030)
+const REF_BAR := Vector3(0.0, 0.502, -0.326)
 
 @export var display_name := "Kart"
 @export_multiline var description := ""
@@ -13,7 +31,7 @@ const STAT_KEYS := ["speed", "acceleration", "handling", "weight"]
 
 @export_group("Modelo 3D")
 @export var model_scene: PackedScene
-## Escala aplicada ao modelo (o kart deve ficar com ~2,4 m de comprimento).
+## Escala aplicada ao modelo (sai do encaixe: tools/karts/encaixe_karts.py).
 @export var model_scale := 1.0
 ## Rotação do modelo. A frente do kart precisa apontar para -Z.
 @export var model_rotation_degrees := Vector3(0, 180, 0)
@@ -53,7 +71,12 @@ const STAT_KEYS := ["speed", "acceleration", "handling", "weight"]
 @export var rear_wheel_radius := 0.27
 
 @export_group("Piloto e volante")
-## Ponto do banco onde fica a base do corpo do piloto (espaço do kart, frente = -Z).
+## S · assento do encaixe: ponto da linha central onde o fundo do banco encontra o encosto
+## (o vinco), no espaço do kart (frente = -Z). Na moto, o ponto do selim embaixo do
+## quadril. Os pilotos do padrão entram com a origem em driver_origin().
+@export var seat_point := Vector3.ZERO
+## Ponto do banco onde fica a base do corpo do Celerino e dos adversários (espaço do
+## kart, frente = -Z). Os pilotos do padrão usam seat_point.
 @export var seat_position := Vector3(0, 0.33, 0.3)
 ## Nós do volante dentro do modelo (giram quando o kart vira).
 @export var steering_wheel_nodes := PackedStringArray()
@@ -67,6 +90,11 @@ const STAT_KEYS := ["speed", "acceleration", "handling", "weight"]
 ## Posição das mãos no aro, em graus a partir do topo (70 ≈ "10 e 2", 90 = "9 e 3",
 ## nas barras laterais de um manche).
 @export var hand_angle := 70.0
+## Onde fica o tornozelo DIREITO dos pilotos do padrão (espaço do kart; o esquerdo é o
+## espelho em X), em veículos cujo painel ou capô é mais baixo que o do kart de
+## referência: as pernas da POSE_Kart (joelhos altos) atravessariam a carenagem, então
+## esticam por IK até aqui, com o quadril onde a pose deixou. Zero = pernas da pose.
+@export var foot_point := Vector3.ZERO
 ## Pegada que não fica num aro (guidão de moto): ponto da manopla onde a mão DIREITA
 ## segura, no espaço do kart. A esquerda é o espelho em volta do centro do volante.
 ## Zero = as mãos seguram o aro (raio + ângulo acima).
@@ -108,6 +136,18 @@ func get_exhausts() -> Array[KartExhaust]:
 	fallback.position = Vector3(0, 0.45, 1.15)
 	fallback.radius = 0.08
 	return [fallback]
+
+
+## Origem do piloto do padrão "Encaixe piloto × kart" no espaço do kart: o assento menos
+## o assento de referência (o piloto entra em escala 1, sem giro além de virar para a
+## frente, e a pose sentada leva o corpo até o banco e as mãos até o volante).
+func driver_origin() -> Vector3:
+	return seat_point - (REF_SADDLE if is_bike() else REF_SEAT)
+
+
+## Moto (deita nas curvas, piloto na POSE_Moto).
+func is_bike() -> bool:
+	return turn_lean_degrees > 0.0
 
 
 ## Medidas do cockpit para o CharacterRig (vazio = sem medida). Espaço do kart.

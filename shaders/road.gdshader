@@ -28,13 +28,15 @@ float box(vec2 p, vec2 center, vec2 half_size, float aa) {
 	return 1.0 - smoothstep(-aa, aa, dist);
 }
 
-// Marca de posição de largada ("U" aberto para trás).
+// Marca de posição de largada ("U" aberto para trás), do tamanho dos karts do encaixe
+// piloto × kart (0,55 das medidas de antes: KartScale.ITEMS).
 float grid_slot(vec2 q, vec2 slot, float aa) {
-	float w = 1.5;
-	float t = 0.08;
-	float m = box(q, slot + vec2(0.0, 1.75), vec2(w, t), aa);
-	m = max(m, box(q, slot + vec2(-w, 1.0), vec2(t, 0.75), aa));
-	m = max(m, box(q, slot + vec2(w, 1.0), vec2(t, 0.75), aa));
+	float k = 0.55;
+	float w = 1.5 * k;
+	float t = 0.08 * k;
+	float m = box(q, slot + vec2(0.0, 1.75 * k), vec2(w, t), aa);
+	m = max(m, box(q, slot + vec2(-w, 1.0 * k), vec2(t, 0.75 * k), aa));
+	m = max(m, box(q, slot + vec2(w, 1.0 * k), vec2(t, 0.75 * k), aa));
 	return m;
 }
 

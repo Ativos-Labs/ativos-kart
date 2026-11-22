@@ -9,8 +9,8 @@ extends Node3D
 const SHADER := preload("res://shaders/julgado.gdshader")
 ## Martelo: raio da volta (m, além da metade do kart), altura, voltas por segundo e
 ## a cada quanto tempo (s) ele bate.
-const ORBIT := 0.9
-const ORBIT_HEIGHT := 1.05
+const ORBIT := 0.9 * KartScale.ITEMS
+const ORBIT_HEIGHT := 1.05 * KartScale.ITEMS
 const ORBIT_SPEED := 0.55
 const KNOCK_EVERY := 0.9
 const SPARKS := 12
@@ -46,7 +46,7 @@ var _radius := 1.6
 func build(k: Kart) -> void:
 	name = "TransitoEmJulgado"
 	kart = k
-	var size := k.hitbox_size if k.hitbox_size != Vector3.ZERO else Vector3(1.8, 1.2, 2.4)
+	var size := k.hitbox_size if k.hitbox_size != Vector3.ZERO else Vector3(1.8, 1.2, 2.4) * KartScale.ITEMS
 	_radius = maxf(size.x, size.z) * 0.5 + ORBIT
 	_mat = _get_aura_material().duplicate() as ShaderMaterial
 	_smat = _get_spark_material().duplicate() as ShaderMaterial
@@ -56,7 +56,7 @@ func build(k: Kart) -> void:
 	_floor = MeshInstance3D.new()
 	_floor.name = "BrilhoChao"
 	var plane := PlaneMesh.new()
-	plane.size = Vector2.ONE * (_radius * 2.0 + 0.6)
+	plane.size = Vector2.ONE * (_radius * 2.0 + 0.6 * KartScale.ITEMS)
 	_floor.mesh = plane
 	_floor.material_override = _fmat
 	_floor.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -71,8 +71,8 @@ func build(k: Kart) -> void:
 	_aura.material_override = _mat
 	_aura.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	# Esfera achatada envolvendo o kart e o piloto.
-	_aura.scale = Vector3(size.x * 0.5 + 0.65, size.y * 0.5 + 0.85, size.z * 0.5 + 0.6)
-	_aura.position = Vector3(0.0, size.y * 0.5 + 0.25, 0.0)
+	_aura.scale = Vector3(size.x * 0.5, size.y * 0.5, size.z * 0.5) + Vector3(0.65, 0.85, 0.6) * KartScale.ITEMS
+	_aura.position = Vector3(0.0, size.y * 0.5 + 0.25 * KartScale.ITEMS, 0.0)
 	add_child(_aura)
 	_orbit = Node3D.new()
 	_orbit.name = "Volta"
@@ -88,8 +88,9 @@ func build(k: Kart) -> void:
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		_gavel.add_child(mi)
 	_gavel.position = Vector3(_radius, ORBIT_HEIGHT, 0.0)
+	_gavel.scale = Vector3.ONE * KartScale.ITEMS
 	var quad := QuadMesh.new()
-	quad.size = Vector2.ONE * 0.7
+	quad.size = Vector2.ONE * 0.7 * KartScale.ITEMS
 	_spark_t.resize(SPARKS)
 	for i in SPARKS:
 		var spark := MeshInstance3D.new()
@@ -149,7 +150,7 @@ func _physics_process(delta: float) -> void:
 		var k := fmod(_spark_t[i] + _t * 0.7, 1.0)
 		var a := TAU * i / SPARKS + _t * 1.3
 		var r := _radius * lerpf(0.75, 0.45, k)
-		_sparks[i].position = Vector3(cos(a) * r, 0.2 + k * 2.2, sin(a) * r)
+		_sparks[i].position = Vector3(cos(a) * r, (0.2 + k * 2.2) * KartScale.ITEMS, sin(a) * r)
 		_sparks[i].scale = Vector3.ONE * sin(k * PI) * lerpf(0.6, 1.1, float(i % 3) / 2.0)
 	if left <= 0.0 and _fade <= 0.0:
 		visible = false
@@ -189,7 +190,7 @@ func prewarm(on: bool) -> void:
 		_fmat.set_shader_parameter("fade", 1.0)
 		_omat.set_shader_parameter("fade", 1.0)
 		for i in SPARKS:
-			_sparks[i].position = Vector3(cos(i) * _radius, 1.0, sin(i) * _radius)
+			_sparks[i].position = Vector3(cos(i) * _radius, 1.0 * KartScale.ITEMS, sin(i) * _radius)
 			_sparks[i].scale = Vector3.ONE
 	_gild(on)
 

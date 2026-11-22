@@ -71,6 +71,11 @@ var hand_target_r := Vector3.ZERO
 var hand_grip_l := Vector3.UP
 var hand_grip_r := Vector3.UP
 var has_hand_targets := false
+## Alvos dos tornozelos no espaço do nó pai (KartData.foot_point): as pernas esticam por
+## IK até eles, com o quadril e o plano do joelho da pose sentada.
+var foot_target_l := Vector3.ZERO
+var foot_target_r := Vector3.ZERO
+var has_foot_targets := false
 ## Medidas do banco e do assoalho do kart (KartData.cockpit(), espaço do nó pai). Com
 ## `skeleton_data.fit_seat`, a pose sentada é montada a partir delas.
 var cockpit := {}:
@@ -810,6 +815,8 @@ func _process(delta: float) -> void:
 			_fit_seat()
 		elif skeleton_data.drive_pose == &"":
 			_pose_legs()
+		if has_foot_targets and not _bike:
+			_pose_legs_to_targets()
 		_pose_arms(delta)
 		if not fit:
 			_update_bounce(delta)
@@ -1074,6 +1081,43 @@ func _rotate_global(i: int, rotation_basis: Basis) -> void:
 	_rot[i] = Quaternion(parent_basis.inverse() * rotation_basis * parent_basis).normalized() * _rot[i]
 
 
+## Pernas esticadas até os alvos dos tornozelos (foot_target_l/r): IK de dois ossos a
+## partir do quadril da pose, com o joelho dobrando no mesmo plano em que dobra na pose. O
+## pé mantém o giro que tinha em relação à canela (na POSE_Kart, apoiado nos pedais).
+func _pose_legs_to_targets() -> void:
+	var to_skel := _parent_to_skeleton()
+	for side in 2:
+		var chain := _leg_chain[side]
+		var upleg := chain[0]
+		var leg := chain[1]
+		var foot := chain[2]
+		if upleg < 0 or leg < 0 or foot < 0:
+			continue
+		var parent_g := _global(_parent[upleg]) if _parent[upleg] >= 0 else Transform3D.IDENTITY
+		var upper_g := parent_g * _local(upleg)
+		var hip := upper_g.origin
+		var knee_now := (upper_g * _local(leg)).origin
+		var ankle := to_skel * (foot_target_l if side == 0 else foot_target_r)
+		var a := _rest_pos[leg].length()
+		var b := _rest_pos[foot].length()
+		var to := ankle - hip
+		var dist := maxf(to.length(), 1e-5)
+		var dir := to / dist
+		var pole := (knee_now - hip) - dir * (knee_now - hip).dot(dir)
+		if pole.length_squared() < 1e-8:
+			pole = to_skel.basis * Vector3.UP
+		pole = pole.normalized()
+		var knee := hip + dir * a
+		if dist < (a + b) * 0.9995:
+			var cos_a := clampf((a * a + dist * dist - b * b) / (2.0 * a * dist), -1.0, 1.0)
+			knee = hip + (dir * cos_a + pole * sqrt(1.0 - cos_a * cos_a)) * a
+		else:
+			ankle = hip + dir * (a + b) * 0.9995
+		_aim_in(upleg, parent_g.basis.orthonormalized(), knee - hip)
+		upper_g = parent_g * _local(upleg)
+		_aim_in(leg, upper_g.basis.orthonormalized(), ankle - (upper_g * _local(leg)).origin)
+
+
 func _pose_legs() -> void:
 	for side in 2:
 		var thigh := _leg_bones[side * 2]
@@ -1272,6 +1316,9 @@ func _arm_ik_bend(side: int, target: Vector3, thumb: Vector3, weight: float) -> 
 	var mirror := Vector3(1.0 if side == 0 else -1.0, 1.0, 1.0)
 	var grip := sd.grip_point * mirror
 	var bar := (sd.grip_axis * mirror).normalized()
+	if side == 1 and sd.grip_axis_right != Vector3.ZERO:
+		grip = sd.grip_point_right
+		bar = sd.grip_axis_right.normalized()
 	var neutral := _neutral_hand[side]
 	var a := _rest_pos[fore].length()
 	var b := _rest_pos[hand].length()

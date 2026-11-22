@@ -10,7 +10,7 @@ const BACK_TEX := preload("res://assets/textures/itens/intimacao_verso.png")
 ## Tamanho do envelope (m, proporção das texturas 512 x 352) e altura do centro acima do
 ## chão (m).
 const SIZE := Vector2(1.1, 1.1 * 352.0 / 512.0)
-const HOVER := 1.0
+const HOVER := 1.0 * KartScale.ITEMS
 
 static var _front: QuadMesh
 static var _back: QuadMesh

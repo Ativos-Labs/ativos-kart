@@ -38,10 +38,10 @@ const STAMP_SPEED := 1.55
 const STAMP_MIN_SPEED := 36.0
 const STAMP_LIFE := 7.0
 const STAMP_BOUNCES := 5
-const STAMP_RADIUS := 1.45
+const STAMP_RADIUS := 1.45 * KartScale.ITEMS
 const SAFE_TIME := 0.6
 ## Folga (m) entre a mureta e o tiro quando ele bate.
-const WALL_MARGIN := 0.6
+const WALL_MARGIN := 0.6 * KartScale.ITEMS
 ## Marca "INDEFERIDO" atrás do kart: tempo na tela (s).
 const MARK_TIME := 4.5
 ## Intimação: velocidade (× a máxima de quem jogou, mínimo m/s), quanto mais rápida que o
@@ -52,7 +52,7 @@ const ENVELOPE_MIN_SPEED := 36.0
 const ENVELOPE_CATCH := 12.0
 const ENVELOPE_LIFE := 10.0
 const HOMING_GAP := 18.0
-const ENVELOPE_RADIUS := 1.5
+const ENVELOPE_RADIUS := 1.5 * KartScale.ITEMS
 ## PEC: velocidade (m/s, e quanto mais rápida que o líder), altura do voo, altura e
 ## distância à frente dele (m) onde ela para — baixa o bastante para a câmera do líder
 ## ver —, tempos (s) parada em cima, caindo, em cima do kart e subindo,
@@ -60,14 +60,14 @@ const ENVELOPE_RADIUS := 1.5
 const PEC_SPEED := 62.0
 const PEC_CATCH := 22.0
 const PEC_HEIGHT := 11.0
-const PEC_HOVER_HEIGHT := 5.0
-const PEC_HOVER_AHEAD := 3.5
+const PEC_HOVER_HEIGHT := 5.0 * KartScale.CAMERA
+const PEC_HOVER_AHEAD := 3.5 * KartScale.CAMERA
 const PEC_HOVER_TIME := 0.9
 const PEC_DROP_TIME := 0.24
 const PEC_STAY_TIME := 0.45
 const PEC_RISE_TIME := 0.7
 const PEC_PARCELS := 6
-const PEC_SPLASH := 6.5
+const PEC_SPLASH := 6.5 * KartScale.ITEMS
 ## Calculadora: arremesso (m/s para a frente além de 65% da velocidade do kart, e para cima),
 ## gravidade (m/s²), pavio (s, do arremesso ao estouro), tempo até ela poder estourar num
 ## kart (s) e até poder estourar em quem jogou (s), raio de contato e da explosão (m),
@@ -78,8 +78,8 @@ const CALC_GRAVITY := 28.0
 const CALC_FUSE := 3.4
 const CALC_ARM := 0.35
 const CALC_OWNER_SAFE := 1.2
-const CALC_RADIUS := 1.5
-const BLAST_RADIUS := 7.0
+const CALC_RADIUS := 1.5 * KartScale.ITEMS
+const BLAST_RADIUS := 7.0 * KartScale.ITEMS
 const BLAST_LIFT := 9.0
 ## Armadilhas: quantas no máximo na pista (a mais velha some), vida (s), tempo até
 ## pegarem alguém (s) e até pegarem quem largou (s), raio de toque (m) da pilha e da caixa
@@ -88,8 +88,8 @@ const TRAP_MAX := 14
 const TRAP_LIFE := 80.0
 const TRAP_ARM := 0.2
 const TRAP_OWNER_SAFE := 0.9
-const TRAP_RADIUS := 1.45
-const FAKE_RADIUS := 1.65
+const TRAP_RADIUS := 1.45 * KartScale.ITEMS
+const FAKE_RADIUS := 1.65 * KartScale.ITEMS
 const TRAP_TOSS := Vector2(3.0, 3.5)
 ## Pendência documental: fração da velocidade que sobra para quem escorrega.
 const SLIP_SLOW := 0.4
@@ -97,7 +97,7 @@ const SLIP_SLOW := 0.4
 const QUEUE_TIME := 2.4
 ## Liminar: raio da onda (m), até que altura (m) ela derruba a PEC e o empurrão (m/s)
 ## em quem está perto (some com a distância).
-const LIMINAR_RADIUS := 7.0
+const LIMINAR_RADIUS := 7.0 * KartScale.ITEMS
 const LIMINAR_REACH_UP := 14.0
 const LIMINAR_PUSH := 10.0
 ## Até onde (m) um jogador ouve os tiros (mais baixo quanto mais longe).
@@ -202,7 +202,7 @@ func throw_stamp(h: RaceItems.Holder, backward: bool, target: RaceItems.Holder =
 	if target:
 		dir = _lead_dir(k.global_position, target.kart, s.speed, dir)
 	s.dir = dir
-	s.pos = k.global_position + dir * 2.4 + Vector3.UP * CarimboIndeferido.HOVER
+	s.pos = k.global_position + dir * 2.4 * KartScale.ITEMS + Vector3.UP * CarimboIndeferido.HOVER
 	_show(s)
 	_sound_at(s.pos, &"item_use", -5.0)
 
@@ -218,7 +218,7 @@ func throw_envelope(h: RaceItems.Holder, target: RaceItems.Holder = null) -> voi
 	s.lateral = _clamp_lateral(_lateral_of(h), 1.2)
 	s.speed = maxf(k.max_speed * ENVELOPE_SPEED, ENVELOPE_MIN_SPEED)
 	s.dir = k.get_forward()
-	s.pos = k.global_position + s.dir * 1.6 + Vector3.UP * IntimacaoEnvelope.HOVER
+	s.pos = k.global_position + s.dir * 1.6 * KartScale.ITEMS + Vector3.UP * IntimacaoEnvelope.HOVER
 	s.offset = s.pos - _rail_pos(s, IntimacaoEnvelope.HOVER, 1.0)
 	_show(s)
 	_sound_at(s.pos, &"paper", -5.0, 1.2)
@@ -235,13 +235,13 @@ func throw_pec(h: RaceItems.Holder, target: RaceItems.Holder = null) -> void:
 	s.lateral = _clamp_lateral(_lateral_of(h), 2.0)
 	s.speed = PEC_SPEED * 0.5
 	s.dir = k.get_forward()
-	s.pos = k.global_position + Vector3.UP * 2.5
+	s.pos = k.global_position + Vector3.UP * 2.5 * KartScale.ITEMS
 	s.offset = s.pos - _rail_pos(s, PEC_HEIGHT, 1.0)
 	_show(s)
 	var book := s.node as PecConstituicao
-	book.scale = Vector3.ONE * 0.15
+	book.scale = Vector3.ONE * 0.15 * KartScale.ITEMS
 	var tw := _tween(book)
-	tw.tween_property(book, "scale", Vector3.ONE, 0.6).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(book, "scale", Vector3.ONE * KartScale.ITEMS, 0.6).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	_sound_at(s.pos, &"paper", -3.0, 0.7)
 
 
@@ -255,10 +255,10 @@ func throw_calc(h: RaceItems.Holder, backward: bool, target: RaceItems.Holder = 
 	s.fuse = CALC_FUSE
 	s.beep = 0.0
 	if backward:
-		s.pos = k.global_position + Vector3.UP * 0.9 - fwd * 2.2
+		s.pos = k.global_position + (Vector3.UP * 0.9 - fwd * 2.2) * KartScale.ITEMS
 		s.vel = -fwd * 3.0 + Vector3.UP * 3.0
 	else:
-		s.pos = k.global_position + Vector3.UP * 1.4 + fwd * 1.4
+		s.pos = k.global_position + (Vector3.UP * 1.4 + fwd * 1.4) * KartScale.ITEMS
 		s.vel = fwd * (maxf(k.speed, 0.0) * 0.65 + CALC_THROW_FWD) + Vector3.UP * CALC_THROW_UP
 	if target and not backward:
 		# Cai onde o alvo vai estar (seguindo a pista, não em linha reta); de longe o arco
@@ -298,7 +298,7 @@ func drop_trap(h: RaceItems.Holder, kind: int, before: RaceItems.Holder = null) 
 	s.phase = Phase.AIR
 	s.seed = randf()
 	s.timer = TRAP_LIFE
-	s.pos = k.global_position + Vector3.UP * 0.8 - fwd * 2.2
+	s.pos = k.global_position + (Vector3.UP * 0.8 - fwd * 2.2) * KartScale.ITEMS
 	s.vel = -fwd * TRAP_TOSS.x + Vector3.UP * TRAP_TOSS.y
 	if before:
 		var track: Track = race.track
@@ -317,7 +317,7 @@ func drop_trap(h: RaceItems.Holder, kind: int, before: RaceItems.Holder = null) 
 	else:
 		s.node = _get_node(kind)
 		s.node.call(&"reset")
-	s.node.scale = Vector3.ONE
+	s.node.scale = Vector3.ONE * _scale_of(kind)
 	s.dir = fwd
 	_place_trap(s)
 	s.node.reset_physics_interpolation()
@@ -392,7 +392,7 @@ func _suspend_pec(s: Shot, by: RaceItems.Holder) -> void:
 	tw.tween_property(book, "position", book.position + Vector3.UP * 14.0 + away * 8.0, PEC_RISE_TIME) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tw.tween_property(book, "rotation:z", book.rotation.z + TAU * 1.5, PEC_RISE_TIME)
-	tw.tween_property(book, "scale", Vector3.ONE * 0.1, PEC_RISE_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_property(book, "scale", Vector3.ONE * 0.1 * KartScale.ITEMS, PEC_RISE_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	# O aviso fica onde a Constituição estava (preso ao kart, na câmera de quem usou, ele
 	# cobriria a tela); no HUD do alvo (e de quem usou) o "PEC A CAMINHO!" fica verde.
 	_world_pop(s.pos, "PEC SUSPENSA!", Color("7ef0a8"))
@@ -472,7 +472,7 @@ func _new_shot(kind: int, h: RaceItems.Holder) -> Shot:
 func _show(s: Shot) -> void:
 	s.node = _get_node(s.kind)
 	s.node.call(&"reset")
-	s.node.scale = Vector3.ONE
+	s.node.scale = Vector3.ONE * _scale_of(s.kind)
 	_place(s.node, s.pos, s.dir)
 	s.node.reset_physics_interpolation()
 	s.node.visible = true
@@ -562,7 +562,7 @@ func _move_envelope(s: Shot, delta: float) -> void:
 		s.phase = Phase.FLY
 	var before := s.pos
 	if s.phase == Phase.HOMING and s.target:
-		var aim := s.target.kart.global_position + Vector3.UP * 0.7
+		var aim := s.target.kart.global_position + Vector3.UP * 0.7 * KartScale.ITEMS
 		s.speed = maxf(s.speed, s.target.kart.speed + ENVELOPE_CATCH)
 		var to := aim - s.pos
 		var step := s.speed * delta
@@ -641,7 +641,7 @@ func _move_pec(s: Shot, delta: float) -> void:
 		Phase.DROP:
 			s.timer -= delta
 			var k := 1.0 - clampf(s.timer / PEC_DROP_TIME, 0.0, 1.0)
-			var land := Vector3.UP * (PecConstituicao.SIZE.y * 0.5 + 0.35)
+			var land := Vector3.UP * (PecConstituicao.SIZE.y * 0.5 + 0.35) * KartScale.ITEMS
 			s.pos = s.target.kart.global_position + s.offset.lerp(land, k * k)
 			book.set_open(1.0 - k)
 			_place(book, s.pos, s.dir)
@@ -650,7 +650,7 @@ func _move_pec(s: Shot, delta: float) -> void:
 				_pec_impact(s)
 		Phase.STAY:
 			s.timer -= delta
-			s.pos = s.target.kart.global_position + Vector3.UP * (PecConstituicao.SIZE.y * 0.5 + 0.35)
+			s.pos = s.target.kart.global_position + Vector3.UP * (PecConstituicao.SIZE.y * 0.5 + 0.35) * KartScale.ITEMS
 			book.global_position = s.pos
 			if s.timer <= 0.0:
 				s.phase = Phase.RISE
@@ -661,7 +661,7 @@ func _move_pec(s: Shot, delta: float) -> void:
 				tw.tween_property(book, "position", book.position + Vector3.UP * 9.0 + s.dir * 4.0, PEC_RISE_TIME) \
 						.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 				tw.tween_property(book, "rotation:y", book.rotation.y + 1.6, PEC_RISE_TIME)
-				tw.tween_property(book, "scale", Vector3.ONE * 0.1, PEC_RISE_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+				tw.tween_property(book, "scale", Vector3.ONE * 0.1 * KartScale.ITEMS, PEC_RISE_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 				book.set_open(1.0)
 		Phase.RISE:
 			s.timer -= delta
@@ -751,7 +751,7 @@ func _move_calc(s: Shot, delta: float) -> void:
 		return
 	if s.age < CALC_ARM:
 		return
-	if _touching(s.pos + Vector3.UP * 0.4, CALC_RADIUS, s.owner if s.age < CALC_OWNER_SAFE else null):
+	if _touching(s.pos + Vector3.UP * 0.4 * KartScale.ITEMS, CALC_RADIUS, s.owner if s.age < CALC_OWNER_SAFE else null):
 		_explode(s)
 
 
@@ -759,7 +759,7 @@ func _move_calc(s: Shot, delta: float) -> void:
 ## vai estar quando ela descer).
 func _guide_calc(s: Shot) -> void:
 	var tk := s.target.kart
-	var drop := s.pos.y - (tk.global_position.y + 0.5)
+	var drop := s.pos.y - (tk.global_position.y + 0.5 * KartScale.ITEMS)
 	var disc := s.vel.y * s.vel.y + 2.0 * CALC_GRAVITY * drop
 	if disc < 0.0:
 		return
@@ -1012,8 +1012,8 @@ func _touching(pos: Vector3, radius: float, skip: RaceItems.Holder) -> RaceItems
 	for h in items.holders():
 		if h == skip or h.racer.finished:
 			continue
-		var d := h.kart.global_position + Vector3.UP * 0.5 - pos
-		if absf(d.y) > 1.6:
+		var d := h.kart.global_position + Vector3.UP * 0.5 * KartScale.ITEMS - pos
+		if absf(d.y) > 1.6 * KartScale.ITEMS:
 			continue
 		var l := d.x * d.x + d.z * d.z
 		if l < best_d:
@@ -1032,7 +1032,7 @@ func stamp_mark(k: Kart) -> void:
 		k.visual.add_child(mark)
 		_marks[k] = mark
 	var size := k.hitbox_size
-	var width := clampf(size.x * 0.95, 1.0, 1.4)
+	var width := clampf(size.x * 0.95, 1.0 * KartScale.ITEMS, 1.4 * KartScale.ITEMS)
 	mark.position = Vector3(0.0, 0.25 + size.y * 0.7, size.z * 0.5 - 0.05)
 	mark.rotation = Vector3(-0.15, 0.0, randf_range(-0.22, 0.22))
 	mark.scale = Vector3.ONE * width * 2.4
@@ -1058,14 +1058,14 @@ func pop_text(k: Kart, text: String, color: Color) -> void:
 	label.text = text
 	label.modulate = color
 	label.outline_modulate = UiKit.NAVY
-	label.position = Vector3(0.0, 2.3, 0.0)
+	label.position = Vector3(0.0, 2.3 * KartScale.ITEMS, 0.0)
 	label.scale = Vector3.ONE * 0.3
 	label.visible = true
 	label.reset_physics_interpolation()
 	var tw := _tween(label)
 	tw.tween_property(label, "scale", Vector3.ONE * 1.15, 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tw.tween_property(label, "scale", Vector3.ONE, 0.1)
-	tw.tween_property(label, "position:y", 2.8, 0.9)
+	tw.tween_property(label, "position:y", 2.8 * KartScale.ITEMS, 0.9)
 	tw.parallel().tween_property(label, "modulate:a", 0.0, 0.4).set_delay(0.5)
 	tw.parallel().tween_property(label, "outline_modulate:a", 0.0, 0.4).set_delay(0.5)
 	tw.tween_callback(label.hide)
@@ -1093,7 +1093,7 @@ func _show_parcel(k: Kart, paid: int, total: int) -> void:
 	label.visible = true
 	label.modulate.a = 1.0
 	label.outline_modulate.a = 1.0
-	label.position = Vector3(0.0, 2.2, 0.0)
+	label.position = Vector3(0.0, 2.2 * KartScale.ITEMS, 0.0)
 	label.scale = Vector3.ONE * 1.25
 	var tw := _tween(label)
 	tw.tween_property(label, "scale", Vector3.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
@@ -1132,7 +1132,7 @@ func _make_label(node_name: String, size: int) -> Label3D:
 	label.font = UiKit.FONT_TITLE
 	label.font_size = size
 	label.outline_size = 18
-	label.pixel_size = 0.011
+	label.pixel_size = 0.011 * KartScale.CAMERA
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	label.shaded = false
 	label.no_depth_test = true
@@ -1292,6 +1292,13 @@ func _place(node: Node3D, pos: Vector3, dir: Vector3) -> void:
 
 # --- Reserva de nós ----------------------------------------------------------------
 
+## Escala de cada tiro/armadilha: os modelos foram feitos para os karts de antes do
+## encaixe piloto × kart e encolhem com eles. A caixa falsa já usa as medidas das caixas
+## de verdade (ItemBox, também encolhidas).
+static func _scale_of(kind: int) -> float:
+	return 1.0 if kind == RaceItem.Kind.FILA else KartScale.ITEMS
+
+
 func _get_node(kind: int) -> Node3D:
 	var list: Array = _free.get(kind, [])
 	if not list.is_empty():
@@ -1316,7 +1323,8 @@ func _get_node(kind: int) -> Node3D:
 		RaceItem.Kind.IMPUGNACAO:
 			var calc := ImpugnacaoCalculadora.new()
 			add_child(calc)
-			calc.build(BLAST_RADIUS)
+			# O nó todo encolhe (_scale_of): o círculo de perigo dentro dele fica do raio real.
+			calc.build(BLAST_RADIUS / KartScale.ITEMS)
 			node = calc
 		RaceItem.Kind.PENDENCIA:
 			var pile := PendenciaPapelada.new()
@@ -1363,7 +1371,7 @@ func _release(s: Shot) -> void:
 	if node.has_meta(&"vanish"):
 		node.remove_meta(&"vanish")
 		var tw := _tween(node)
-		tw.tween_property(node, "scale", Vector3.ONE * 0.05, 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		tw.tween_property(node, "scale", Vector3.ONE * 0.05 * _scale_of(s.kind), 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 		tw.tween_callback(_park.bind(node, s.kind))
 	else:
 		_park(node, s.kind)

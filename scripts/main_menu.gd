@@ -18,6 +18,9 @@ extends Node3D
 @onready var record_label: Label = %RecordLabel
 @onready var driver_label: Label = %DriverLabel
 
+## Quanto a câmera do menu chega mais perto do kart parado no grid (o enquadramento era
+## dos karts de antes do encaixe piloto × kart).
+const MENU_ZOOM := 0.6
 var _kart: KartVisual
 var _time := 0.0
 var _wave_timer := 2.5
@@ -44,6 +47,7 @@ func _ready() -> void:
 	record_label.text = GameState.format_time(GameState.get_record(track.track_id, "total"))
 	driver_label.text = character.display_name if character else "-"
 
+	camera.h_offset *= MENU_ZOOM
 	_update_camera()
 	camera.reset_physics_interpolation()
 	play_button.grab_focus()
@@ -66,13 +70,14 @@ func _process(delta: float) -> void:
 
 
 func _update_camera() -> void:
-	var center := showcase.global_position + Vector3.UP * 0.75
+	# Perto do kart (do tamanho do encaixe piloto × kart, menor que os de antes).
+	var center := showcase.global_position + Vector3.UP * 0.75 * MENU_ZOOM
 	var forward := -showcase.global_basis.z
 	forward.y = 0.0
 	forward = forward.normalized()
 	var right := forward.cross(Vector3.UP)
 	var angle := 0.55 + sin(_time * 0.13) * 0.75
-	var offset := (forward * cos(angle) + right * sin(angle)) * 5.4 + Vector3.UP * 1.25
+	var offset := ((forward * cos(angle) + right * sin(angle)) * 5.4 + Vector3.UP * 1.25) * MENU_ZOOM
 	camera.global_position = center + offset
 	camera.look_at(center, Vector3.UP)
 

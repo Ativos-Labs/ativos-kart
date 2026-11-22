@@ -27,10 +27,13 @@ class Part:
 			skeleton.set_bone_pose_rotation(bone, local.basis.get_rotation_quaternion())
 
 
-## Mão direita levantada (Fila do tribunal, segurando a senha): onde fica o punho em
-## relação ao banco (KartData.seat_position) e para onde aponta o polegar (para cima: a
-## mão fechada segura a borda de baixo da senha, em pé).
+## Mão direita levantada (Fila do tribunal, segurando a senha): onde fica o punho e para
+## onde aponta o polegar (para cima: a mão fechada segura a borda de baixo da senha, em
+## pé). Celerino: em relação ao banco (KartData.seat_position), para kart_scale 0,55.
+## Pilotos do padrão: em relação à origem do piloto (KartData.driver_origin), ao lado da
+## cabeça, com o cotovelo dobrado.
 const RAISED_HAND := Vector3(0.34, 0.92, -0.02)
+const RAISED_HAND_STANDARD := Vector3(0.24, 0.66, 0.03)
 const RAISED_THUMB := Vector3.UP
 
 var kart_data: KartData
@@ -70,9 +73,19 @@ func setup(p_kart: KartData, p_character: CharacterData) -> void:
 	if p_character and p_character.model_scene:
 		driver = p_character.instantiate_rig()
 		driver.cockpit = p_kart.cockpit()
-		driver.setup_drive(p_character.kart_scale, p_character.seat_height, p_kart.turn_lean_degrees > 0.0,
-				p_character.seat_forward)
-		driver.position = p_kart.seat_position
+		if p_character.standard_fit:
+			# Encaixe piloto × kart: escala 1 e origem na origem do piloto do veículo (fora
+			# de qualquer escala do modelo do kart); a pose sentada faz o resto.
+			driver.setup_drive(1.0, 0.0, p_kart.is_bike())
+			driver.position = p_kart.driver_origin()
+			if p_kart.foot_point != Vector3.ZERO:
+				driver.foot_target_r = p_kart.foot_point
+				driver.foot_target_l = p_kart.foot_point * Vector3(-1.0, 1.0, 1.0)
+				driver.has_foot_targets = true
+		else:
+			driver.setup_drive(p_character.kart_scale, p_character.seat_height, p_kart.is_bike(),
+					p_character.seat_forward)
+			driver.position = p_kart.seat_position
 		driver.rotation = Vector3(0.0, PI, 0.0)
 		add_child(driver)
 	_update_steering(0.0)
@@ -154,9 +167,23 @@ func _update_steering(angle: float) -> void:
 		driver.has_hand_targets = true
 
 
+## Escala do kart com o piloto nas telas de seleção (KartScale.SHOWCASE): os veículos altos
+## (piloto sentado no alto) crescem menos, para o conjunto caber no palco. Depois de setup.
+func showcase_scale() -> float:
+	if kart_data == null:
+		return KartScale.SHOWCASE
+	# Topo da cabeça do piloto sentado (o Henrique, o mais alto; na moto, a POSE_Moto).
+	var head := kart_data.driver_origin().y + (0.99 if kart_data.is_bike() else 0.87)
+	var top := maxf(head, GliderVisual.kart_bounds(self).end.y)
+	return minf(KartScale.SHOWCASE, KartScale.SHOWCASE_HEIGHT / maxf(top, 0.1))
+
+
 ## Onde fica o punho direito levantado (espaço deste nó), ao lado da cabeça do piloto.
 func raised_hand_point() -> Vector3:
-	return kart_data.seat_position + RAISED_HAND
+	if character and character.standard_fit:
+		return kart_data.driver_origin() + RAISED_HAND_STANDARD
+	var size := character.kart_scale / 0.55 if character else 1.0
+	return kart_data.seat_position + RAISED_HAND * size
 
 
 ## Pegada de uma mão (`side`: -1 = esquerda, 1 = direita) com o volante girado `turn`

@@ -469,13 +469,14 @@ assets/models/moeda/moeda.glb        Moeda Ativos (gerada por tools/moeda/build_
 tools/karts/                         Gera bolido/cometa/motoca/bugre.glb e o
                                      standard_kart.glb (azul, com o "A" da Ativos) a
                                      partir dos modelos originais (troca os adesivos
-                                     pelas logos da Ativos). O Godot ignora a pasta tools/.
-tools/personagens/                   Prepara o Jarbas, o Henrique e o Ulysses: monta o esqueleto do
-                                     Henrique (rig_henrique.py, com o Blender), limpa o
+                                     pelas logos da Ativos) e escala cada kart para os
+                                     pilotos (encaixe_karts.py, veja "Encaixe piloto ×
+                                     kart"). O Godot ignora a pasta tools/.
+tools/personagens/                   Prepara o Jarbas, o Henrique e o Ulysses: limpa o
                                      modelo e junta as texturas num atlas
                                      (build_personagem.py), monta as animações
-                                     (gerar_animacoes.gd) e confere a pose em cada kart
-                                     (poses_nos_karts.gd). Veja o README.md de lá.
+                                     (gerar_animacoes.gd) e confere o encaixe em cada
+                                     veículo (poses_nos_karts.gd). Veja o README.md de lá.
 tools/asas/                          Gera a asa-delta do jogo e as texturas das asas a partir
                                      do modelo original (build_asas.py) e traz a sonda que
                                      mede os voos (veja o README.md de lá)
@@ -533,14 +534,13 @@ arquivo trazem trilhas para quase todos os ossos.
 O Jarbas vem de `assets/models/personagens/jarbas.glb`, preparado a partir do modelo
 original por `tools/personagens/` (README lá, com todos os números).
 
-- **No kart:** a pose sentada é montada para cada kart a partir das medidas do cockpit
-  (banco, encosto, assoalho e pedais, no grupo "Cockpit" de cada `data/karts/*.tres`): o
-  bumbum apoia no estofado com as costas no encosto, as pernas esticam por IK até o
-  calcanhar apoiar no assoalho (ou nos pedais, se alcança) e os braços, com cotovelo,
-  fecham as mãos no aro com a pegada medida no volante de referência do arquivo. Como os
-  volantes ficam longe do banco, ele inclina a partir do quadril e desliza um pouco no
-  estofado — o mínimo para alcançar, calculado por veículo. Na moto a pose vem da
-  `POSE_Moto` do modelo, com o quadril no selim.
+- **No kart:** encaixe piloto × kart (veja abaixo): o modelo entra em escala 1, com a
+  origem na origem do piloto do veículo, e a `POSE_Kart` do arquivo põe o quadril no banco
+  e as mãos no aro — o kart é que foi escalado para isso dar certo. As mãos seguem o
+  volante por IK (braços com cotovelo, pegada medida na `POSE_Kart`); nos veículos de
+  volante mais baixo que o da referência o tronco inclina um pouco para alcançar, e nos de
+  painel baixo as pernas esticam até o assoalho (`foot_point` do kart). Na moto a pose vem
+  da `POSE_Moto`.
 - **Expressões e piscada:** as do próprio modelo (alegria, surpresa, raiva, tristeza...).
   **Gestos, respiração, olhar e formatos de mão:** transferidos das animações do Celerino
   (`tools/personagens/gerar_animacoes.gd`).
@@ -551,26 +551,58 @@ original por `tools/personagens/` (README lá, com todos os números).
   `CharacterMesh` junta tudo numa superfície (`shaders/character_textured.gdshader`). No
   multijogador, o jogador que repete o Jarbas corre com o azul do macacão na cor dele.
 
-O **Henrique** e o **Ulysses** seguem o mesmo caminho do Jarbas (pose montada por kart,
-expressões próprias, gestos do Celerino, `idle_stand`, atlas numa superfície). O Henrique
-veio sem esqueleto: ganhou o do Jarbas, ajustado ao corpo dele. O Ulysses veio com
-esqueleto e animações e tem ossos auxiliares no meio do cotovelo, do joelho e do quadril
-que giram metade do osso seguinte (no Blender é uma restrição; no jogo,
-`follow_bones` no `ulysses_esqueleto.tres`), para a dobra não murchar. Detalhes e
-números em `tools/personagens/README.md`.
+O **Henrique** e o **Ulysses** seguem o mesmo caminho do Jarbas (encaixe com a
+`POSE_Kart`, expressões próprias, gestos do Celerino, `idle_stand`, atlas numa
+superfície). Os três vieram do Blender com esqueleto, poses e expressões, já nas
+proporções finais. Os três têm ossos auxiliares no quadril (o Ulysses também no meio do
+cotovelo e do joelho) que giram metade do osso seguinte (no Blender é uma restrição; no
+jogo, `follow_bones` no `CharacterSkeleton`), para a dobra não murchar. Detalhes e números
+em `tools/personagens/README.md`.
+
+### Encaixe piloto × kart (tamanho dos karts e dos pilotos)
+
+Segue o documento "Encaixe Piloto × Kart" (medidas da cena Proporcoes_Finais do
+kart-compare.blend):
+
+- **Os pilotos nunca mudam de escala.** Jarbas, Henrique e Ulysses entram em escala 1 (os
+  `.glb` já estão em metros: 1,03, 1,06 e 1,03 m de altura) em todo veículo.
+- **O veículo é que se ajusta:** cada kart foi escalado pela distância do assento (S, o
+  vinco entre o fundo do banco e o encosto, na linha central) ao centro do volante (W),
+  igual à do kart de referência (0,370 m: o Kart Padrão, com o modelo original na escala
+  0,06). Quando o volante do veículo fica bem mais baixo ou mais alto que o da referência
+  (as escalas pela horizontal e pela vertical diferem mais de 10%), vale a horizontal
+  (alcance dos braços) e o IK das mãos cuida da altura. O tamanho de cada kart sai disso:
+  o Padrão tem 1,13 m de comprimento; os outros, de 1,11 m (Bugre) a 1,67 m (Motoca).
+- **Origem do piloto:** `KartData.driver_origin()` = assento − assento de referência; a pose
+  sentada (`POSE_Kart`, ou `POSE_Moto` na moto) leva o corpo ao banco e as mãos ao volante.
+  No Kart Padrão o resultado é o do documento: topo da cabeça a 0,836 / 0,872 / 0,839 m
+  (Jarbas / Henrique / Ulysses), punho a 8,8 / 5,3 / 6,1 cm da pega, quadril 10 cm acima do
+  assento.
+- `python3 tools/karts/encaixe_karts.py` imprime a conferência de cada kart (k, erro do
+  volante, diâmetro da pega, inclinação do volante); com `--gravar`, escala um kart novo.
+- As pistas e a física não mudaram: a câmera, as caixas de batida, as caixas de item, as
+  moedas, os tiros e os efeitos, feitos para os karts de antes, usam as proporções de
+  `scripts/kart_scale.gd` (itens e efeitos 0,55, câmera 0,75). Nas telas de seleção de kart
+  e de asa o kart com o piloto aparece 1,6× maior (o conjunto inteiro, sem mudar a
+  proporção). As fileiras de caixas de item têm 6 caixas, mais juntas, para continuarem
+  pegando qualquer kart que passe.
+- O Celerino e os adversários (o Celerino recolorido) ficaram com `kart_scale` 0,43, na mesma
+  proporção dos pilotos novos.
 
 ### Ajustar o piloto no kart
 
-- Altura/posição no banco: `seat_position` em `data/karts/standard_kart.tres`.
-- Tamanho do personagem no kart: `kart_scale` no `.tres` do personagem (`seat_forward`
-  adianta o corpo no banco).
+- Onde os pilotos sentam: `seat_point` no `.tres` do kart (o vinco do banco); o Celerino
+  e os adversários usam `seat_position`.
+- Tamanho do kart: sai do encaixe (`tools/karts/encaixe_karts.py`); não mude
+  `model_scale` à mão.
 - Volante: `steering_wheel_center`, `steering_wheel_axis`, `steering_wheel_radius` e
   `hand_angle` (posição das mãos no aro) no `.tres` do kart.
-- Pernas, inclinação e pegada: grupo "Pose de piloto" do `CharacterSkeleton` (Celerino:
-  padrão em `character_skeleton.gd`; Jarbas: `jarbas_esqueleto.tres`, grupos "Pose de
-  piloto" e "Sentar no kart").
-- Banco, encosto, assoalho e pedais (pilotos que sentam de verdade, como o Jarbas): grupo
-  "Cockpit" no `.tres` do kart; `tools/personagens/medir_cockpit.gd` mede e sugere.
+- Pernas em veículo de painel baixo: `foot_point` no `.tres` do kart (onde fica o
+  tornozelo direito; zero = as pernas da `POSE_Kart`).
+- Pegada e inclinação para alcançar o volante: grupo "Pose de piloto" do
+  `CharacterSkeleton` (Celerino: padrão em `character_skeleton.gd`; Jarbas:
+  `jarbas_esqueleto.tres`).
+- Tamanho do Celerino e dos adversários no kart: `kart_scale` no `.tres` deles.
 
 ## Os adversários
 
@@ -636,16 +668,22 @@ Ele aparece no lugar de um dos "?" da grade de seleção.
 
 1. Coloque o modelo (`.glb`) em `assets/models/karts/`.
 2. Duplique `data/karts/standard_kart.tres` e, no Inspetor, troque o **Model Scene**,
-   o nome, a descrição e os atributos (1 a 5). Ajuste **Model Scale** para o kart ficar
-   com ~2,4 m e **Model Rotation** para a frente apontar para -Z.
+   o nome, a descrição e os atributos (1 a 5). Ajuste **Model Rotation** para a frente
+   apontar para -Z; **Model Scale** pode ficar numa escala qualquer em que dê para medir
+   (o tamanho final sai do passo 5).
 3. (Opcional) Em **Rodas**, coloque os nomes das rodas para elas girarem. Podem ser nós
    do modelo ou ossos de um esqueleto (o Relâmpago usa ossos).
 4. Em **Piloto e volante**, ajuste o banco e o volante. Se o volante for uma peça
    separada (nó ou osso), coloque o nome dela para ele girar; se fizer parte da
    carroceria (como no Kart de Treino), deixe vazio e as mãos ficam paradas nele.
-5. Em **Cockpit**, coloque as medidas do banco, encosto, assoalho e pedais (o Jarbas
-   senta a partir delas): rode `tools/personagens/medir_cockpit.gd` e confira os valores
-   no mapa que ele grava (veja `tools/personagens/README.md`).
+5. **Encaixe:** meça o assento S (o vinco entre o fundo do banco e o encosto, na linha
+   central; sem encosto, o ponto mais de trás do fundo) no espaço do kart, acrescente em
+   `MEDIDAS` de `tools/karts/encaixe_karts.py` e rode
+   `python3 tools/karts/encaixe_karts.py --gravar`: o script escala o modelo e todas as
+   medidas do `.tres` (rodas, volante, escapamentos, caixa de batida...) para os pilotos
+   caberem em escala 1 e grava o `seat_point`. Confira o piloto sentado com
+   `tools/personagens/poses_nos_karts.gd`; se os joelhos atravessarem o painel, ponha um
+   `foot_point`.
 6. Em **Turbo**, cadastre as saídas de escapamento (ou turbinas) da traseira: para cada
    uma, a **posição** do centro da boca e a **direção** em que a chama sai (espaço do kart,
    frente = -Z), o **raio** da boca, o **comprimento** da chama e o **estilo** (Fogo, Jato

@@ -11,7 +11,7 @@ const GHOST_SHADER := preload("res://shaders/ghost.gdshader")
 const PAPER_SHADER := preload("res://shaders/item_contract.gdshader")
 ## Tamanho do fantasma (o Celerino tem 2 m) e altura dos pés acima do kart (m).
 const GHOST_SCALE := 0.85
-const HOVER := 1.3
+const HOVER := 1.3 * KartScale.ITEMS
 ## Opacidade do corpo e da borda (multiplicadas pelo aparecer/sumir).
 const BASE_ALPHA := 0.52
 const RIM_ALPHA := 0.7
@@ -142,17 +142,18 @@ func _update(_delta: float) -> void:
 	_set_alpha(smoothstep(0.0, 0.12, k) * (1.0 - smoothstep(0.86, 1.0, k)))
 	_paper_mat.set_shader_parameter("reveal", clampf((k - 0.15) / 0.45, 0.0, 1.0))
 	_paper_mat.set_shader_parameter("stamp", clampf((k - 0.6) / 0.06, 0.0, 1.0))
-	var start := _from.global_position + Vector3.UP * (HOVER + sin(_t * 5.0) * 0.08)
-	var goal := _to.global_position + Vector3.UP * 1.2
+	var start := _from.global_position + Vector3.UP * (HOVER + sin(_t * 5.0) * 0.08 * KartScale.ITEMS)
+	var goal := _to.global_position + Vector3.UP * 1.2 * KartScale.ITEMS
 	var f := clampf((k - 0.68) / 0.32, 0.0, 1.0)
 	var e := f * f * (3.0 - 2.0 * f)
-	var pos := start.lerp(goal, e) + Vector3.UP * sin(e * PI) * 1.6
+	var pos := start.lerp(goal, e) + Vector3.UP * sin(e * PI) * 1.6 * KartScale.ITEMS
 	# Encara quem usou o item; voando, olha para onde vai.
 	var look := (_to.global_position - pos) if f <= 0.0 else (goal - start)
 	look.y = 0.0
 	if look.length_squared() > 0.01:
 		_basis = Basis.looking_at(look.normalized(), Vector3.UP)
-	var s := lerpf(1.0, 0.45, e) * lerpf(0.6, 1.0, smoothstep(0.0, 0.12, k))
+	# O fantasma foi feito para os karts de antes do encaixe piloto × kart: encolhe com eles.
+	var s := lerpf(1.0, 0.45, e) * lerpf(0.6, 1.0, smoothstep(0.0, 0.12, k)) * KartScale.ITEMS
 	global_transform = Transform3D(_basis.scaled(Vector3.ONE * s), pos)
 	if k >= 1.0:
 		_park()

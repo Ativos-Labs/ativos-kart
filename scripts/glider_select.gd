@@ -65,6 +65,7 @@ func _ready() -> void:
 	_kart_visual = KartVisual.new()
 	turntable.add_child(_kart_visual)
 	_kart_visual.setup(kart, character)
+	_kart_visual.scale = Vector3.ONE * _kart_visual.showcase_scale()
 	_show_glider(0)
 	race_button.grab_focus()
 
@@ -321,6 +322,7 @@ func _setup_multi() -> void:
 		var visual := KartVisual.new()
 		panel.stage.turntable.add_child(visual)
 		visual.setup(GameState.get_player_kart(p), GameState.get_player_character(p))
+		visual.scale = Vector3.ONE * visual.showcase_scale()
 		_panels.append(panel)
 		_karts.append(visual)
 		_gliders.append(null)

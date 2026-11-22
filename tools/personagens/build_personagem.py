@@ -1,31 +1,30 @@
 """Prepara o modelo de um piloto com textura (Jarbas, Henrique, Ulysses) para o jogo.
 
-Lê o modelo original de tools/personagens/originais/ (exportado do Blender) e grava
-assets/models/personagens/<nome>.glb:
+Lê o modelo original de tools/personagens/originais/ (exportado do Blender com
+esqueleto, poses e expressões, já em metros e nas proporções finais do encaixe piloto ×
+kart) e grava assets/models/personagens/<nome>.glb:
 
 - tira o volante e o guidão de referência (Ref_*) e os desenhos de controle (WGT_*);
-- Henrique: o modelo veio sem esqueleto; o esqueleto e os pesos saem de
-  henrique_esqueleto.json (gerado por rig_henrique.py, que precisa do Blender) e as
-  cores de vértice e o segundo UV, que o jogo não usa, saem;
+- tira as cores de vértice e o segundo UV, que o jogo não usa;
 - tira do esqueleto os ossos sem peso nenhum (controles de IK do Blender, alvos do
   olhar, pontas dos dedos e dos pés) — no Godot eles não fazem nada e o CharacterRig
-  percorre todos os ossos a cada quadro;
+  percorre todos os ossos a cada quadro. A raiz (Raiz) fica: é ela que, na POSE_Kart,
+  desce o corpo até o assento;
 - renomeia os ossos "mixamorig:Xxx" para "Xxx";
 - junta as texturas (as 27 da Tripo no Jarbas, a única do Henrique, as duas do Ulysses)
   e os logos num atlas só (2048 x 2048). No Ulysses cada textura entra recortada por ilha
-  de UV (as dele usam só 27% e 40% da área). As partes de cor lisa (olhos, boca, luvas, pálpebras)
-  apontam para um quadradinho branco do atlas e mantêm a cor no material. Assim o
-  CharacterMesh junta o piloto inteiro numa superfície só (na web cada superfície com
-  esqueleto custa um passe de GPU por quadro). Mapas de normal, rugosidade e metal
+  de UV (as dele usam só parte da área). As partes de cor lisa (olhos, boca, luvas,
+  pálpebras) apontam para um quadradinho branco do atlas e mantêm a cor no material.
+  Assim o CharacterMesh junta o piloto inteiro numa superfície só (na web cada superfície
+  com esqueleto custa um passe de GPU por quadro). Mapas de normal, rugosidade e metal
   saem (o shader dos pilotos não usa);
 - logos: transparência recortada (alpha scissor) em vez de mistura, para caberem na
   mesma superfície;
 - Henrique: a aba do boné vai para um material próprio ("SemSombra_Aba_Bone", mesma
   textura), que no jogo não projeta sombra (ela escurecia o rosto).
 
-As animações do arquivo do Jarbas (expressões, piscada, POSE_Kart, POSE_Moto) vão
-junto. As que o jogo usa são montadas no Godot por gerar_animacoes.gd (veja o README
-desta pasta); as do Henrique saem das do Jarbas.
+As animações do arquivo (expressões, piscada, POSE_Kart, POSE_Moto) vão junto. As que o
+jogo usa são montadas no Godot por gerar_animacoes.gd (veja o README desta pasta).
 
 Uso: python3 tools/personagens/build_personagem.py jarbas|henrique|ulysses
 """
@@ -45,18 +44,19 @@ from gltf_util import Glb  # noqa: E402
 
 PROJ = os.path.abspath(os.path.join(HERE, "..", ".."))
 CHARACTERS = {
-    "jarbas": {"src": "jarbas-piloto.glb", "skeleton": None, "root": None},
+    "jarbas": {"src": "jarbas-piloto.glb"},
     "henrique": {
-        "src": "henrique-piloto.glb", "skeleton": "henrique_esqueleto.json", "root": "Henrique",
+        "src": "henrique-piloto.glb",
         # A aba do boné fazia uma sombra grande no rosto (medido na tela de seleção e na
-        # corrida). Ela é azul e fica na frente da testa; a pele da testa, na mesma
-        # altura e profundidade, tem matiz ~0,03 (o azul do boné, ~0,6).
-        "no_shadow": [{"name": "Aba_Bone", "mesh": "Henrique_Corpo", "material": "tripo_mat_4699cc3b",
-                       "min_y": 0.87, "min_front_z": 0.075, "hue": (0.5, 0.75), "min_saturation": 0.3}],
+        # corrida). Ela é azul e fica na frente da testa (y 0,92 a 0,96, até z 0,20); a
+        # frente da copa, logo acima, não passa de z 0,09, e a pele da testa é outro
+        # material (PELE__).
+        "no_shadow": [{"name": "Aba_Bone", "mesh": "Henrique_Corpo", "material": "TECIDO__tripo_mat_4699cc3b",
+                       "min_y": 0.91, "min_front_z": 0.095, "hue": (0.5, 0.75), "min_saturation": 0.3}],
     },
     # Duas texturas de 4096 (cabeça da Tripo e corpo refeito) usando só 27% e 40% da área:
     # inteiras, cada uma viraria ~1000 px no atlas; por ilha de UV, o dobro.
-    "ulysses": {"src": "ulysses-piloto.glb", "skeleton": None, "root": None, "islands": True},
+    "ulysses": {"src": "ulysses-piloto.glb", "islands": True},
 }
 
 ATLAS = 2048
@@ -78,11 +78,8 @@ def main():
     dst = os.path.join(PROJ, "assets", "models", "personagens", name + ".glb")
     g = Glb(src)
     js = g.js
-    drop = DROP_NODES + ((cfg["root"],) if cfg["root"] else ())
-    _drop_scene_nodes(g, drop)
-    if cfg["skeleton"]:
-        with open(os.path.join(HERE, cfg["skeleton"])) as f:
-            _add_skeleton(g, json.load(f), cfg["root"])
+    _drop_scene_nodes(g, DROP_NODES)
+    _strip_unused_attributes(js)
     _clean_skeleton(g)
     _rename_bones(js)
     for rule in cfg.get("no_shadow", []):
@@ -155,64 +152,14 @@ def _drop_scene_nodes(g, names):
     _reindex_nodes(g, [i for i in range(len(js["nodes"])) if i not in drop])
 
 
-def _add_skeleton(g, data, root_name):
-    """Esqueleto e pesos de rig_henrique.py: nós dos ossos, skin e JOINTS_0/WEIGHTS_0
-    em cada primitiva. Fica como o do Jarbas: <root> > Armature > (malhas, Raiz > ossos)."""
-    js = g.js
-    meshes = {n["name"]: i for i, n in enumerate(js["nodes"]) if "mesh" in n}
-    missing = set(data["meshes"]) ^ set(meshes)
-    if missing:
-        raise SystemExit("malhas diferentes entre o modelo e o esqueleto: %s" % sorted(missing))
-    first = len(js["nodes"])
-    bones = data["bones"]
-    for b in bones:
-        js["nodes"].append({"name": b["name"], "translation": b["translation"], "rotation": b["rotation"]})
-    for k, b in enumerate(bones):
-        if b["parent"] >= 0:
-            js["nodes"][first + b["parent"]].setdefault("children", []).append(first + k)
-    roots = [first + k for k, b in enumerate(bones) if b["parent"] < 0]
-    armature = len(js["nodes"])
-    js["nodes"].append({"name": "Armature", "children": sorted(meshes.values()) + roots})
-    js["nodes"].append({"name": root_name, "children": [armature]})
-    js["scenes"][0]["nodes"] = [armature + 1]
-    # Matrizes inversas de ligação: as malhas ficam na origem, então é a inversa da
-    # transformação de cada osso (giro e translação, sem escala).
-    world = g.world_matrices()
-    ibm = []
-    for k in range(len(bones)):
-        m = world[first + k]
-        r = [[m[i][j] for j in range(3)] for i in range(3)]
-        t = [m[i][3] for i in range(3)]
-        rt = [[r[j][i] for j in range(3)] for i in range(3)]
-        tt = [-sum(rt[i][j] * t[j] for j in range(3)) for i in range(3)]
-        inv = [rt[0] + [tt[0]], rt[1] + [tt[1]], rt[2] + [tt[2]], [0.0, 0.0, 0.0, 1.0]]
-        ibm.append(tuple(inv[row][col] for col in range(4) for row in range(4)))
-    js.setdefault("skins", []).append({"name": "Armature", "joints": list(range(first, first + len(bones))),
-                                       "inverseBindMatrices": g.add_accessor(ibm, "MAT4", target=None)})
-    skin = len(js["skins"]) - 1
-    for name, node in meshes.items():
-        js["nodes"][node]["skin"] = skin
-        prims = js["meshes"][js["nodes"][node]["mesh"]]["primitives"]
-        for p, w in zip(prims, data["meshes"][name]):
-            count = js["accessors"][p["attributes"]["POSITION"]]["count"]
-            if count != w["count"]:
-                raise SystemExit("%s: %d vértices no modelo, %d no esqueleto" % (name, count, w["count"]))
-            J = w["joints"]
-            W = w["weights_1e4"]
-            joints = [tuple(J[i * 4:i * 4 + 4]) for i in range(count)]
-            weights = []
-            for i in range(count):
-                q = W[i * 4:i * 4 + 4]
-                total = float(sum(q)) or 1.0
-                weights.append(tuple(v / total for v in q))
-            p["attributes"]["JOINTS_0"] = g.add_accessor(joints, "VEC4", component=5123)
-            p["attributes"]["WEIGHTS_0"] = g.add_accessor(weights, "VEC4")
-            # O jogo não usa cor de vértice (o Blender exporta uma camada por atributo
-            # de cor, COLOR_0 a COLOR_n) nem o segundo UV.
+def _strip_unused_attributes(js):
+    """O jogo não usa cor de vértice (o Blender exporta uma camada por atributo de cor,
+    COLOR_0 a COLOR_n) nem o segundo UV."""
+    for m in js["meshes"]:
+        for p in m["primitives"]:
             for attr in list(p["attributes"]):
                 if attr.startswith("COLOR_") or attr == "TEXCOORD_1":
                     p["attributes"].pop(attr)
-    print("esqueleto: %d ossos, %d malhas com pesos" % (len(bones), len(meshes)))
 
 
 def _clean_skeleton(g):
@@ -368,7 +315,10 @@ def _build_atlas(g, islands=False):
     pieces = []  # {"mats", "img", "rect": (x0, y0, x1, y1) em px da imagem original, "mask"}
     for image_index, group in by_image.items():
         img = Image.open(io.BytesIO(g.image_bytes(image_index)))
-        logo = any(mats[mi].get("alphaMode") == "BLEND" for mi in group)
+        # Logos: material com transparência (os modelos antigos vinham com BLEND; os
+        # refeitos para o encaixe piloto × kart já vêm com MASK). Sem isso a logo entra
+        # como textura comum, perde a transparência e aparece com o fundo da imagem.
+        logo = any(mats[mi].get("alphaMode") in ("BLEND", "MASK") for mi in group)
         img = img.convert("RGBA")
         w, h = img.size
         tris = []
@@ -528,7 +478,7 @@ def _build_atlas(g, islands=False):
             mat.pop(key, None)
         mat.pop("extensions", None)  # KHR_materials_specular (só a sombra da órbita)
         mat["doubleSided"] = True
-        if mat.get("alphaMode") == "BLEND":
+        if mat.get("alphaMode") in ("BLEND", "MASK"):
             mat["alphaMode"] = "MASK"
             mat["alphaCutoff"] = 0.5
         for p in users.get(mi, []):

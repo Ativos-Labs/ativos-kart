@@ -17,12 +17,12 @@ curve = SubResource("Curve_shrink")
 
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_sparks"]
 emission_shape = 1
-emission_sphere_radius = 0.06
+emission_sphere_radius = 0.033
 direction = Vector3(0, 0.7, 1)
 spread = 40.0
-initial_velocity_min = 2.0
-initial_velocity_max = 4.5
-gravity = Vector3(0, -9, 0)
+initial_velocity_min = 1.1
+initial_velocity_max = 2.5
+gravity = Vector3(0, -5, 0)
 scale_min = 0.6
 scale_max = 1.3
 scale_curve = SubResource("CurveTexture_shrink")
@@ -51,16 +51,16 @@ particles_anim_loop = false
 
 [sub_resource type="QuadMesh" id="QuadMesh_spark"]
 material = SubResource("StandardMaterial3D_glow")
-size = Vector2(0.2, 0.2)
+size = Vector2(0.11, 0.11)
 
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_dust"]
 emission_shape = 3
-emission_box_extents = Vector3(0.8, 0.05, 0.1)
+emission_box_extents = Vector3(0.44, 0.03, 0.055)
 direction = Vector3(0, 1, 1)
 spread = 30.0
-initial_velocity_min = 1.0
-initial_velocity_max = 2.5
-gravity = Vector3(0, -2, 0)
+initial_velocity_min = 0.55
+initial_velocity_max = 1.4
+gravity = Vector3(0, -1.1, 0)
 scale_min = 0.8
 scale_max = 1.6
 color = Color(0.55, 0.47, 0.32, 0.55)
@@ -78,7 +78,7 @@ particles_anim_loop = false
 
 [sub_resource type="QuadMesh" id="QuadMesh_dust"]
 material = SubResource("StandardMaterial3D_dust")
-size = Vector2(0.55, 0.55)
+size = Vector2(0.3, 0.3)
 
 [node name="Kart" type="CharacterBody3D" unique_id=933917689]
 floor_max_angle = 0.872665
@@ -98,7 +98,7 @@ shape = SubResource("CapsuleShape3D_floor")
 [node name="ModelSlot" type="Node3D" parent="Visual" unique_id=895319456]
 
 [node name="SparksL" type="GPUParticles3D" parent="Visual" unique_id=2132240072]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.74, 0.06, 0.78)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.41, 0.035, 0.43)
 emitting = false
 amount = 36
 lifetime = 0.35
@@ -106,7 +106,7 @@ process_material = SubResource("ParticleProcessMaterial_sparks")
 draw_pass_1 = SubResource("QuadMesh_spark")
 
 [node name="SparksR" type="GPUParticles3D" parent="Visual" unique_id=19121860]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.74, 0.06, 0.78)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.41, 0.035, 0.43)
 emitting = false
 amount = 36
 lifetime = 0.35
@@ -114,7 +114,7 @@ process_material = SubResource("ParticleProcessMaterial_sparks")
 draw_pass_1 = SubResource("QuadMesh_spark")
 
 [node name="Dust" type="GPUParticles3D" parent="Visual" unique_id=1459004230]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 0.9)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.055, 0.5)
 emitting = false
 amount = 24
 lifetime = 0.6

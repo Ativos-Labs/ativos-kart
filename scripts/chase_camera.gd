@@ -4,10 +4,12 @@ extends Camera3D
 ## abrindo com a velocidade (veja `_speed_fov`). Com a asa-delta aberta ela se afasta e sobe um pouco, para a asa caber por cima do kart.
 ## Na tela dividida cada jogador tem a sua (veja `fit_aspect`).
 
-@export var distance := 3.15
-@export var height := 1.55
-@export var look_height := 0.65
-@export var look_ahead := 2.2
+## Medidas da câmera para os karts de antes, multiplicadas por KartScale.CAMERA (os karts
+## e os pilotos encolheram no encaixe piloto × kart).
+@export var distance := 3.15 * KartScale.CAMERA
+@export var height := 1.55 * KartScale.CAMERA
+@export var look_height := 0.65 * KartScale.CAMERA
+@export var look_ahead := 2.2 * KartScale.CAMERA
 @export var follow_sharpness := 6.0
 @export var base_fov := 62.0
 
@@ -19,15 +21,15 @@ const HEIGHT_SHARPNESS := 8.0
 const HEIGHT_LEAD := 0.55
 ## Planando: quanto a câmera se afasta, sobe e levanta o olhar (m), e a rapidez da
 ## troca (fração por segundo).
-const GLIDE_DISTANCE := 1.8
-const GLIDE_HEIGHT := 0.55
-const GLIDE_LOOK := 1.0
+const GLIDE_DISTANCE := 1.8 * KartScale.ITEMS
+const GLIDE_HEIGHT := 0.55 * KartScale.ITEMS
+const GLIDE_LOOK := 1.0 * KartScale.ITEMS
 const GLIDE_BLEND_SPEED := 1.5
 ## Superpreferência (o kart vira o ofício gigante): a câmera sobe e se afasta para a
 ## folha caber e o carimbo aparecer.
-const SUPER_DISTANCE := 0.9
-const SUPER_HEIGHT := 1.5
-const SUPER_LOOK := 0.2
+const SUPER_DISTANCE := 0.9 * KartScale.ITEMS
+const SUPER_HEIGHT := 1.5 * KartScale.ITEMS
+const SUPER_LOOK := 0.2 * KartScale.ITEMS
 const SUPER_BLEND_SPEED := 2.0
 ## Campo de visão pela velocidade real (m/s), a mesma conta para todo kart e
 ## cilindrada (o 150cc abre mais que o 50cc): parado fica em `base_fov` e abre até
@@ -61,10 +63,10 @@ func fit_aspect(aspect: float) -> void:
 	if aspect > 2.4:
 		keep_aspect = Camera3D.KEEP_WIDTH
 		base_fov = 92.0
-		distance = 5.2
-		height = 2.25
-		look_height = 0.8
-		look_ahead = 3.0
+		distance = 5.2 * KartScale.CAMERA
+		height = 2.25 * KartScale.CAMERA
+		look_height = 0.8 * KartScale.CAMERA
+		look_ahead = 3.0 * KartScale.CAMERA
 	else:
 		keep_aspect = Camera3D.KEEP_HEIGHT
 	fov = base_fov
@@ -110,7 +112,7 @@ func _physics_process(delta: float) -> void:
 	var look := _look_point()
 	if _shake > 0.0:
 		_shake = move_toward(_shake, 0.0, delta * 2.5)
-		look += Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)) * _shake * 0.25
+		look += Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)) * _shake * 0.25 * KartScale.CAMERA
 	if global_position.distance_to(look) > 0.01:
 		look_at(look, Vector3.UP)
 
@@ -136,20 +138,29 @@ func _desired_position() -> Vector3:
 		var e := intro * intro * (3.0 - 2.0 * intro)
 		dir = _dir.rotated(Vector3.UP, e * PI * 0.92)
 		dist = lerpf(distance, distance * 1.15, e)
-		h = lerpf(height, 1.05, e)
+		h = lerpf(height, 1.05 * KartScale.CAMERA, e)
 	var g := _glide_amount()
 	dist += GLIDE_DISTANCE * g
 	h += GLIDE_HEIGHT * g
 	var su := _super * _super * (3.0 - 2.0 * _super)
 	dist += SUPER_DISTANCE * su
 	h += SUPER_HEIGHT * su
-	return target.global_position - dir * dist + Vector3.UP * h
+	return target.global_position - dir * dist + Vector3.UP * (h + _lift())
 
 
 func _look_point() -> Vector3:
 	var ahead := look_ahead * (1.0 - intro)
 	var su := _super * _super * (3.0 - 2.0 * _super)
-	return target.global_position + Vector3.UP * (look_height + GLIDE_LOOK * _glide_amount() + SUPER_LOOK * su) + _dir * ahead
+	return target.global_position + Vector3.UP * (look_height + _lift() + GLIDE_LOOK * _glide_amount() + SUPER_LOOK * su) + _dir * ahead
+
+
+## Veículos de banco alto (o piloto sentado mais alto que no Kart Padrão): a câmera e o
+## ponto para onde ela olha sobem o mesmo tanto, para a cabeça do piloto tapar a pista do
+## mesmo jeito em todos.
+func _lift() -> float:
+	if target == null or target.data == null:
+		return 0.0
+	return maxf(target.data.driver_origin().y, 0.0) * target.data.race_scale
 
 
 func _glide_amount() -> float:

@@ -71,7 +71,7 @@ const BIKE_LEAN_FULL_SPEED := 0.55
 const BIKE_LEAN_SHARPNESS := 6.0
 ## --- Pulos de rampa ---
 ## A frente do kart passou da borda da rampa (m antes da borda): decola.
-const LIP_REACH := 0.9
+const LIP_REACH := 0.9 * KartScale.ITEMS
 ## Desvio máximo (rad) entre o kart e a rampa na decolagem; acima disso a rampa
 ## endireita o kart (assim ninguém sai voando de lado por cima da mureta).
 const RAMP_ALIGN_MAX := 0.24
@@ -98,7 +98,7 @@ const TRICK_MIN_TIME := 0.3
 ## Folga (s) entre o fim da manobra e a aterrissagem prevista.
 const TRICK_LAND_MARGIN := 0.1
 ## Altura do eixo do giro da manobra (meio do kart).
-const TRICK_PIVOT := 0.55
+const TRICK_PIVOT := 0.55 * KartScale.ITEMS
 ## Queda livre (sem rampa) a partir deste tempo no ar também conta como pulo.
 const LONG_AIR_TIME := 0.5
 ## --- Asa-delta ---
@@ -186,14 +186,14 @@ const REV_WHEEL_SPEED := 14.0
 ## Balanço da traseira (rad, em volta do eixo da frente), tremida do motor (rad de
 ## inclinação e m de pulinho) e o bico que sobe com a traseira agachada (rad).
 const REV_SWAY := 0.05
-const REV_SHAKE := 0.012
-const REV_BOUNCE := 0.01
+const REV_SHAKE := 0.012 * KartScale.ITEMS
+const REV_BOUNCE := 0.01 * KartScale.ITEMS
 const REV_SQUAT := 0.03
 ## Fumaça dos pneus: partículas por roda de trás e duração de cada uma (s).
 const REV_SMOKE_AMOUNT := 18
 const REV_SMOKE_LIFETIME := 0.95
 ## --- Marcas de pneu ---
-const MARK_WIDTH := 0.27
+const MARK_WIDTH := 0.27 * KartScale.ITEMS
 const ROAD_MARK := Color(0.04, 0.04, 0.05, 0.62)
 const DRIFT_COLORS := [
 	Color(1.0, 0.95, 0.8, 0.55),
@@ -477,7 +477,7 @@ func apply_data(d: KartData, c: CharacterData = null) -> void:
 		var p := _dust_emitters[i]
 		p.visible = i < _rear_points.size()
 		if p.visible:
-			p.position = _rear_points[i] + Vector3(0.0, 0.08, 0.15)
+			p.position = _rear_points[i] + Vector3(0.0, 0.08, 0.15) * KartScale.ITEMS
 	_rev_pivot = kart_visual.front_axle_center() * d.race_scale
 	_setup_rev_smoke()
 	_apply_hitbox(d.hitbox_size)
@@ -504,7 +504,7 @@ func _setup_glider() -> void:
 	glider_visual.name = "AsaDelta"
 	add_child(glider_visual)
 	glider_visual.setup(g)
-	_glider_mount = glider_visual.fit_to(kart_visual) if kart_visual else Vector3(0.0, 0.9, 0.0)
+	_glider_mount = glider_visual.fit_to(kart_visual) if kart_visual else Vector3(0.0, 0.9 * KartScale.ITEMS, 0.0)
 	if gliding:
 		glider_visual.set_open(true, true)
 
@@ -548,8 +548,14 @@ func _place_sparks() -> void:
 	sparks_right.position = _scene_spark_points[1]
 	if _rear_points.size() == 1:
 		var p := _rear_points[0]
-		sparks_left.position = Vector3(p.x - 0.1, _scene_spark_points[0].y, p.z)
-		sparks_right.position = Vector3(p.x + 0.1, _scene_spark_points[1].y, p.z)
+		sparks_left.position = Vector3(p.x - 0.1 * KartScale.ITEMS, _scene_spark_points[0].y, p.z)
+		sparks_right.position = Vector3(p.x + 0.1 * KartScale.ITEMS, _scene_spark_points[1].y, p.z)
+	elif _rear_points.size() == 2:
+		# Nas rodas de trás, um pouco para fora (o tamanho de cada kart saiu do encaixe).
+		var l := _rear_points[0] if _rear_points[0].x < _rear_points[1].x else _rear_points[1]
+		var r := _rear_points[1] if _rear_points[0].x < _rear_points[1].x else _rear_points[0]
+		sparks_left.position = Vector3(l.x - 0.04, _scene_spark_points[0].y, l.z)
+		sparks_right.position = Vector3(r.x + 0.04, _scene_spark_points[1].y, r.z)
 
 
 ## Fumaça dos pneus da largada (só nos karts dos jogadores): uma por roda de trás, com
@@ -575,7 +581,7 @@ func _setup_rev_smoke() -> void:
 		var p := _rev_smoke[i]
 		p.visible = i < _rear_points.size()
 		if p.visible:
-			p.position = _rear_points[i] + Vector3(0.0, 0.1, 0.12)
+			p.position = _rear_points[i] + Vector3(0.0, 0.1, 0.12) * KartScale.ITEMS
 
 
 ## Fumaça branca de pneu: sai para trás e para cima, perde a força logo, sobe devagar
@@ -583,14 +589,14 @@ func _setup_rev_smoke() -> void:
 func _rev_smoke_material() -> ParticleProcessMaterial:
 	var m := ParticleProcessMaterial.new()
 	m.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
-	m.emission_box_extents = Vector3(0.1, 0.03, 0.06)
+	m.emission_box_extents = Vector3(0.1, 0.03, 0.06) * KartScale.ITEMS
 	m.direction = Vector3(0.0, 1.0, 0.8)
 	m.spread = 35.0
-	m.initial_velocity_min = 1.0
-	m.initial_velocity_max = 2.2
-	m.damping_min = 1.5
-	m.damping_max = 2.5
-	m.gravity = Vector3(0.0, 1.8, 0.0)
+	m.initial_velocity_min = 1.0 * KartScale.ITEMS
+	m.initial_velocity_max = 2.2 * KartScale.ITEMS
+	m.damping_min = 1.5 * KartScale.ITEMS
+	m.damping_max = 2.5 * KartScale.ITEMS
+	m.gravity = Vector3(0.0, 1.8, 0.0) * KartScale.ITEMS
 	m.scale_min = 1.1
 	m.scale_max = 2.0
 	m.color = Color(0.86, 0.86, 0.86, 0.62)
@@ -1191,7 +1197,7 @@ func _update_parcel(delta: float, throttle: float, on_floor: bool) -> bool:
 		if on_floor and throttle > 0.05:
 			_vertical = PARCEL_HOP
 			on_floor = false
-			_squash_vel -= 0.5
+			_squash_vel -= 0.5 * KartScale.ITEMS
 	_parcel_phase -= delta
 	_parcel_left -= delta
 	var moving := _parcel_phase > PARCEL_STEP * (1.0 - PARCEL_MOVE)
@@ -1648,7 +1654,7 @@ func _on_landed(fall_speed: float) -> void:
 		return
 	var strength := clampf(fall_speed / 22.0, 0.0, 1.0)
 	# A suspensão afunda e volta (mola no _update_visuals).
-	_squash_vel -= 0.6 + strength * 1.1
+	_squash_vel -= (0.6 + strength * 1.1) * KartScale.ITEMS
 	_land_dust = 0.3
 	if driver:
 		driver.bounce(-1.0 - strength * 1.2)
@@ -1777,7 +1783,7 @@ func _update_visuals(delta: float, steer: float) -> void:
 	_ground_roll = lerpf(_ground_roll, ground_roll, ground_smooth)
 	# Mola da suspensão (afunda na aterrissagem e volta).
 	_squash_vel += (-_squash * 170.0 - _squash_vel * 13.0) * delta
-	_squash = clampf(_squash + _squash_vel * delta, -0.16, 0.08)
+	_squash = clampf(_squash + _squash_vel * delta, -0.16 * KartScale.ITEMS, 0.08 * KartScale.ITEMS)
 	var xf := Transform3D(Basis.from_euler(Vector3(_visual_pitch + _ground_pitch, _visual_yaw, _visual_roll + _ground_roll)),
 			Vector3(0.0, _squash + visual_lift, 0.0))
 	# Deságio: o modelo encolhe (e volta) numa mola com um balanço.

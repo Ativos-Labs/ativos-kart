@@ -9,7 +9,7 @@ extends Node3D
 const LABEL_TEX := preload("res://assets/textures/itens/carimbo_etiqueta.png")
 const MARK_TEX := preload("res://assets/textures/itens/indeferido.png")
 ## Altura do centro do carimbo acima do chão (m) e giro (rad/s).
-const HOVER := 0.55
+const HOVER := 0.55 * KartScale.ITEMS
 const SPIN := 9.0
 ## Proporção da marca (altura / largura).
 const MARK_ASPECT := 208.0 / 512.0

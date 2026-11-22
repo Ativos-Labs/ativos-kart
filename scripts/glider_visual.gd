@@ -17,10 +17,15 @@ const OPEN_TIME := 0.4
 const CLOSE_TIME := 0.2
 ## Fechada, a asa fica dobrada para trás deste ângulo (rad) e bem estreita.
 const FOLDED_PITCH := 1.25
-## Altura da base da asa acima do banco (m): a vela fica bem acima da cabeça do piloto.
-const MOUNT_HEIGHT := 0.6
+## Tamanho da asa em relação ao modelo (feito para os karts de antes do encaixe piloto ×
+## kart; os karts e os pilotos encolheram).
+const SAIL_SCALE := KartScale.ITEMS
+## Altura da base da asa acima da origem do piloto (KartData.driver_origin), no kart e na
+## moto (m): a vela (de 0,61 a 1,02 m acima da base) fica ~30 cm acima da cabeça.
+const MOUNT_HEIGHT := 0.56
+const MOUNT_HEIGHT_BIKE := 0.68
 ## Centro da vela em relação à base do modelo, já com a inclinação PITCH: a base vai
-## este tanto para a frente para a vela ficar no meio do kart (m).
+## este tanto para a frente para a vela ficar no meio do kart (m, no tamanho do modelo).
 const SAIL_BACK := 0.37
 ## Onde as cordas prendem na carroceria: fração da largura do kart para cada lado, e
 ## fração do comprimento a partir da frente (cordas da frente) e de trás (de trás).
@@ -80,7 +85,7 @@ func setup(d: GliderData) -> void:
 		_cords.append(cord)
 		_cord_tops.append(top)
 		_cord_bottoms.append(bottom)
-		_anchors.append(top + bottom)
+		_anchors.append((top + bottom) * SAIL_SCALE)
 	_time = randf() * 10.0
 	_apply()
 
@@ -112,13 +117,15 @@ static func clear_cache() -> void:
 ## do kart, acima da cabeça do piloto. Chame depois de `setup`.
 func fit_to(kv: KartVisual) -> Vector3:
 	var b := kart_bounds(kv)
-	var seat := kv.kart_data.seat_position if kv.kart_data else Vector3(0.0, 0.33, 0.3)
-	var mount := Vector3(0.0, seat.y + MOUNT_HEIGHT, b.get_center().z - SAIL_BACK)
+	var bike := kv.kart_data != null and kv.kart_data.is_bike()
+	var origin := kv.kart_data.driver_origin() if kv.kart_data else Vector3.ZERO
+	var seat := kv.kart_data.seat_point if kv.kart_data else KartData.REF_SEAT
+	var mount := Vector3(0.0, origin.y + (MOUNT_HEIGHT_BIKE if bike else MOUNT_HEIGHT),
+			b.get_center().z - SAIL_BACK * SAIL_SCALE)
 	# Pontos da carroceria: em cima das laterais, na frente e atrás do piloto. Numa moto
 	# a caixa inclui o guidão: as cordas prendem rente ao corpo dela.
-	var bike := kv.kart_data != null and kv.kart_data.turn_lean_degrees > 0.0
 	var side := b.size.x * (ANCHOR_SIDE_BIKE if bike else ANCHOR_SIDE)
-	var y := clampf(seat.y + 0.12, b.position.y + b.size.y * 0.25, b.end.y)
+	var y := clampf(seat.y + 0.12 * KartScale.ITEMS, b.position.y + b.size.y * 0.25, b.end.y)
 	var front := b.position.z + b.size.z * ANCHOR_FRONT
 	var rear := b.end.z - b.size.z * ANCHOR_REAR
 	for i in _cords.size():
@@ -148,8 +155,8 @@ static func kart_bounds(kv: KartVisual) -> AABB:
 			out = box if first else out.merge(box)
 			first = false
 	if first:
-		# Sem modelo: um kart padrão (2,4 m de comprimento).
-		out = AABB(Vector3(-0.75, 0.0, -1.2), Vector3(1.5, 0.9, 2.4))
+		# Sem modelo: um kart padrão (1,13 m de comprimento).
+		out = AABB(Vector3(-0.44, 0.0, -0.56), Vector3(0.87, 0.44, 1.13))
 	return out
 
 
@@ -191,7 +198,7 @@ func _apply() -> void:
 	var k := openness
 	# Abrindo: passa um pouco do tamanho e volta (estalo do tecido). Fechando: encolhe.
 	var e := _ease_out_back(k) if _opening else k * k * (3.0 - 2.0 * k)
-	var s := Vector3(lerpf(0.12, 1.0, e), lerpf(0.35, 1.0, e), lerpf(0.5, 1.0, e))
+	var s := Vector3(lerpf(0.12, 1.0, e), lerpf(0.35, 1.0, e), lerpf(0.5, 1.0, e)) * SAIL_SCALE
 	var wobble := sway * clampf(k, 0.0, 1.0)
 	var pitch := lerpf(FOLDED_PITCH, PITCH, clampf(e, 0.0, 1.15)) + lift \
 			+ sin(_time * 1.7) * 0.03 * wobble

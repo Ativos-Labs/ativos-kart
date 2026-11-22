@@ -20,10 +20,13 @@ const SHADER := preload("res://shaders/obstacle.gdshader")
 const WAVE_SHADER := preload("res://shaders/obstacle_wave.gdshader")
 const LOGO_ICON := preload("res://assets/logos/ativos_icone.png")
 ## Meio do kart acima do chão e "raio" do kart nas contas de batida (m), para a caixa
-## padrão dos karts; veículo menor desconta Kart.hitbox_shrink (veja _hits).
-const KART_CENTER := 0.55
+## padrão da cena (res://scenes/kart.tscn); cada veículo desconta Kart.hitbox_shrink, a
+## diferença da caixa dele para essa (veja _hits). Na altura vale o tamanho dos karts do
+## encaixe piloto × kart (KartScale.ITEMS).
+const KART_CENTER := 0.55 * KartScale.ITEMS
 const KART_RADIUS := 0.8
 const KART_HALF_LENGTH := 1.0
+const KART_HALF_HEIGHT := 0.8 * KartScale.ITEMS
 ## Onda: comprimento do trecho (m), altura máxima (m) e fases (s): chegando pelo mar,
 ## atravessando a pista e sumindo. Depois um tempo de calmaria.
 const WAVE_LENGTH := 26.0
@@ -514,10 +517,10 @@ func _hits(m: Mover, kx: float, ky: float, kz: float, shrink := Vector2.ZERO) ->
 		return false
 	# Alcance do obstáculo + kart em cada eixo (elipse; num kart comum é um círculo).
 	var dx := (kx - st.x) / maxf(r + KART_RADIUS - shrink.x, 0.1)
-	var dy := (ky - st.y) / (r + KART_RADIUS)
+	var dy := (ky - st.y) / (r + KART_HALF_HEIGHT)
 	if m.kind == Kind.NEVE:
 		dx = (kx - st.x) / maxf(r + KART_RADIUS + 0.1 - shrink.x, 0.1)
-		dy = (ky - st.y) / (r + KART_RADIUS + 0.1)
+		dy = (ky - st.y) / (r + KART_HALF_HEIGHT + 0.1)
 		var dzn := dz / maxf(r + KART_RADIUS + 0.1 - shrink.y, 0.1)
 		return Vector3(dx, dy, dzn).length() < 1.0
 	return Vector2(dx, dy).length() < 1.0
@@ -554,7 +557,7 @@ func lane_danger(along: float, speed: float, lanes: PackedFloat32Array) -> Packe
 					center = st.x - m.side * 0.2
 				else:
 					# Pneu no alto do pulo: passa por baixo.
-					if st.y - m.radius * st.z > 1.3:
+					if st.y - m.radius * st.z > KART_CENTER + KART_HALF_HEIGHT:
 						continue
 					reach = m.radius * st.z + 1.3
 				if absf(center) > _road_half + reach:

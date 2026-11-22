@@ -9,20 +9,24 @@ extends Node3D
 
 const COIN_SCENE := preload("res://assets/models/moeda/moeda.glb")
 const SHADER := preload("res://shaders/coin.gdshader")
+## Tamanho da moeda em relação ao modelo (feito para os karts de antes do encaixe piloto
+## × kart, que encolheram).
+const COIN_SCALE := KartScale.ITEMS
 ## Altura do centro da moeda acima do asfalto (m).
-const HEIGHT := 0.95
-## Raio (no plano) e meia altura da área de coleta, medidos do meio do kart (um kart
-## comum; veículo mais estreito desconta Kart.hitbox_shrink do raio).
-const PICK_RADIUS := 1.55
-const PICK_HEIGHT := 1.3
+const HEIGHT := 0.95 * KartScale.ITEMS
+## Área de coleta, medida do meio do kart: no plano, meia largura da caixa de batida do
+## kart (Kart.hitbox_size) mais este alcance (o raio da moeda e uma folga); na altura,
+## esta meia altura.
+const PICK_REACH := 0.78 * KartScale.ITEMS
+const PICK_HEIGHT := 1.3 * KartScale.ITEMS
 ## Altura do meio do kart acima do chão (m).
-const KART_CENTER := 0.55
+const KART_CENTER := 0.55 * KartScale.ITEMS
 const RESPAWN_TIME := 12.0
 ## Lado das células da grade de busca (m).
 const CELL := 8.0
 ## Moeda que voa ao ser pega: duração (s), subida (m) e quantas podem voar juntas.
 const POP_TIME := 0.42
-const POP_RISE := 1.6
+const POP_RISE := 1.6 * KartScale.ITEMS
 const POP_POOL := 10
 const GROW_TIME := 0.35
 
@@ -104,7 +108,8 @@ func setup(p_positions: PackedVector3Array, directions: PackedVector3Array, with
 	for i in count:
 		var dir := directions[i] if i < directions.size() else Vector3.FORWARD
 		dir.y = 0.0
-		_bases.append(Basis.looking_at(dir.normalized() if dir.length_squared() > 0.001 else Vector3.FORWARD, Vector3.UP))
+		_bases.append(Basis.looking_at(dir.normalized() if dir.length_squared() > 0.001 else Vector3.FORWARD, Vector3.UP)
+				.scaled(Vector3.ONE * COIN_SCALE))
 		var cell := _cell_of(positions[i])
 		if not _grid.has(cell):
 			_grid[cell] = PackedInt32Array()
@@ -187,8 +192,8 @@ func _physics_process(delta: float) -> void:
 		var kart := node as Kart
 		if kart == null:
 			continue
-		# Veículo mais estreito que um kart (moto) precisa passar mais perto da moeda.
-		var r := PICK_RADIUS - kart.hitbox_shrink.x
+		# Veículo mais estreito (moto) precisa passar mais perto da moeda.
+		var r := kart.hitbox_size.x * 0.5 + PICK_REACH
 		var r2 := r * r
 		var p := inv * kart.global_position + Vector3(0.0, KART_CENTER, 0.0)
 		var cell := _cell_of(p)
@@ -228,10 +233,10 @@ func _respawn_due() -> void:
 func burst(at: Vector3, count: int) -> void:
 	if _pops.is_empty():
 		return
-	var local := global_transform.affine_inverse() * at + Vector3.UP * 0.8
+	var local := global_transform.affine_inverse() * at + Vector3.UP * 0.8 * KartScale.ITEMS
 	for i in count:
 		var a := TAU * (float(i) / count) + randf() * 0.8
-		_spawn_pop(local, Vector3(cos(a), 0.0, sin(a)) * 2.2)
+		_spawn_pop(local, Vector3(cos(a), 0.0, sin(a)) * 2.2 * KartScale.ITEMS)
 
 
 func _spawn_pop(at: Vector3, drift := Vector3.ZERO) -> void:
@@ -247,7 +252,7 @@ func _spawn_pop(at: Vector3, drift := Vector3.ZERO) -> void:
 	_pop_dir[best] = drift
 	var pop := _pops[best]
 	pop.position = at
-	pop.scale = Vector3.ONE
+	pop.scale = Vector3.ONE * COIN_SCALE
 	pop.visible = true
 
 
@@ -271,7 +276,7 @@ func _process(delta: float) -> void:
 		var u := clampf(_pop_t[k] / POP_TIME, 0.0, 1.0)
 		var pop := _pops[k]
 		pop.position = _pop_from[k] + _pop_dir[k] * u + Vector3.UP * POP_RISE * (1.0 - (1.0 - u) * (1.0 - u))
-		pop.scale = Vector3.ONE * lerpf(1.0, 0.25, u * u)
+		pop.scale = Vector3.ONE * lerpf(1.0, 0.25, u * u) * COIN_SCALE
 		if u >= 1.0:
 			_pop_t[k] = -1.0
 			pop.visible = false

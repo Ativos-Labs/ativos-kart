@@ -29,12 +29,12 @@ const SKY_MINUS_SIZE := 0.45
 ## Raios guardados para cair ao mesmo tempo.
 const BOLTS := 8
 const BOLT_HEIGHT := 42.0
-const MARK_HEIGHT := 2.4
+const MARK_HEIGHT := 2.4 * KartScale.ITEMS
 ## Correção monetária: moedas da chuva (quantas podem cair juntas), tamanho, altura de
 ## onde caem (m, acima do kart) e intervalo entre elas (s).
 const SHOWER_COINS := 6
-const SHOWER_SCALE := 0.5
-const SHOWER_HEIGHT := 1.85
+const SHOWER_SCALE := 0.5 * KartScale.ITEMS
+const SHOWER_HEIGHT := 1.85 * KartScale.ITEMS
 const SHOWER_GAP := 0.16
 
 var ghost: CessaoGhost
@@ -270,7 +270,7 @@ func ink_mark(k: Kart, duration: float, layers := 1) -> void:
 		label.font = UiKit.FONT_TITLE
 		label.font_size = 110
 		label.outline_size = 22
-		label.pixel_size = 0.011
+		label.pixel_size = 0.011 * KartScale.CAMERA
 		label.modulate = RaceItem.INK_BLOB
 		label.outline_modulate = Color.WHITE
 		label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -289,7 +289,7 @@ func ink_mark(k: Kart, duration: float, layers := 1) -> void:
 	tw.tween_property(label, "scale", Vector3.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	var bobs := maxi(int((duration - 0.6) / 0.3), 1)
 	for i in bobs:
-		tw.tween_property(label, "position:y", MARK_HEIGHT + (0.18 if i % 2 == 0 else 0.0), 0.3) \
+		tw.tween_property(label, "position:y", MARK_HEIGHT + (0.18 * KartScale.ITEMS if i % 2 == 0 else 0.0), 0.3) \
 				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	tw.tween_property(label, "modulate:a", 0.0, 0.35)
 	tw.parallel().tween_property(label, "outline_modulate:a", 0.0, 0.35)
@@ -339,19 +339,19 @@ func coin_shower(k: Kart, count: int, on_coin: Callable) -> void:
 		if coin.visible:
 			continue
 		var delay := used * SHOWER_GAP
-		var side := (used - (count - 1) * 0.5) * 0.7
+		var side := (used - (count - 1) * 0.5) * 0.7 * KartScale.ITEMS
 		used += 1
 		if coin.get_parent() != k:
 			coin.get_parent().remove_child(coin)
 			k.add_child(coin)
-		coin.position = Vector3(side, SHOWER_HEIGHT, 0.3)
+		coin.position = Vector3(side, SHOWER_HEIGHT, 0.3 * KartScale.ITEMS)
 		coin.scale = Vector3.ONE * 0.01
 		coin.visible = true
 		coin.reset_physics_interpolation()
 		var tw := _tween(coin)
 		tw.tween_property(coin, "scale", Vector3.ONE * SHOWER_SCALE, 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		tw.tween_interval(0.12 + delay)
-		tw.tween_property(coin, "position", Vector3(0.0, 0.7, 0.0), 0.22).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		tw.tween_property(coin, "position", Vector3(0.0, 0.7 * KartScale.ITEMS, 0.0), 0.22).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 		tw.parallel().tween_property(coin, "scale", Vector3.ONE * SHOWER_SCALE * 0.4, 0.22)
 		tw.tween_callback(_coin_landed.bind(coin, on_coin))
 	# Sem moeda livre na chuva (muitas juntas): as que faltam entram direto.

@@ -173,12 +173,14 @@ func _spawn_kart(data: KartData, character: CharacterData, parent: Node3D, dir: 
 	var visual := KartVisual.new()
 	parent.add_child(visual)
 	visual.setup(data, character)
+	var size := visual.showcase_scale()
+	visual.scale = Vector3.ONE * size
 	if dir != 0:
 		visual.position.x = dir * 4.0
-		visual.scale = Vector3.ONE * 0.7
+		visual.scale = Vector3.ONE * 0.7 * size
 		var tw := create_tween().set_parallel().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		tw.tween_property(visual, "position:x", 0.0, 0.4)
-		tw.tween_property(visual, "scale", Vector3.ONE, 0.4)
+		tw.tween_property(visual, "scale", Vector3.ONE * size, 0.4)
 	return visual
 
 

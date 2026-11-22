@@ -13,6 +13,9 @@ signal called
 const TEX := preload("res://assets/textures/itens/senha.png")
 ## Tamanho do papel (m) e onde fica o número nele (fração da altura, a partir de cima).
 const SIZE := Vector2(0.56, 0.875)
+## Escala do nó (a senha foi feita para os pilotos de antes do encaixe piloto × kart; ela
+## encolhe como a câmera, para continuar legível do mesmo tamanho na tela).
+const PAPER_SCALE := KartScale.CAMERA
 const NUMBER_AT := 0.525
 ## Quantas senhas o painel chama antes da do piloto.
 const CALLS_BEFORE := 3
@@ -82,7 +85,7 @@ func play(duration: float) -> void:
 	_show_call(number - CALLS_BEFORE)
 	_place()
 	visible = true
-	scale = Vector3.ONE * 0.15
+	scale = Vector3.ONE * 0.15 * PAPER_SCALE
 	_paper.position = Vector3.ZERO
 	_paper.rotation = Vector3.ZERO
 	_paper.scale = Vector3.ONE
@@ -91,7 +94,7 @@ func play(duration: float) -> void:
 	if _tween:
 		_tween.kill()
 	_tween = create_tween().set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)
-	_tween.tween_property(self, "scale", Vector3.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_tween.tween_property(self, "scale", Vector3.ONE * PAPER_SCALE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	set_physics_process(true)
 
 
@@ -150,7 +153,7 @@ func _place() -> void:
 		var hand := d.hand_global(1)
 		if hand.is_finite():
 			fist = fist.lerp(kv.to_local(hand), clampf(kv.hand_raise, 0.0, 1.0))
-	position = fist + Vector3(0.0, SIZE.y * 0.5 + 0.04, 0.02)
+	position = fist + Vector3(0.0, SIZE.y * 0.5 + 0.04, 0.02) * PAPER_SCALE
 
 
 func _show_call(value: int) -> void:

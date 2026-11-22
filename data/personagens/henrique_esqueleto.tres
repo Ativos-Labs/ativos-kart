@@ -17,6 +17,11 @@ face = PackedStringArray("Canto_Boca.L", "Canto_Boca.R", "Labio_Sup", "Labio_Inf
 eyes = PackedStringArray("Olho.L", "Olho.R")
 lids = PackedStringArray("Palpebra_Sup.L", "Palpebra_Sup.R", "Palpebra_Inf.L", "Palpebra_Inf.R")
 eyelid_closed_offset = 0.0
+follow_bones = {
+"Quadril_Meio.L": "LeftUpLeg",
+"Quadril_Meio.R": "RightUpLeg"
+}
+follow_share = 0.5
 animations = ExtResource("2_anims")
 stand_idle = &"idle_stand"
 drive_pose = &"drive_kart"
@@ -24,15 +29,13 @@ bike_pose = &"drive_moto"
 lean_forward = 0.0
 bend_elbows = true
 elbow_pole = Vector3(0.8, -0.6, 0)
-grip_point = Vector3(0.0085, 0.0439, -0.0198)
-grip_axis = Vector3(0.945, 0.233, -0.232)
+grip_point = Vector3(0.0002, 0.0524, -0.0038)
+grip_axis = Vector3(1, 0.0004, 0.0016)
+grip_point_right = Vector3(0.016, 0.0604, -0.0279)
+grip_axis_right = Vector3(-0.8769, 0.0004, -0.4808)
 max_arm_stretch = 1.5
 max_wrist_bend_degrees = 35.0
-max_seat_slide = 0.18
+max_seat_slide = 0.0
 head_counter = 0.9
-max_reach_lean = 1.0
-fit_seat = true
-hip_above_seat = 0.102
-hip_ahead_of_back = 0.111
-foot_length = 0.165
-ankle_lift = 0.063
+max_reach_lean = 0.4
+fit_seat = false

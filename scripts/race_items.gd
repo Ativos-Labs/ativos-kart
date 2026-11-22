@@ -51,7 +51,7 @@ const AI_CELER_GAP := Vector2(0.45, 0.9)
 const SUPER_TIME := Vector2(4.5, 6.5)
 const SUPER_SPEED := 1.6
 const SUPER_ACCEL := 30.0
-const SUPER_HIT_RADIUS := 2.8
+const SUPER_HIT_RADIUS := 2.8 * KartScale.ITEMS
 const SUPER_PUSH := 7.0
 ## Correção monetária: quantas moedas.
 const CORRECAO_COINS := 3
@@ -560,7 +560,7 @@ func _superpreferencia(h: Holder) -> void:
 	var local := track.to_local(k.global_position)
 	var index := track.get_closest_index(local, h.racer.index)
 	run.along = track.get_along(local, index)
-	var edge := track.road_width * 0.5 - 2.0
+	var edge := track.road_width * 0.5 - 2.0 * KartScale.ITEMS
 	run.lateral = clampf(track.get_lateral(local, index), -edge, edge)
 	var road := track.global_transform * track.get_transform_at(run.along, run.lateral).origin
 	run.offset = k.global_position - road
@@ -592,7 +592,7 @@ func _super_rail(k: Kart, delta: float, h: Holder) -> Transform3D:
 		return k.global_transform
 	run.speed = move_toward(run.speed, run.top, SUPER_ACCEL * delta)
 	run.along += run.speed * delta
-	var edge := track.road_width * 0.5 - 2.0
+	var edge := track.road_width * 0.5 - 2.0 * KartScale.ITEMS
 	var goal := clampf((_line.lateral_at(run.along + 20.0) if _line else 0.0) * 0.6, -edge, edge)
 	run.lateral = move_toward(run.lateral, goal, 4.5 * delta)
 	run.offset *= exp(-5.0 * delta)

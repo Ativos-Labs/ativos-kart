@@ -6,29 +6,29 @@
 
 [sub_resource type="Resource" id="Resource_saida1"]
 script = ExtResource("3_exhaust")
-position = Vector3(0.39, 0.845, 1.06)
+position = Vector3(0.230188, 0.498741, 0.625639)
 direction = Vector3(0.25, 0.68, 0.69)
-radius = 0.09
-length = 0.8
+radius = 0.05312
+length = 0.47218
 
 [sub_resource type="Resource" id="Resource_saida2"]
 script = ExtResource("3_exhaust")
-position = Vector3(-0.39, 0.845, 1.06)
+position = Vector3(-0.230188, 0.498741, 0.625639)
 direction = Vector3(-0.25, 0.68, 0.69)
-radius = 0.09
-length = 0.8
+radius = 0.05312
+length = 0.47218
 
 [sub_resource type="Resource" id="Resource_saida3"]
 script = ExtResource("3_exhaust")
-position = Vector3(0.06, 0.25, 1.08)
-radius = 0.035
-length = 0.45
+position = Vector3(0.035414, 0.147556, 0.637444)
+radius = 0.020658
+length = 0.265602
 
 [sub_resource type="Resource" id="Resource_saida4"]
 script = ExtResource("3_exhaust")
-position = Vector3(-0.06, 0.25, 1.08)
-radius = 0.035
-length = 0.45
+position = Vector3(-0.035414, 0.147556, 0.637444)
+radius = 0.020658
+length = 0.265602
 
 [resource]
 script = ExtResource("1_data")
@@ -36,22 +36,26 @@ display_name = "Bólido"
 description = "Kart de corrida clássico, de motor grande e escapamento duplo. Rápido e bem equilibrado."
 credits = "Modelo de kart por drance (Sketchfab) — CC BY-SA 4.0, modificado"
 model_scene = ExtResource("2_model")
-model_scale = 0.024
+model_scale = 0.014165
 model_rotation_degrees = Vector3(0, 0, 0)
-model_offset = Vector3(0, 0.473, -4.765)
+model_offset = Vector3(0, 0.279177, -2.812425)
 speed = 4
 front_wheels = PackedStringArray("RodaFrenteEsq", "RodaFrenteDir")
 rear_wheels = PackedStringArray("RodaTrasEsq", "RodaTrasDir")
-front_wheel_radius = 0.238
-rear_wheel_radius = 0.247
-seat_position = Vector3(0, 0.353, 0.131)
+front_wheel_radius = 0.140474
+rear_wheel_radius = 0.145786
+seat_position = Vector3(0, 0.20835, 0.07732)
+seat_point = Vector3(0, 0.20953, 0.091485)
 steering_wheel_nodes = PackedStringArray("Volante")
-steering_wheel_center = Vector3(0, 0.784, -0.377)
+steering_wheel_center = Vector3(0, 0.462737, -0.222515)
 steering_wheel_axis = Vector3(0, 0.573, 0.82)
-steering_wheel_radius = 0.14
-seat_back_point = Vector3(0, 0.36, 0.17)
+steering_wheel_radius = 0.082632
+seat_back_point = Vector3(0, 0.212481, 0.100338)
 seat_back_angle = 16.0
-seat_front_z = -0.2
-floor_height = 0.26
-foot_limit_z = -0.4
+seat_front_z = -0.118045
+floor_height = 0.153459
+foot_limit_z = -0.23609
 exhausts = Array[ExtResource("3_exhaust")]([SubResource("Resource_saida1"), SubResource("Resource_saida2"), SubResource("Resource_saida3"), SubResource("Resource_saida4")])
+hand_grip_point = Vector3(0, 0, 0)
+foot_spread = 0.070827
+hitbox_size = Vector3(0.911276, 0.295113, 1.27325)

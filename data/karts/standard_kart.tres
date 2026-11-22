@@ -6,17 +6,17 @@
 
 [sub_resource type="Resource" id="Resource_saida1"]
 script = ExtResource("3_exhaust")
-position = Vector3(0.51, 0.821, 1.19)
+position = Vector3(0.235469, 0.379058, 0.549427)
 direction = Vector3(0.07, 0.47, 0.88)
-radius = 0.065
-length = 0.7
+radius = 0.030011
+length = 0.323192
 
 [sub_resource type="Resource" id="Resource_saida2"]
 script = ExtResource("3_exhaust")
-position = Vector3(-0.51, 0.821, 1.19)
+position = Vector3(-0.235469, 0.379058, 0.549427)
 direction = Vector3(-0.07, 0.47, 0.88)
-radius = 0.065
-length = 0.7
+radius = 0.030011
+length = 0.323192
 
 [resource]
 script = ExtResource("1_data")
@@ -24,19 +24,24 @@ display_name = "Kart Padrão"
 description = "Equilibrado em tudo. Ótimo para aprender a pilotar e dominar o drift."
 credits = "Modelo: “standard kart” por amogusstrikesback2 (Sketchfab) — CC BY 4.0, modificado"
 model_scene = ExtResource("2_model")
-model_scale = 0.13
-model_offset = Vector3(0, 0, 0.265)
+model_scale = 0.060021
+model_offset = Vector3(0, 0, 0.122351)
 front_wheels = PackedStringArray("normal_kart_root_polymsh13", "normal_kart_root_polymsh_detached")
 rear_wheels = PackedStringArray("normal_kart_root_polymsh_detached9", "normal_kart_root_polymsh_detached10")
-front_wheel_radius = 0.224
-rear_wheel_radius = 0.269
+front_wheel_radius = 0.103422
+rear_wheel_radius = 0.124198
 steering_wheel_nodes = PackedStringArray("normal_kart_root_torus")
-steering_wheel_center = Vector3(0, 0.665, -0.159)
+steering_wheel_center = Vector3(0, 0.307033, -0.073411)
 steering_wheel_axis = Vector3(0, 0.516, 0.857)
-steering_wheel_radius = 0.235
-seat_back_point = Vector3(0, 0.26, 0.5)
+steering_wheel_radius = 0.1085
+seat_back_point = Vector3(0, 0.120043, 0.230852)
 seat_back_angle = 13.0
-seat_front_z = -0.06
-floor_height = 0.18
-foot_limit_z = -0.32
+seat_front_z = -0.027702
+floor_height = 0.083107
+foot_limit_z = -0.147745
 exhausts = Array[ExtResource("3_exhaust")]([SubResource("Resource_saida1"), SubResource("Resource_saida2")])
+seat_position = Vector3(0, 0.152362, 0.138511)
+seat_point = Vector3(0, 0.11104, 0.240594)
+hand_grip_point = Vector3(0, 0, 0)
+foot_spread = 0.055404
+hitbox_size = Vector3(0.712845, 0.230852, 0.995998)

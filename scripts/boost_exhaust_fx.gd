@@ -97,9 +97,9 @@ func setup(data: KartData, with_light: bool) -> void:
 		_light.name = "LuzTurbo"
 		# Baixa e atrás do kart: tinge o asfalto (e só um pouco a traseira) com o
 		# brilho do fogo. Mais perto da carroceria ela pintava o kart todo.
-		_light.position = Vector3(center.x, 0.25, back + 0.6)
+		_light.position = Vector3(center.x, 0.25 * KartScale.ITEMS, back + 0.6 * KartScale.ITEMS)
 		_light.light_color = LIGHT_COLORS[main.style]
-		_light.omni_range = 2.6
+		_light.omni_range = 2.6 * KartScale.ITEMS
 		_light.light_specular = 0.2
 		_light.omni_attenuation = 1.4
 		_light.shadow_enabled = false
@@ -277,8 +277,8 @@ static func _make_sparks(points: Array[ImageTexture], soft: Texture2D, color: Co
 	var pm := _directed(points)
 	# Poucas e espalhadas (faíscas em fila contínua viravam um feixe de luz).
 	pm.spread = 30.0
-	pm.initial_velocity_min = 3.0
-	pm.initial_velocity_max = 7.0
+	pm.initial_velocity_min = 3.0 * KartScale.ITEMS
+	pm.initial_velocity_max = 7.0 * KartScale.ITEMS
 	pm.inherit_velocity_ratio = 0.95
 	pm.gravity = Vector3(0, -7.0, 0)
 	pm.damping_min = 1.0
@@ -301,7 +301,7 @@ static func _make_sparks(points: Array[ImageTexture], soft: Texture2D, color: Co
 	mat.albedo_texture = soft
 	mat.disable_fog = true
 	var quad := QuadMesh.new()
-	quad.size = Vector2(0.025, 0.12)
+	quad.size = Vector2(0.025, 0.12) * KartScale.ITEMS
 	quad.material = mat
 
 	var p := GPUParticles3D.new()
@@ -323,15 +323,16 @@ static func _make_sparks(points: Array[ImageTexture], soft: Texture2D, color: Co
 static func _make_smoke(points: Array[ImageTexture], soft: Texture2D, color: Color, radius: float, nozzles: int) -> GPUParticles3D:
 	var pm := _directed(points)
 	pm.spread = 25.0
-	pm.initial_velocity_min = 1.0
-	pm.initial_velocity_max = 2.5
+	pm.initial_velocity_min = 1.0 * KartScale.ITEMS
+	pm.initial_velocity_max = 2.5 * KartScale.ITEMS
 	pm.inherit_velocity_ratio = 0.75
-	pm.gravity = Vector3(0, 0.8, 0)
+	pm.gravity = Vector3(0, 0.8, 0) * KartScale.ITEMS
 	pm.damping_min = 2.0
 	pm.damping_max = 4.0
 	pm.angle_min = -180.0
 	pm.angle_max = 180.0
-	var base := clampf(radius / 0.07, 0.6, 1.6)
+	# Raio da saída em relação a uma de 7 cm nos karts de antes do encaixe piloto × kart.
+	var base := clampf(radius / (0.07 * KartScale.ITEMS), 0.6, 1.6)
 	pm.scale_min = 0.7 * base
 	pm.scale_max = 1.1 * base
 	var curve := Curve.new()
@@ -357,10 +358,10 @@ static func _make_smoke(points: Array[ImageTexture], soft: Texture2D, color: Col
 	mat.billboard_keep_scale = true
 	# Some perto da câmera (a fumaça passa por ela quando fica para trás).
 	mat.distance_fade_mode = BaseMaterial3D.DISTANCE_FADE_PIXEL_ALPHA
-	mat.distance_fade_min_distance = 0.6
-	mat.distance_fade_max_distance = 2.2
+	mat.distance_fade_min_distance = 0.6 * KartScale.CAMERA
+	mat.distance_fade_max_distance = 2.2 * KartScale.CAMERA
 	var quad := QuadMesh.new()
-	quad.size = Vector2(0.45, 0.45)
+	quad.size = Vector2(0.45, 0.45) * KartScale.ITEMS
 	quad.material = mat
 
 	var p := GPUParticles3D.new()

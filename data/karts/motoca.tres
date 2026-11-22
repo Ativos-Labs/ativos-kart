@@ -6,17 +6,17 @@
 
 [sub_resource type="Resource" id="Resource_saida1"]
 script = ExtResource("3_exhaust")
-position = Vector3(-0.243, 0.594, 0.893)
+position = Vector3(-0.188061, 0.459704, 0.691104)
 direction = Vector3(0, 0.39, 0.92)
-radius = 0.045
-length = 0.7
+radius = 0.034826
+length = 0.541739
 
 [sub_resource type="Resource" id="Resource_saida2"]
 script = ExtResource("3_exhaust")
-position = Vector3(0.264, 0.594, 0.893)
+position = Vector3(0.204313, 0.459704, 0.691104)
 direction = Vector3(0, 0.39, 0.92)
-radius = 0.045
-length = 0.7
+radius = 0.034826
+length = 0.541739
 
 [resource]
 script = ExtResource("1_data")
@@ -24,29 +24,31 @@ display_name = "Motoca"
 description = "A moto do grid: levíssima, arranca rápido e faz as curvas mais fechadas — mas qualquer encostão a tira da linha."
 credits = "Modelo por amogusstrikesback2 (Sketchfab) — CC BY 4.0, modificado"
 model_scene = ExtResource("2_model")
-model_scale = 1.25
+model_scale = 0.967391
 model_rotation_degrees = Vector3(0, -90, 0)
-model_offset = Vector3(0, 0.064, 0.377)
+model_offset = Vector3(0, 0.04953, 0.291765)
 race_scale = 0.8
 turn_lean_degrees = 28.0
-hitbox_size = Vector3(0.75, 0.5, 1.6)
+hitbox_size = Vector3(0.580435, 0.386957, 1.238261)
 acceleration = 4
 handling = 5
 weight = 1
 front_wheels = PackedStringArray("RodaFrente")
 rear_wheels = PackedStringArray("RodaTras")
-front_wheel_radius = 0.294
-rear_wheel_radius = 0.298
-seat_position = Vector3(0, 0.9, 0.44)
-steering_wheel_center = Vector3(0.01, 1.086, -0.13)
+front_wheel_radius = 0.22753
+rear_wheel_radius = 0.230626
+seat_position = Vector3(0, 0.696522, 0.340522)
+seat_point = Vector3(0, 0.681043, 0.255391)
+steering_wheel_center = Vector3(0.007739, 0.84047, -0.100609)
 steering_wheel_axis = Vector3(0, 0.3, 0.95)
-steering_wheel_radius = 0.415
+steering_wheel_radius = 0.321174
 hand_angle = 90.0
-hand_grip_point = Vector3(0.425, 1.086, -0.129)
+hand_grip_point = Vector3(0.328913, 0.84047, -0.099835)
 hand_grip_axis = Vector3(-0.96, 0.17, -0.223)
-seat_back_point = Vector3(0, 0.9, 0.56)
+seat_back_point = Vector3(0, 0.696522, 0.433391)
 seat_back_angle = 0.0
-seat_front_z = 0.3
-floor_height = 0.6
-foot_limit_z = 0.0
+seat_front_z = 0.232174
+floor_height = 0.464348
+foot_limit_z = 0
 exhausts = Array[ExtResource("3_exhaust")]([SubResource("Resource_saida1"), SubResource("Resource_saida2")])
+foot_spread = 0.09287

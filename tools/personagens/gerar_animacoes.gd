@@ -6,11 +6,9 @@ extends SceneTree
 ## idle_stand (parado em pé nas telas de seleção).
 ##
 ## - Expressões, piscada e poses sentadas: copiadas das animações do modelo
-##   (EXP_*, ANIM_Piscar, POSE_Kart, POSE_Moto), só com os ossos de cada grupo. O
-##   Henrique veio sem animações (e sem esqueleto; veja rig_henrique.py): as dele são as
-##   do Jarbas transferidas (_transfer), com o mesmo giro de cada osso no espaço do
-##   personagem, os deslocamentos do rosto na escala do rosto dele e as pálpebras na
-##   proporção da abertura delas (as do Henrique são mais caídas).
+##   (EXP_*, ANIM_Piscar, POSE_Kart, POSE_Moto), só com os ossos de cada grupo. Nas poses
+##   sentadas o deslocamento da raiz (que desce o corpo até o assento) passa para o
+##   quadril (veja _drive_pose).
 ## - Gestos, respiração, olhar e formatos de mão: transferidos das animações do
 ##   Celerino. Os dois estão em pose T, de frente para +Z, com a palma para baixo: cada
 ##   osso do braço (e da coluna, e os olhos) recebe o mesmo giro, no espaço do
@@ -25,14 +23,13 @@ extends SceneTree
 ## - Parado em pé (idle_stand): gerado aqui, o corpo todo (veja _idle_stand).
 ##
 ## Rode de novo depois de mudar o modelo (build_personagem.py) ou as animações do
-## Celerino (o Henrique também depois de mudar as do Jarbas):
+## Celerino:
 ##   Godot --headless --path . -s res://tools/personagens/gerar_animacoes.gd -- jarbas
 ##   Godot --headless --path . -s res://tools/personagens/gerar_animacoes.gd -- henrique
 ##   Godot --headless --path . -s res://tools/personagens/gerar_animacoes.gd -- ulysses
 
 const CELERINO := "res://assets/models/personagens/celerino.glb"
-## Modelo e saída de cada personagem. `from`: modelo de onde vêm as expressões e as poses
-## (quando o próprio não tem), com as medidas do rosto em `rig` (JSON de rig_henrique.py).
+## Modelo e saída de cada personagem.
 const CHARACTERS := {
 	"jarbas": {
 		"model": "res://assets/models/personagens/jarbas.glb",
@@ -41,8 +38,6 @@ const CHARACTERS := {
 	"henrique": {
 		"model": "res://assets/models/personagens/henrique.glb",
 		"out": "res://assets/models/personagens/henrique_animacoes.res",
-		"from": "res://assets/models/personagens/jarbas.glb",
-		"rig": "res://tools/personagens/henrique_esqueleto.json",
 	},
 	"ulysses": {
 		"model": "res://assets/models/personagens/ulysses.glb",
@@ -179,19 +174,13 @@ class Skel:
 
 ## Instâncias carregadas (liberadas no fim).
 var _loaded: Array[Node] = []
-## Esqueleto do personagem (j), do Celerino (c) e do modelo de onde vêm as expressões e
-## as poses, quando não é o próprio (src).
+## Esqueleto do personagem (j) e do Celerino (c).
 var j: Skel
 var c: Skel
-var src: Skel
 var j_anims := {}
 var c_anims := {}
 var _prefix := ""
 var _frames := 0
-## Transferência das animações do `from`: escala dos deslocamentos do rosto (espaço do
-## personagem) e do giro das pálpebras.
-var _face_scale := Vector3.ONE
-var _lid_scale := 1.0
 ## Giro (espaço do personagem) que leva a mão do Jarbas em repouso para a orientação
 ## da mão do Celerino em repouso, por lado ("L"/"R").
 var _hand_align := {}
@@ -233,23 +222,13 @@ func _run(cfg: Dictionary) -> void:
 	j = Skel.new(model.find_child("Skeleton3D", true, false) as Skeleton3D)
 	c = Skel.new(celerino.find_child("Skeleton3D", true, false) as Skeleton3D)
 	c_anims = _animations(celerino)
-	if cfg.has("from"):
-		# Expressões e poses de outro modelo (o Henrique não tem animações).
-		var source := _instance(cfg["from"])
-		src = Skel.new(source.find_child("Skeleton3D", true, false) as Skeleton3D)
-		var face: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(cfg["rig"]))["face"]
-		var fs: Array = face["face_scale"]
-		_face_scale = Vector3(fs[0], fs[1], fs[2])
-		_lid_scale = face["lid_scale"]
-		print("rosto: escala %s, pálpebras ×%.3f" % [_face_scale, _lid_scale])
-		_prefix = str(model.get_path_to(j.sk))
-		var src_anims := _animations(source)
-		for clip in OWN_CLIPS:
-			j_anims[clip] = _transfer(src_anims[clip])
-	else:
-		j_anims = _animations(model)
-		var sample_anim: Animation = j_anims[&"EXP_Neutro"]
-		_prefix = str(sample_anim.track_get_path(0)).split(":")[0]
+	j_anims = _animations(model)
+	for clip in OWN_CLIPS:
+		if not j_anims.has(clip):
+			push_error("o modelo não tem a animação %s" % clip)
+			return
+	var sample_anim: Animation = j_anims[&"EXP_Neutro"]
+	_prefix = str(sample_anim.track_get_path(0)).split(":")[0]
 	_check_rest_poses()
 	for side in ["L", "R"]:
 		var long_side := "Left" if side == "L" else "Right"
@@ -271,7 +250,7 @@ func _run(cfg: Dictionary) -> void:
 		if not FACE.has(name) and not EYE_MAP.values().has(name) and j.parent[i] >= 0:
 			drive_bones.append(name)
 	for clip in DRIVE_CLIPS:
-		lib.add_animation(clip, _copy(j_anims[DRIVE_CLIPS[clip]], drive_bones))
+		lib.add_animation(clip, _drive_pose(j_anims[DRIVE_CLIPS[clip]], drive_bones))
 
 	# Do Celerino.
 	for clip in RETARGET_CLIPS:
@@ -321,71 +300,6 @@ func _hand_frame(s: Skel, hand: String, middle: String, index: String, pinky: St
 	return Basis(fingers, thumb_side, fingers.cross(thumb_side))
 
 
-# --- Transferência de outro modelo (Henrique ← Jarbas) --------------------------------------
-
-## Animação de `src` (esqueleto com os mesmos nomes de ossos) passada para o personagem:
-## cada osso recebe o mesmo giro, no espaço do personagem, que o osso de mesmo nome. As
-## pálpebras giram `_lid_scale` do ângulo, no espaço delas (igual nos dois: o
-## rig_henrique.py copia a orientação dos ossos do rosto do Jarbas). Os deslocamentos do
-## rosto (lábios, cantos da boca, sobrancelhas) vão na escala do rosto.
-func _transfer(anim: Animation) -> Animation:
-	var keys := {}
-	for t in anim.get_track_count():
-		for k in anim.track_get_key_count(t):
-			keys[snappedf(anim.track_get_key_time(t, k), 0.0001)] = true
-	var times: Array = keys.keys()
-	times.sort()
-	var rot_bones: Array[StringName] = []
-	var pos_tracks := {}
-	for t in anim.get_track_count():
-		var bone_name := StringName(anim.track_get_path(t).get_concatenated_subnames())
-		if j.bone(bone_name) < 0 or src.bone(bone_name) < 0:
-			continue
-		match anim.track_get_type(t):
-			Animation.TYPE_ROTATION_3D:
-				rot_bones.append(bone_name)
-			Animation.TYPE_POSITION_3D:
-				pos_tracks[bone_name] = t
-	var out := Animation.new()
-	out.length = anim.length
-	out.loop_mode = anim.loop_mode
-	var rot_t := {}
-	for bone_name in rot_bones:
-		var tr := out.add_track(Animation.TYPE_ROTATION_3D)
-		out.track_set_path(tr, NodePath("%s:%s" % [_prefix, bone_name]))
-		rot_t[bone_name] = tr
-	var pos_t := {}
-	for bone_name in pos_tracks:
-		var tr := out.add_track(Animation.TYPE_POSITION_3D)
-		out.track_set_path(tr, NodePath("%s:%s" % [_prefix, bone_name]))
-		pos_t[bone_name] = tr
-	for time in times:
-		var sp := src.sample(anim, time)
-		var sg := src.globals(sp)
-		var wanted := {}
-		for bone_name in rot_bones:
-			var sb := src.bone(bone_name)
-			var jb := j.bone(bone_name)
-			wanted[jb] = sg[sb] * src.rest_global[sb].inverse() * j.rest_global[jb]
-		var rots := j.solve(j.rest_rot, wanted)
-		for bone_name in rot_bones:
-			var jb := j.bone(bone_name)
-			var q: Quaternion = rots[jb]
-			if LIDS.has(bone_name):
-				var sb := src.bone(bone_name)
-				var d := src.rest_rot[sb].inverse() * sp[sb]
-				q = j.rest_rot[jb] * Quaternion.IDENTITY.slerp(d, _lid_scale)
-			out.rotation_track_insert_key(rot_t[bone_name], time, q)
-		for bone_name in pos_tracks:
-			var sb := src.bone(bone_name)
-			var jb := j.bone(bone_name)
-			var d := anim.position_track_interpolate(pos_tracks[bone_name], time) - src.rest_pos[sb]
-			var scaled := (src.rest_global[src.parent[sb]] * d) * _face_scale
-			out.position_track_insert_key(pos_t[bone_name], time,
-					j.rest_pos[jb] + j.rest_global[j.parent[jb]].inverse() * scaled)
-	return out
-
-
 # --- Cópias das animações do modelo ------------------------------------------------------
 
 ## Cópia de `src` só com as trilhas dos ossos de `bones`.
@@ -396,6 +310,56 @@ func _copy(src: Animation, bones: Array) -> Animation:
 		if not bones.has(bone_name):
 			anim.remove_track(t)
 	return anim
+
+
+## Pose sentada (POSE_Kart, POSE_Moto): cópia só com os ossos de `bones` e com o giro e
+## o deslocamento da raiz do esqueleto (osso `Raiz`) passados para o quadril. Na
+## POSE_Kart é a raiz que desce o corpo 0,19 m até o assento; no jogo ela fica parada no
+## repouso (o CharacterRig não anima a raiz), então o quadril leva esse deslocamento e
+## fica onde a pose o põe em relação à origem do piloto (= origem do kart).
+func _drive_pose(src: Animation, bones: Array) -> Animation:
+	var anim := _copy(src, bones)
+	var hips := j.bone(&"Hips")
+	var root := j.parent[hips] if hips >= 0 else -1
+	if root < 0:
+		return anim
+	var root_name := StringName(j.sk.get_bone_name(root))
+	var hips_name := StringName(j.sk.get_bone_name(hips))
+	var root_pose := _bone_pose(src, root_name, j.sk.get_bone_rest(root))
+	var root_rest := j.sk.get_bone_rest(root)
+	var fix := root_rest.affine_inverse() * root_pose
+	if fix.is_equal_approx(Transform3D.IDENTITY):
+		return anim
+	var hips_pose := fix * _bone_pose(src, hips_name, j.sk.get_bone_rest(hips))
+	for type in [Animation.TYPE_POSITION_3D, Animation.TYPE_ROTATION_3D]:
+		var path := NodePath("%s:%s" % [_prefix, hips_name])
+		var t := anim.find_track(path, type)
+		if t < 0:
+			t = anim.add_track(type)
+			anim.track_set_path(t, path)
+		for k in range(anim.track_get_key_count(t) - 1, -1, -1):
+			anim.track_remove_key(t, k)
+		if type == Animation.TYPE_POSITION_3D:
+			anim.position_track_insert_key(t, 0.0, hips_pose.origin)
+		else:
+			anim.rotation_track_insert_key(t, 0.0, hips_pose.basis.get_rotation_quaternion())
+	print("pose sentada: raiz %s levada para o quadril (quadril em %s no esqueleto)" % [
+			_v(fix.origin), _v((root_rest * hips_pose).origin)])
+	return anim
+
+
+## Transformação local de um osso no começo da animação (repouso onde não há trilha).
+func _bone_pose(anim: Animation, bone_name: StringName, rest: Transform3D) -> Transform3D:
+	var path := NodePath("%s:%s" % [_prefix, bone_name])
+	var pos := rest.origin
+	var rot := rest.basis.get_rotation_quaternion()
+	var t := anim.find_track(path, Animation.TYPE_POSITION_3D)
+	if t >= 0:
+		pos = anim.position_track_interpolate(t, 0.0)
+	t = anim.find_track(path, Animation.TYPE_ROTATION_3D)
+	if t >= 0:
+		rot = anim.rotation_track_interpolate(t, 0.0)
+	return Transform3D(Basis(rot), pos)
 
 
 ## Expressão `base` com alguns ossos trocados: osso → [animação, quanto do giro dela].

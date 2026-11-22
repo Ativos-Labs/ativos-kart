@@ -14,7 +14,10 @@ const NOTE_TEX := preload("res://assets/textures/itens/nota.png")
 const RIG_SCALE := 0.6
 ## Onde ele fica no espaço do kart: à esquerda (a direita do alto da tela é do mapa),
 ## um pouco acima e atrás.
-const OFFSET := Vector3(-1.65, 0.9, 0.0)
+const OFFSET := Vector3(-1.65, 0.9, 0.0) * KartScale.ITEMS
+## Escala do nó todo (o Celerino e a maleta foram feitos para os karts de antes do encaixe
+## piloto × kart).
+const NODE_SCALE := KartScale.ITEMS
 ## Maleta: tamanho (m) e onde fica, na frente da barriga (este nó olha para +Z).
 const CASE_SIZE := Vector3(0.6, 0.42, 0.1)
 const CASE_POS := Vector3(0.0, 0.6, 0.3)
@@ -76,7 +79,7 @@ func open(k: Kart) -> void:
 		k.add_child(self)
 	position = OFFSET
 	rotation = Vector3.ZERO
-	scale = Vector3.ONE * 0.2
+	scale = Vector3.ONE * 0.2 * NODE_SCALE
 	visible = true
 	reset_physics_interpolation()
 	if rig:
@@ -85,8 +88,8 @@ func open(k: Kart) -> void:
 	lid.rotation.x = 0.0
 	_kill_tween()
 	_tween = _new_tween()
-	_tween.tween_property(self, "scale", Vector3.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	_tween.parallel().tween_property(self, "position:y", OFFSET.y + 0.25, 0.2).from(OFFSET.y - 0.5)
+	_tween.tween_property(self, "scale", Vector3.ONE * NODE_SCALE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_tween.parallel().tween_property(self, "position:y", OFFSET.y + 0.25 * KartScale.ITEMS, 0.2).from(OFFSET.y - 0.5 * KartScale.ITEMS)
 	_tween.tween_property(self, "position:y", OFFSET.y, 0.25).set_trans(Tween.TRANS_SINE)
 	_tween.parallel().tween_property(lid, "rotation:x", LID_OPEN, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	set_physics_process(true)
@@ -125,7 +128,7 @@ func close() -> void:
 	_tween.tween_interval(0.45)
 	var up := position + Vector3.UP * 5.0
 	_tween.tween_property(self, "position", up, 0.7).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	_tween.parallel().tween_property(self, "scale", Vector3.ONE * 0.2, 0.7).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	_tween.parallel().tween_property(self, "scale", Vector3.ONE * 0.2 * NODE_SCALE, 0.7).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	_tween.tween_callback(_park)
 
 
@@ -167,7 +170,7 @@ func _physics_process(delta: float) -> void:
 	case_root.rotation.x = -0.25 * _kick * _kick
 	case_root.position = CASE_POS + Vector3(0.0, 0.0, -0.06 * _kick)
 	if not _leaving and _t > 0.45:
-		position.y = OFFSET.y + sin((_t - 0.45) * 4.2) * 0.06
+		position.y = OFFSET.y + sin((_t - 0.45) * 4.2) * 0.06 * KartScale.ITEMS
 		rotation.z = sin(_t * 2.3) * 0.06
 	if not is_instance_valid(_kart) and not _leaving:
 		_park()

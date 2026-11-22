@@ -442,7 +442,7 @@ func _add_player_tag(r: Racer) -> void:
 	label.fixed_size = true
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	label.no_depth_test = true
-	label.position = Vector3(0.0, 1.9, 0.0)
+	label.position = Vector3(0.0, 1.9 * KartScale.ITEMS, 0.0)
 	# Colado na câmera (kart do lado) a etiqueta só atrapalha.
 	label.visibility_range_begin = 6.0
 	label.visibility_range_end = 140.0
@@ -555,7 +555,7 @@ func warm_up() -> void:
 func _chase_view(r: Racer) -> Transform3D:
 	var k := r.kart
 	var fwd := k.get_forward()
-	var pos := k.global_position - fwd * 3.2 + Vector3.UP * 1.6
+	var pos := k.global_position - fwd * 3.2 * KartScale.CAMERA + Vector3.UP * 1.6 * KartScale.CAMERA
 	return Transform3D(Basis.looking_at(fwd, Vector3.UP), pos)
 
 

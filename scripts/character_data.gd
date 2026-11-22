@@ -17,6 +17,13 @@ extends Resource
 @export var model_scene: PackedScene
 ## Ossos, animações extras e jeito de pilotar do modelo. Vazio = o esqueleto do Celerino.
 @export var skeleton: CharacterSkeleton
+## Piloto do padrão "Encaixe piloto × kart" (Jarbas, Henrique, Ulysses): o .glb já está em
+## metros, nas proporções finais, e entra em todo veículo em escala 1, com a origem na
+## origem do piloto do veículo (KartData.driver_origin). A pose sentada (drive_kart na
+## POSE_Kart, drive_moto na POSE_Moto) leva o corpo até o assento e as mãos até o volante;
+## o veículo é que foi escalado para isso dar certo. kart_scale, seat_height e
+## seat_forward não valem para ele.
+@export var standard_fit := false
 ## Escala do personagem sentado no kart (o modelo do Celerino tem 2 m de altura).
 @export var kart_scale := 0.55
 ## Escala do personagem em pé nas telas de seleção.

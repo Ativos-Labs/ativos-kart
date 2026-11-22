@@ -11,7 +11,9 @@ const PAPER_TEX := preload("res://assets/textures/itens/oficio.png")
 const STAMP_TEX := preload("res://assets/textures/itens/oficio_carimbo.png")
 ## Tamanho da folha (m, proporção A4) e a altura em que ela voa.
 const SIZE := Vector2(3.0, 4.24)
-const HOVER := 0.7
+const HOVER := 0.7 * KartScale.ITEMS
+## Escala do nó (a folha foi feita para os karts de antes do encaixe piloto × kart).
+const NODE_SCALE := KartScale.ITEMS
 ## Quando o carimbo bate (s depois de virar ofício) e quanto demora.
 const STAMP_AT := 0.32
 const STAMP_TIME := 0.16
@@ -59,13 +61,13 @@ func start(k: Kart) -> void:
 		k.add_child(self)
 	position = Vector3(0.0, HOVER, 0.0)
 	rotation = Vector3.ZERO
-	scale = Vector3(0.45, 1.0, 0.45)
+	scale = Vector3(0.45, 1.0, 0.45) * NODE_SCALE
 	visible = true
 	reset_physics_interpolation()
 	_mat.set_shader_parameter("stamp", 0.0)
 	_kill_tween()
 	_tween = _new_tween()
-	_tween.tween_property(self, "scale", Vector3.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_tween.tween_property(self, "scale", Vector3.ONE * NODE_SCALE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	_tween.tween_interval(maxf(STAMP_AT - 0.3, 0.0))
 	_tween.tween_method(_set_stamp, 0.0, 1.0, STAMP_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	set_physics_process(true)
@@ -89,7 +91,7 @@ func finish() -> void:
 	_tween.tween_property(self, "position", position + Vector3.UP * 6.0 + fwd.normalized() * 10.0, 0.8) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	_tween.tween_property(self, "rotation", rotation + Vector3(-0.9, 2.4, 0.5), 0.8)
-	_tween.tween_property(self, "scale", Vector3.ONE * 0.05, 0.8).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	_tween.tween_property(self, "scale", Vector3.ONE * 0.05 * NODE_SCALE, 0.8).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	_tween.chain().tween_callback(_park)
 
 
@@ -129,7 +131,7 @@ func _physics_process(delta: float) -> void:
 	_pitch = lerpf(_pitch, pitch, k)
 	_roll = lerpf(_roll, roll, k)
 	rotation = Vector3(_pitch + 0.04, 0.0, _roll)
-	position.y = HOVER + sin(_t * 3.1) * 0.08
+	position.y = HOVER + sin(_t * 3.1) * 0.08 * KartScale.ITEMS
 
 
 func _set_stamp(value: float) -> void:

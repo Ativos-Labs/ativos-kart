@@ -15,9 +15,9 @@ const RADIUS := 0.22
 const LENGTH := 2.8
 ## O foguete fica um pouco para trás (m): a cauda, com as aletas e o "RPV", sai de
 ## trás do kart, onde a câmera vê.
-const BACK := 0.45
+const BACK := 0.45 * KartScale.ITEMS
 ## Quanto o modelo do kart sobe (m) para ficar em cima do foguete.
-const LIFT := 0.36
+const LIFT := 0.36 * KartScale.ITEMS
 ## Tempos (s): enrolar, o fogo acender e soltar no fim.
 const ROLL_TIME := 0.22
 const IGNITE_AT := 0.16
@@ -97,7 +97,8 @@ func play(duration: float) -> void:
 	visible = true
 	_parts.scale = Vector3.ONE * 0.01
 	_mat.set_shader_parameter("roll", 0.0)
-	scale = Vector3.ONE * (kart.data.race_scale if kart.data else 1.0)
+	# O modelo foi feito para os karts de antes do encaixe piloto × kart: encolhe com eles.
+	scale = Vector3.ONE * (kart.data.race_scale if kart.data else 1.0) * KartScale.ITEMS
 	_follow()
 	reset_physics_interpolation()
 	_flame.ignite(3)
@@ -142,9 +143,9 @@ func _physics_process(delta: float) -> void:
 		_mat.set_shader_parameter("roll", 1.0 - d)
 		_parts.scale = Vector3.ONE * maxf(1.0 - d * 3.0, 0.01)
 		var spin := Basis(Vector3.UP, d * 0.8)
-		var s := (kart.data.race_scale if kart.data else 1.0) * (1.0 - d * d)
+		var s := (kart.data.race_scale if kart.data else 1.0) * KartScale.ITEMS * (1.0 - d * d)
 		global_transform = Transform3D(_drop_xf.basis * spin * Basis.from_scale(Vector3.ONE * maxf(s, 0.01)),
-				_drop_xf.origin + Vector3.UP * d * 0.6)
+				_drop_xf.origin + Vector3.UP * d * 0.6 * KartScale.ITEMS)
 		_flame.update(delta, false)
 		_spring_lift(0.0, delta)
 		if d >= 1.0:

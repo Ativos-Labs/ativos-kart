@@ -8,9 +8,11 @@ extends Node3D
 const TEX := preload("res://assets/textures/itens/liminar.png")
 ## Tamanho do escudo (m), altura do meio dele acima do kart e quanto à frente (m): baixo e
 ## um pouco adiante, para caber na câmera de quem usou (ela vem atrás e mais baixa).
-const SIZE := Vector2(1.0, 1.25)
-const HEIGHT := 1.45
-const AHEAD := 1.6
+const SIZE := Vector2(1.0, 1.25) * KartScale.CAMERA
+const HEIGHT := 1.45 * KartScale.CAMERA
+const AHEAD := 1.6 * KartScale.CAMERA
+## Altura da onda (escala do anel na vertical), no tamanho dos karts do encaixe.
+const WAVE_Y := 0.55 * KartScale.ITEMS
 ## Duração (s) da onda e do escudo na tela.
 const WAVE_TIME := 0.5
 const SHOW_TIME := 1.15
@@ -45,7 +47,7 @@ func build() -> void:
 	_wave.mesh = _get_wave_mesh()
 	_wave.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	# A faixa (2,4 m de altura, achatada pela escala) começa no chão.
-	_wave.position.y = 0.66
+	_wave.position.y = 0.66 * KartScale.ITEMS
 	add_child(_wave)
 	_ring = MeshInstance3D.new()
 	_ring.name = "Anel"
@@ -74,11 +76,11 @@ func play(k: Kart, radius: float) -> void:
 	_follow()
 	visible = true
 	_shield.visible = true
-	_shield.position = Vector3(0.0, HEIGHT - 0.5, 0.0)
+	_shield.position = Vector3(0.0, HEIGHT - 0.5 * KartScale.CAMERA, 0.0)
 	_shield.scale = Vector3.ONE * 0.15
 	_shield.transparency = 0.0
 	_wave.visible = true
-	_wave.scale = Vector3(1.0, 0.55, 1.0)
+	_wave.scale = Vector3(1.0, WAVE_Y, 1.0)
 	_wave.transparency = 0.0
 	_ring.visible = true
 	_ring.scale = Vector3.ONE
@@ -93,13 +95,13 @@ func play(k: Kart, radius: float) -> void:
 	_tween.tween_property(_shield, "scale", Vector3.ONE * 1.15, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	_tween.tween_property(_shield, "position:y", HEIGHT, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	_tween.tween_property(_shield, "scale", Vector3.ONE, 0.12).set_delay(0.2)
-	_tween.tween_property(_shield, "position:y", HEIGHT + 0.2, SHOW_TIME - 0.3).set_delay(0.3)
+	_tween.tween_property(_shield, "position:y", HEIGHT + 0.2 * KartScale.CAMERA, SHOW_TIME - 0.3).set_delay(0.3)
 	_tween.tween_property(_shield, "scale", Vector3.ONE * 0.2, 0.25).set_delay(SHOW_TIME - 0.25) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	_tween.tween_property(_shield, "transparency", 1.0, 0.25).set_delay(SHOW_TIME - 0.25)
 	# Onda: um anel de luz em pé e outro no chão se abrindo.
 	var wide := Vector3(radius, 1.0, radius)
-	_tween.tween_property(_wave, "scale", Vector3(radius, 0.55, radius), WAVE_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_tween.tween_property(_wave, "scale", Vector3(radius, WAVE_Y, radius), WAVE_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	_tween.tween_property(_wave, "transparency", 1.0, WAVE_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	_tween.tween_property(_ring, "scale", wide * 1.15, WAVE_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	_tween.tween_property(_ring, "transparency", 1.0, WAVE_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
@@ -123,7 +125,7 @@ func _physics_process(delta: float) -> void:
 
 func _follow() -> void:
 	if kart and is_instance_valid(kart):
-		global_position = kart.global_position + Vector3.UP * 0.1
+		global_position = kart.global_position + Vector3.UP * 0.1 * KartScale.ITEMS
 		var f := kart.get_forward()
 		_pivot.position = Vector3(f.x, 0.0, f.z) * AHEAD
 
@@ -137,7 +139,7 @@ func prewarm(on: bool, xf := Transform3D.IDENTITY) -> void:
 		_shield.scale = Vector3.ONE
 		_shield.position = Vector3(0.0, HEIGHT, 0.0)
 		_wave.visible = true
-		_wave.scale = Vector3(3.0, 0.55, 3.0)
+		_wave.scale = Vector3(3.0, WAVE_Y, 3.0)
 		_ring.visible = true
 		_ring.scale = Vector3(3.0, 1.0, 3.0)
 		for child: GeometryInstance3D in [_shield, _wave, _ring]:

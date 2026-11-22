@@ -1,19 +1,27 @@
 extends SceneTree
-## Confere a pose de um piloto em cada veículo (sem janela): monta o kart com o piloto,
-## deixa a pose assentar com o volante reto e virado todo para cada lado e imprime o
-## quanto ele inclinou e deslizou no banco, o erro das mãos no volante, quanto o braço
-## esticou, o ângulo de cotovelo e joelho (180° = reto), a distância do joelho ao aro e
-## onde ficaram os pés (assoalho, estofado, no limite dos pedais). Grava também um glb
-## por veículo com a cena posada (malhas deformadas na CPU), para ver de fora do Godot
-## (render_poses.py, no Blender).
+## Confere o encaixe de um piloto em cada veículo (sem janela), pelo checklist do documento
+## "Encaixe Piloto × Kart": monta o kart com o piloto, deixa a pose assentar com o volante
+## reto e virado todo para cada lado e imprime
 ##
-##   Godot --headless --path . -s res://tools/personagens/poses_nos_karts.gd -- <pasta> <personagem>
+## - a escala global do piloto (tem de ser 1) e onde fica a origem dele no kart;
+## - o topo da cabeça sentado acima da origem do piloto (0,836 / 0,872 / 0,839 m no Jarbas,
+##   Henrique e Ulysses);
+## - a distância de cada punho até a pega no volante (8,7 / 5,2 / 6,0 cm no kart de
+##   referência), o erro do IK das mãos, quanto o braço esticou e o ângulo do cotovelo;
+## - quadril, joelhos e pés no espaço do kart e a folga do joelho até o aro do volante.
 ##
-## <personagem> = nome do .tres em res://data/personagens/ (henrique, jarbas, ulysses...).
+## Grava também um glb por veículo com a cena posada (malhas deformadas na CPU), para ver
+## de fora do Godot (render_poses.py, no Blender).
+##
+##   Godot --headless --path . -s res://tools/personagens/poses_nos_karts.gd -- <pasta> <personagem> [kart]
+##
+## <personagem> = nome do .tres em res://data/personagens/ (henrique, jarbas, ulysses...);
+## [kart] = só esse kart (nome do .tres em res://data/karts/).
 
 var _f := 0
 var _out := "/tmp"
 var _who := "henrique"
+var _only := ""
 
 
 func _process(_d: float) -> bool:
@@ -23,6 +31,7 @@ func _process(_d: float) -> bool:
 	var args := OS.get_cmdline_user_args()
 	_out = args[0] if args.size() > 0 else "/tmp"
 	_who = args[1] if args.size() > 1 else "henrique"
+	_only = args[2] if args.size() > 2 else ""
 	_run()
 	return true
 
@@ -32,6 +41,9 @@ func _run() -> void:
 	var gs: Node = root.get_node("GameState")
 	var data: CharacterData = load("res://data/personagens/%s.tres" % _who)
 	for k: KartData in gs.karts:
+		var slug := k.resource_path.get_file().get_basename()
+		if _only != "" and slug != _only:
+			continue
 		var kv := KartVisual.new()
 		root.add_child(kv)
 		kv.setup(k, data)
@@ -47,8 +59,8 @@ func _run() -> void:
 		for i in 150:
 			kv.update_motion(1.0 / 30.0, 0.0, 0.0)
 			rig._process(1.0 / 30.0)
-		_report(k, data, out)
-		_export(kv, "%s/%s_%s.glb" % [_out, _who, k.resource_path.get_file().get_basename()])
+		_report(k, data, kv, rig, out)
+		_export(kv, "%s/%s_%s.glb" % [_out, _who, slug])
 		kv.free()
 	CharacterMesh.clear_cache()
 
@@ -61,23 +73,26 @@ func _kart_point(kv: KartVisual, rig: CharacterRig, bone: int, local := Vector3.
 func _measure(kv: KartVisual, rig: CharacterRig, k: KartData) -> Dictionary:
 	var sd := rig.skeleton_data
 	var r := {}
-	r.lean = rad_to_deg(deg_to_rad(sd.max_hip_lean) * rig._reach_lean)
-	r.slide = rig._reach_slide
 	var errs := []
+	var wrist := []
 	var stretch := []
 	var elbows := []
 	for side in 2:
 		var arm: PackedInt32Array = rig._arm_bones[side]
 		var grip := sd.grip_point * Vector3(1.0 if side == 0 else -1.0, 1.0, 1.0)
+		if side == 1 and sd.grip_axis_right != Vector3.ZERO:
+			grip = sd.grip_point_right
 		var actual := _kart_point(kv, rig, arm[2], grip)
 		var target := rig.hand_target_l if side == 0 else rig.hand_target_r
 		errs.append(actual.distance_to(target) * 100.0)
+		wrist.append(_kart_point(kv, rig, arm[2]).distance_to(target) * 100.0)
 		stretch.append(rig._scl[arm[0]].y)
 		var sh := _kart_point(kv, rig, arm[0])
 		var el := _kart_point(kv, rig, arm[1])
 		var wr := _kart_point(kv, rig, arm[2])
 		elbows.append(180.0 - rad_to_deg((el - sh).angle_to(wr - el)))
 	r.hand_err = errs
+	r.wrist = wrist
 	r.stretch = stretch
 	r.elbow = elbows
 	var legs := []
@@ -87,7 +102,7 @@ func _measure(kv: KartVisual, rig: CharacterRig, k: KartData) -> Dictionary:
 		var knee := _kart_point(kv, rig, chain[1])
 		var ankle := _kart_point(kv, rig, chain[2])
 		var toe_bone := rig._bone.get(StringName(sd.legs[side * 4 + 3]), -1) as int
-		var toe := _kart_point(kv, rig, toe_bone)
+		var toe := _kart_point(kv, rig, toe_bone) if toe_bone >= 0 else ankle
 		# Distância do joelho ao aro do volante (círculo no plano do volante).
 		var c := k.steering_wheel_center
 		var ax := k.steering_wheel_axis.normalized()
@@ -99,43 +114,50 @@ func _measure(kv: KartVisual, rig: CharacterRig, k: KartData) -> Dictionary:
 				"knee_angle": 180.0 - rad_to_deg((knee - hip).angle_to(ankle - knee)), "knee_rim": rim})
 	r.legs = legs
 	var head := rig._bone.get(&"Head", -1) as int
-	r.head = _kart_point(kv, rig, head)
-	r.hips = _kart_point(kv, rig, rig._hips_bone)
+	r.head = _kart_point(kv, rig, head) if head >= 0 else Vector3.ZERO
+	r.hips = _kart_point(kv, rig, rig._hips_bone) if rig._hips_bone >= 0 else Vector3.ZERO
 	return r
 
 
 func _v(v: Vector3) -> String:
-	return "(%.2f, %.2f, %.2f)" % [v.x, v.y, v.z]
+	return "(%.3f, %.3f, %.3f)" % [v.x, v.y, v.z]
 
 
-func _report(k: KartData, data: CharacterData, out: Dictionary) -> void:
+## Topo da malha do piloto (vértices deformados na CPU), no espaço do kart.
+func _mesh_top(kv: KartVisual, rig: CharacterRig) -> float:
+	var top := -INF
+	for n in rig.find_children("*", "MeshInstance3D", true, false):
+		var mi := n as MeshInstance3D
+		if mi.mesh == null or mi.skin == null:
+			continue
+		var sk := mi.get_node_or_null(mi.skeleton) as Skeleton3D
+		if sk == null:
+			continue
+		var m := _skinned(mi, sk, kv)
+		for s in m.get_surface_count():
+			for v in m.surface_get_arrays(s)[Mesh.ARRAY_VERTEX]:
+				top = maxf(top, (v as Vector3).y)
+	return top
+
+
+func _report(k: KartData, data: CharacterData, kv: KartVisual, rig: CharacterRig, out: Dictionary) -> void:
 	var r: Dictionary = out[0.0]
-	var cp := k.cockpit()
-	print("== %s (%s) escala %.2f" % [k.display_name, k.resource_path.get_file(), data.kart_scale])
-	print("   cockpit: canto %s encosto %.0f° frente estofado %.2f assoalho %.2f limite pés %.2f" % [
-		_v(k.seat_back_point), k.seat_back_angle, k.seat_front_z, k.floor_height, k.foot_limit_z])
-	print("   inclinou %.1f° deslizou %.3f | mãos erro %.1f/%.1f cm esticou %.2f/%.2f cotovelo %.0f°/%.0f°" % [
-		r.lean, r.slide, r.hand_err[0], r.hand_err[1], r.stretch[0], r.stretch[1], r.elbow[0], r.elbow[1]])
+	var origin := rig.position
+	var scale := rig.skeleton.global_transform.basis.get_scale() / kv.global_transform.basis.get_scale()
+	print("== %s (%s) | origem do piloto %s, escala global %s" % [k.display_name, k.resource_path.get_file(),
+			_v(origin), _v(scale)])
+	print("   topo da cabeça %.3f acima da origem do piloto (%.3f no kart) | cabeça %s quadril %s (quadril - assento %s)" % [
+		_mesh_top(kv, rig) - origin.y, _mesh_top(kv, rig), _v(r.head), _v(r.hips), _v(r.hips - k.seat_point)])
+	print("   mãos: erro %.1f/%.1f cm, punho→pega %.1f/%.1f cm, esticou %.2f/%.2f, cotovelo %.0f°/%.0f°" % [
+		r.hand_err[0], r.hand_err[1], r.wrist[0], r.wrist[1], r.stretch[0], r.stretch[1], r.elbow[0], r.elbow[1]])
 	for side in 2:
 		var l: Dictionary = r.legs[side]
-		var where := "?"
-		var a: Vector3 = l.ankle
-		if not cp.is_empty():
-			if absf(a.y - (k.floor_height + data.skeleton.ankle_lift * data.kart_scale)) < 0.01:
-				where = "assoalho"
-			elif absf(a.y - (k.seat_back_point.y + data.skeleton.ankle_lift * data.kart_scale)) < 0.01:
-				where = "estofado"
-			else:
-				where = "outro (y %.2f)" % a.y
-			if a.z <= k.foot_limit_z + data.skeleton.foot_length * data.kart_scale * cos(deg_to_rad(data.skeleton.foot_pitch)) + 0.005:
-				where += ", no limite (pedais/parede)"
-		print("   perna %s: quadril %s joelho %s (%.0f° dobrado, %.0f cm do aro) tornozelo %s ponta %s → %s" % [
-			"E" if side == 0 else "D", _v(l.hip), _v(l.knee), l.knee_angle, l.knee_rim * 100.0, _v(l.ankle), _v(l.toe), where])
-	print("   cabeça %s quadril %s" % [_v(r.head), _v(r.hips)])
+		print("   perna %s: quadril %s joelho %s (%.0f° dobrado, %.1f cm do aro) tornozelo %s ponta %s" % [
+			"E" if side == 0 else "D", _v(l.hip), _v(l.knee), l.knee_angle, l.knee_rim * 100.0, _v(l.ankle), _v(l.toe)])
 	for steer in [1.0, -1.0]:
 		var s: Dictionary = out[steer]
-		print("   volante %s: inclinou %.1f° deslizou %.3f mãos erro %.1f/%.1f cm esticou %.2f/%.2f cotovelo %.0f°/%.0f°" % [
-			"esq" if steer > 0 else "dir", s.lean, s.slide, s.hand_err[0], s.hand_err[1], s.stretch[0], s.stretch[1],
+		print("   volante %s: mãos erro %.1f/%.1f cm esticou %.2f/%.2f cotovelo %.0f°/%.0f°" % [
+			"esq" if steer > 0 else "dir", s.hand_err[0], s.hand_err[1], s.stretch[0], s.stretch[1],
 			s.elbow[0], s.elbow[1]])
 
 

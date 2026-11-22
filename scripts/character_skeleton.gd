@@ -59,7 +59,7 @@ extends Resource
 @export var bike_pose := &""
 ## Direção das coxas e canelas sem drive_pose (espaço do personagem: +Z = frente).
 @export var thigh_direction := Vector3(0.12, -0.12, 1.0)
-@export var shin_direction := Vector3(0.05, -1.0, 0.45)
+@export var shin_direction := Vector3(0.05, -0.5, 1.0)
 ## Inclinação para a frente ao pilotar (peso da animação body_lean_forward).
 @export var lean_forward := 0.25
 ## Braços com cotovelo (IK de dois ossos, como uma pessoa). Desligado = braço reto e
@@ -74,6 +74,11 @@ extends Resource
 ## Direção da barra dentro da mão esquerda fechada, para o lado do polegar (espaço do
 ## osso da mão). A mão direita usa o espelho em X.
 @export var grip_axis := Vector3(0.0, 0.0, 1.0)
+## Pegada da mão direita quando ela não é o espelho da esquerda (pose assimétrica, como a
+## do Henrique): ponto e direção da barra no espaço do osso da mão direita. Zero = o
+## espelho em X de grip_point e grip_axis.
+@export var grip_point_right := Vector3.ZERO
+@export var grip_axis_right := Vector3.ZERO
 ## Quanto o braço pode esticar (1 = tamanho normal). Com cotovelo, ele só estica
 ## depois de ficar reto e de o tronco já ter inclinado o máximo.
 @export var max_arm_stretch := 2.6

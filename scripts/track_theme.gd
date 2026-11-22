@@ -162,6 +162,12 @@ static func dust_material(scenery: int) -> ParticleProcessMaterial:
 			m.scale_min = 0.7
 			m.scale_max = 1.3
 	m.color = color
+	# Medidas feitas para os karts de antes do encaixe piloto × kart: a poeira encolhe com
+	# eles (a malha da partícula é a do kart, já menor).
+	m.emission_box_extents *= KartScale.ITEMS
+	m.initial_velocity_min *= KartScale.ITEMS
+	m.initial_velocity_max *= KartScale.ITEMS
+	m.gravity *= KartScale.ITEMS
 	# Cresce e some aos poucos (sem estalar no fim da vida).
 	var size := Curve.new()
 	size.add_point(Vector2(0.0, 1.0 / grow))
