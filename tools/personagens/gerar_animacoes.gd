@@ -21,29 +21,42 @@ extends SceneTree
 ## - Inclinações do corpo: geradas aqui, espalhadas pela coluna, com o pescoço
 ##   compensando um pouco para o Jarbas continuar olhando para a frente.
 ## - Parado em pé (idle_stand): gerado aqui, o corpo todo (veja _idle_stand).
+## - Gesto de escolha (seleção de personagem, corpo inteiro): gestos_escolha.gd. É o único
+##   que o Celerino ganha daqui (`-- celerino`); as outras animações dele são as do glb.
 ##
 ## Rode de novo depois de mudar o modelo (build_personagem.py) ou as animações do
 ## Celerino:
 ##   Godot --headless --path . -s res://tools/personagens/gerar_animacoes.gd -- jarbas
 ##   Godot --headless --path . -s res://tools/personagens/gerar_animacoes.gd -- henrique
 ##   Godot --headless --path . -s res://tools/personagens/gerar_animacoes.gd -- ulysses
+##   Godot --headless --path . -s res://tools/personagens/gerar_animacoes.gd -- celerino
 
 const CELERINO := "res://assets/models/personagens/celerino.glb"
 ## Modelo e saída de cada personagem.
+## `gestos`: animações de escolha (gestos_escolha.gd) que entram na biblioteca. O Celerino
+## usa as animações do próprio glb; a biblioteca dele só tem o gesto de escolha.
 const CHARACTERS := {
 	"jarbas": {
 		"model": "res://assets/models/personagens/jarbas.glb",
 		"out": "res://assets/models/personagens/jarbas_animacoes.res",
+		"gestos": [&"gesture_arms_crossed"],
 	},
 	"henrique": {
 		"model": "res://assets/models/personagens/henrique.glb",
 		"out": "res://assets/models/personagens/henrique_animacoes.res",
+		"gestos": [&"gesture_point_forward"],
 	},
 	"ulysses": {
 		"model": "res://assets/models/personagens/ulysses.glb",
 		"out": "res://assets/models/personagens/ulysses_animacoes.res",
+		"gestos": [&"gesture_hair_fix"],
+	},
+	"celerino": {
+		"out": "res://assets/models/personagens/celerino_animacoes.res",
+		"gestos": [&"gesture_air_guitar"],
 	},
 }
+const Gestos := preload("res://tools/personagens/gestos_escolha.gd")
 ## Animações do modelo (do Blender) que o gerador usa.
 const OWN_CLIPS := [&"EXP_Neutro", &"EXP_Alegria", &"EXP_Surpresa", &"EXP_Raiva", &"EXP_Tristeza",
 	&"EXP_Olhos_Fechados", &"EXP_Boca_Aberta", &"ANIM_Piscar", &"POSE_Kart", &"POSE_Moto"]
@@ -217,6 +230,9 @@ static func _animations(model: Node) -> Dictionary:
 
 
 func _run(cfg: Dictionary) -> void:
+	if not cfg.has("model"):
+		_run_celerino(cfg)
+		return
 	var model := _instance(cfg["model"])
 	var celerino := _instance(CELERINO)
 	j = Skel.new(model.find_child("Skeleton3D", true, false) as Skeleton3D)
@@ -268,6 +284,35 @@ func _run(cfg: Dictionary) -> void:
 	# Parado em pé (telas de seleção), a partir dos braços caídos da respiração.
 	lib.add_animation(&"idle_stand", _idle_stand(lib.get_animation(&"idle")))
 
+	# Escolha na seleção de personagem: gestos do corpo inteiro e a cara de convencido.
+	lib.add_animation(&"face_smug", _mixed_face(&"EXP_Alegria", {&"Mandibula": [&"EXP_Neutro", 1.0],
+			&"Palpebra_Sup.L": [&"EXP_Olhos_Fechados", 0.4], &"Palpebra_Sup.R": [&"EXP_Olhos_Fechados", 0.4]}))
+	var gestos := Gestos.new(j.sk, Gestos.mixamo(), _prefix, j.sample(j_anims[&"POSE_Kart"], 0.0),
+			j.sample(lib.get_animation(&"idle"), 0.0), model)
+	for g in cfg.get("gestos", []):
+		lib.add_animation(g, gestos.bake(g))
+
+	var err := ResourceSaver.save(lib, cfg["out"])
+	print("gravado %s (%d animações): %s" % [cfg["out"], lib.get_animation_list().size(), error_string(err)])
+
+
+## Celerino: só os gestos de escolha (o resto vem do celerino.glb), com o esqueleto dele.
+func _run_celerino(cfg: Dictionary) -> void:
+	var celerino := _instance(CELERINO)
+	c = Skel.new(celerino.find_child("Skeleton3D", true, false) as Skeleton3D)
+	c_anims = _animations(celerino)
+	var idle: Animation = c_anims[&"idle"]
+	var prefix := str(idle.track_get_path(0)).split(":")[0]
+	# Mão fechada: a de cada lado vem da animação daquele lado.
+	var fist_l := c.sample(c_anims[&"hand_fist_L"], 0.0)
+	var fist_r := c.sample(c_anims[&"hand_fist_R"], 0.0)
+	var fist: Array[Quaternion] = []
+	for i in fist_l.size():
+		fist.append(fist_r[i] if c.sk.get_bone_name(i).ends_with(".R") else fist_l[i])
+	var gestos := Gestos.new(c.sk, Gestos.celerino(), prefix, fist, c.sample(idle, 0.0), celerino)
+	var lib := AnimationLibrary.new()
+	for g in cfg.get("gestos", []):
+		lib.add_animation(g, gestos.bake(g))
 	var err := ResourceSaver.save(lib, cfg["out"])
 	print("gravado %s (%d animações): %s" % [cfg["out"], lib.get_animation_list().size(), error_string(err)])
 

@@ -121,6 +121,8 @@ var _body_add := {}
 var _blink_timer := 2.0
 var _face_hold := 0.0
 var _gesture_hold := 0.0
+## Rapidez com que o gesto se desfaz quando `_gesture_hold` acaba.
+var _gesture_fade := 5.0
 var _gesture_arms := 0
 var _ik_l := 1.0
 var _ik_r := 1.0
@@ -280,7 +282,9 @@ func _setup_skeleton() -> void:
 	_masks[&"body_arms"] = _ids(body + arms)
 	_masks[&"body_arms_legs"] = _ids(body + arms + Array(sd.legs))
 	_masks[&"stand"] = _ids(Array(sd.hips) + body + Array(sd.shoulders) + arms + Array(sd.legs))
+	# Tudo menos o rosto: a pose sentada e os gestos do corpo inteiro (play_body_gesture).
 	_masks[&"drive"] = _ids(Array(sd.hips) + body + Array(sd.shoulders) + arms + Array(sd.legs) + fingers_l + fingers_r)
+	_masks[&"whole_body"] = _masks[&"drive"]
 	_masks[&"fingers_l"] = _ids(fingers_l)
 	_masks[&"fingers_r"] = _ids(fingers_r)
 	_masks[&"arms_fingers"] = _ids(arms + fingers_l + fingers_r)
@@ -707,7 +711,36 @@ func play_gesture(gesture_name: StringName, duration := 1.5, arms := 0) -> void:
 		layer.weight = 0.0
 		layer.fade_speed = 7.0
 	_gesture_hold = duration
+	_gesture_fade = 5.0
 	_gesture_arms = 3 if arms == 0 else arms
+
+
+## Gesto do corpo inteiro (quadril, coluna, ombros, braços, dedos e pernas; o rosto fica
+## com set_face), por cima da animação parada em pé: o jeito de cada piloto comemorar ao
+## ser escolhido (CharacterData.pick_gesture). A animação termina numa pose que fica
+## parada por mais `hold` segundos; depois volta para a animação parada. Devolve a
+## duração da animação (0 se ela não existe).
+func play_body_gesture(gesture_name: StringName, hold := 1.5) -> float:
+	if skeleton == null:
+		return 0.0
+	_fade_group(&"gesture", 10.0)
+	var layer := _add_layer(gesture_name, &"whole_body", &"gesture")
+	if layer == null:
+		return 0.0
+	layer.weight = 0.0
+	layer.fade_speed = 7.0
+	_gesture_hold = layer.anim.length + hold
+	# O corpo inteiro volta mais devagar (os braços cruzados não passam pelo peito).
+	_gesture_fade = 2.5
+	_gesture_arms = 3
+	return layer.anim.length
+
+
+## Desfaz o gesto (de braços ou do corpo inteiro) aos poucos.
+func end_gesture(fade := 3.0) -> void:
+	_fade_group(&"gesture", fade)
+	_gesture_hold = 0.0
+	_gesture_arms = 0
 
 
 ## Posição global da mão (`side`: 0 = esquerda, 1 = direita) na pose atual, para prender
@@ -856,7 +889,7 @@ func _update_timers(delta: float) -> void:
 	if _gesture_hold > 0.0:
 		_gesture_hold -= delta
 		if _gesture_hold <= 0.0:
-			_fade_group(&"gesture", 5.0)
+			_fade_group(&"gesture", _gesture_fade)
 			_gesture_arms = 0
 	_glance_timer -= delta
 	if _glance_timer <= 0.0:

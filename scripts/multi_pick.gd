@@ -32,6 +32,9 @@ const GAP := 18.0
 var confirmed: Array[bool] = []
 ## Saindo da tela: ignora tudo.
 var locked := false
+## Espera depois de todos confirmarem (s). A tela pode aumentar (a seleção de personagem
+## espera o último a confirmar terminar a comemoração).
+var ready_delay := ALL_READY_DELAY
 
 var _cooldown := PackedFloat32Array()
 var _timer: SceneTreeTimer
@@ -114,7 +117,7 @@ func set_ready(p: int, on: bool) -> void:
 	if not on or confirmed.has(false):
 		_timer = null
 		return
-	var timer := get_tree().create_timer(ALL_READY_DELAY)
+	var timer := get_tree().create_timer(ready_delay)
 	_timer = timer
 	await timer.timeout
 	if _timer == timer and not locked and not confirmed.has(false):

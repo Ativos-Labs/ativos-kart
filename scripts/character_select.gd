@@ -1,6 +1,10 @@
 extends Node3D
 ## Tela de seleção de personagem: grade de retratos, personagem 3D no palco
-## (acena, sorri, comemora ao confirmar), nome, atributos e dicas de teclas.
+## (acena, sorri e, ao ser escolhido, faz o gesto dele: CharacterData.pick_gesture), nome,
+## atributos e dicas de teclas.
+##
+## Sozinho: depois de confirmar, a tela espera o gesto acabar e segue para os karts; A/Enter
+## (ou clicar de novo) pula a espera e B/Esc desfaz a escolha.
 ##
 ## No multijogador todos escolhem ao mesmo tempo na mesma grade: cada jogador tem um
 ## cursor na cor dele (etiqueta J1, J2... no quadradinho) e um cartão com o piloto
@@ -12,6 +16,10 @@ const COLUMNS := 4
 ## Multijogador: a grade fica no meio, em 2 colunas (os cartões dos jogadores nos lados).
 const MULTI_COLUMNS := 2
 const MULTI_TILE_GAP := 24.0
+## Quanto a pose final do gesto de escolha fica na tela antes de seguir (s).
+const PICK_LINGER := 0.35
+## Quanto a pose final fica parada antes de voltar à animação parada (multijogador, s).
+const PICK_HOLD := 1.5
 
 @onready var turntable: Node3D = $Palco/Giro
 @onready var background: ColorRect = %Background
@@ -31,6 +39,9 @@ var _tiles: Array[CharacterTile] = []
 var _rig: CharacterRig
 var _nav_cooldown := 0.0
 var _confirming := false
+## Muda a cada confirmação desfeita (a espera de uma confirmação antiga não segue).
+var _confirm_token := 0
+var _leaving := false
 var _dragging := false
 var _spin_pause := 0.0
 var _toast_tween: Tween
@@ -92,7 +103,16 @@ func _physics_process(delta: float) -> void:
 
 func _input(event: InputEvent) -> void:
 	# O analógico chega como ui_left/ui_right... (MenuInput), um passo por vez.
-	if _multi or _confirming or event is InputEventJoypadMotion:
+	if _multi or event is InputEventJoypadMotion:
+		return
+	if _confirming:
+		# Durante o gesto de escolha: A/Enter segue logo, B/Esc desfaz a escolha.
+		if event.is_action_pressed("ui_accept"):
+			_leave()
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("ui_cancel"):
+			_unconfirm()
+			get_viewport().set_input_as_handled()
 		return
 	var move := 0
 	if event.is_action_pressed("ui_left") or event.is_action_pressed("esquerda"):
@@ -115,7 +135,7 @@ func _input(event: InputEvent) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if _multi:
+	if _multi or _confirming:
 		return
 	# Arraste com o mouse para girar o personagem.
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
@@ -157,6 +177,10 @@ func _on_tile_pressed(i: int) -> void:
 		else:
 			Sfx.play(self, &"ui_move", -12.0)
 			_set_cursor(p, i)
+		return
+	if _confirming:
+		if i == index:
+			_leave()
 		return
 	if i == index:
 		_confirm()
@@ -245,24 +269,66 @@ func _tint_background(top: Color, bottom: Color, instant: bool) -> void:
 
 func _confirm() -> void:
 	if _confirming:
+		_leave()
 		return
 	var tile := _tiles[index]
 	if not tile.is_unlocked():
 		_reject_locked(tile)
 		return
 	_confirming = true
+	_confirm_token += 1
+	var token := _confirm_token
 	GameState.players[0].character_index = index
 	Sfx.play(self, &"ui_accept", -8.0)
-	_cheer(_rig)
+	# De frente para a câmera (o jogador pode ter girado o personagem com o mouse).
+	_spin_pause = 0.0
+	_dragging = false
+	turntable.rotation.y = wrapf(turntable.rotation.y, -PI, PI)
+	create_tween().set_trans(Tween.TRANS_SINE).tween_property(turntable, "rotation:y", 0.0, 0.3)
+	var wait := _celebrate(_rig, tile.data)
 	_show_toast("%s está pronto!" % tile.data.display_name)
-	await get_tree().create_timer(0.85).timeout
+	await get_tree().create_timer(wait + PICK_LINGER).timeout
+	if token == _confirm_token and _confirming:
+		_leave()
+
+
+func _leave() -> void:
+	if _leaving:
+		return
+	_leaving = true
 	GameState.goto_scene(GameState.SCENE_KART_SELECT)
+
+
+## Desfaz a escolha durante o gesto (sozinho): volta a escolher.
+func _unconfirm() -> void:
+	if _leaving:
+		return
+	_confirming = false
+	_confirm_token += 1
+	Sfx.play(self, &"ui_back", -10.0)
+	if is_instance_valid(_rig):
+		_rig.end_gesture()
+		_rig.set_face(&"face_happy")
 
 
 func _reject_locked(tile: CharacterTile) -> void:
 	_show_toast("Esse piloto chega em breve!")
 	Sfx.play(self, &"ui_back", -10.0)
 	_shake(tile)
+
+
+## Comemoração ao ser escolhido: o gesto do personagem (corpo inteiro, com a expressão
+## dele) ou, sem gesto próprio, os braços para cima. Devolve quanto ela dura (s).
+func _celebrate(rig: CharacterRig, data: CharacterData) -> float:
+	if not is_instance_valid(rig):
+		return 0.5
+	if data and data.pick_gesture != &"":
+		var length := rig.play_body_gesture(data.pick_gesture, PICK_HOLD)
+		if length > 0.0:
+			rig.set_face(data.pick_face)
+			return length
+	_cheer(rig)
+	return 0.5
 
 
 func _cheer(rig: CharacterRig) -> void:
@@ -424,10 +490,12 @@ func _multi_confirm(p: int) -> void:
 		_reject_locked(tile)
 		return
 	GameState.players[p].character_index = _cursors[p]
+	# Se este for o último a confirmar, a tela espera o gesto dele acabar.
+	var length := _celebrate(_rigs[p], GameState.get_player_character(p))
+	_multi.ready_delay = maxf(MultiPick.ALL_READY_DELAY, length + PICK_LINGER)
 	_multi.set_ready(p, true)
 	_panels[p].confirmed = true
 	Sfx.play(self, &"ui_accept", -8.0)
-	_cheer(_rigs[p])
 	_refresh_multi(false)
 	if not _multi.confirmed.has(false):
 		_show_toast("Todos prontos!")
@@ -437,6 +505,7 @@ func _multi_unconfirm(p: int) -> void:
 	_panels[p].confirmed = false
 	Sfx.play(self, &"ui_back", -10.0)
 	if is_instance_valid(_rigs[p]):
+		_rigs[p].end_gesture()
 		_rigs[p].set_face(&"face_happy")
 	_refresh_multi(false)
 

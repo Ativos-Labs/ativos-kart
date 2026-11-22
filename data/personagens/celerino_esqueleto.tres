@@ -1,0 +1,8 @@
+[gd_resource type="Resource" script_class="CharacterSkeleton" format=3]
+
+[ext_resource type="Script" path="res://scripts/character_skeleton.gd" id="1_skel"]
+[ext_resource type="AnimationLibrary" path="res://assets/models/personagens/celerino_animacoes.res" id="2_anims"]
+
+[resource]
+script = ExtResource("1_skel")
+animations = ExtResource("2_anims")

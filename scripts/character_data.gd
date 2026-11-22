@@ -40,6 +40,14 @@ extends Resource
 ## metros). Para personagens de corpo grosso, cujas costas passariam do encosto.
 @export var seat_forward := 0.0
 
+@export_group("Seleção")
+## Animação do corpo inteiro ao ser escolhido na seleção de personagem: uma animação do
+## esqueleto (veja tools/personagens/gestos_escolha.gd). Vazio = comemora com os braços
+## (gesture_cheer).
+@export var pick_gesture := &""
+## Expressão durante a animação de escolha.
+@export var pick_face := &"face_surprised"
+
 @export_group("Cores")
 ## Cor principal (faixa do nome, destaque do retrato).
 @export var color := Color(0.17, 0.38, 0.93)

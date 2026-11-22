@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" path="res://scripts/character_data.gd" id="1_data"]
 [ext_resource type="PackedScene" path="res://assets/models/personagens/celerino.glb" id="2_model"]
+[ext_resource type="Resource" path="res://data/personagens/celerino_esqueleto.tres" id="3_skel"]
 
 [resource]
 script = ExtResource("1_data")
@@ -9,8 +10,11 @@ display_name = "Celerino"
 tagline = "O mascote da Ativos"
 description = "Uma folha de documento cheia de energia. Leve e ágil: acelera rápido e faz curvas fechadas como ninguém."
 model_scene = ExtResource("2_model")
+skeleton = ExtResource("3_skel")
 kart_scale = 0.43
 showcase_scale = 1.0
+pick_gesture = &"gesture_air_guitar"
+pick_face = &"face_screaming"
 seat_height = 0.54
 color = Color(0.17, 0.38, 0.93, 1)
 color_dark = Color(0.05, 0.12, 0.42, 1)

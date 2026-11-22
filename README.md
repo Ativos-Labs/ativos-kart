@@ -508,6 +508,15 @@ outro (nomes dos ossos, animações extras, jeito de pilotar) fica no
 `CharacterSkeleton` de cada um (`scripts/character_skeleton.gd`: os valores padrão são
 os do Celerino; o do Jarbas é `data/personagens/jarbas_esqueleto.tres`).
 
+**Ao ser escolhido** na seleção de personagem, cada um faz o seu gesto, com o corpo
+inteiro: o Celerino toca guitarra invisível (e termina com o braço esticado fazendo
+chifrinho), o Jarbas cruza os braços se achando, o Henrique aponta para quem está
+escolhendo e o Ulysses arruma o cabelo. Jogando sozinho, a tela espera o gesto acabar e
+segue para os karts (A/Enter pula a espera, B/Esc desfaz a escolha); no multijogador a
+tela espera o gesto de quem confirmou por último. O gesto e a expressão ficam em
+`pick_gesture` e `pick_face` no `.tres` do personagem; as animações são geradas por
+`tools/personagens/gestos_escolha.gd` (veja o README de lá).
+
 ### Celerino
 
 O Celerino vem de `assets/models/personagens/celerino.glb` (esqueleto de 65 ossos e
@@ -520,7 +529,9 @@ arquivo trazem trilhas para quase todos os ossos.
   com a direção e as mãos acompanham. Ele se inclina nas curvas, olha para o lado da
   curva, faz cara de concentrado no drift, se assusta nas batidas, grita no turbo e
   comemora com os braços para cima na chegada.
-- **Nas telas de seleção:** fica em pé, respira, pisca, acena e comemora ao confirmar.
+- **Nas telas de seleção:** fica em pé, respira, pisca, acena e, ao ser escolhido, toca
+  guitarra invisível (a única animação dele que não vem do `.glb`: está em
+  `celerino_animacoes.res`, pelo `data/personagens/celerino_esqueleto.tres`).
 - **Uma malha só:** ao carregar, as 10 malhas do modelo (35 superfícies, uma por material)
   viram uma superfície com a cor e a rugosidade de cada material nos vértices
   (`scripts/character_mesh.gd` + `shaders/character.gdshader`, que imita os materiais e
@@ -661,6 +672,10 @@ Como eles pilotam (`kart_ai.gd`):
    jeito de pilotar, e aponte `skeleton` do personagem para ele. O caminho do Jarbas
    (atlas de texturas, animações transferidas do Celerino, pegada medida) está em
    `tools/personagens/README.md`.
+6. **Gesto ao ser escolhido:** ponha em `pick_gesture` uma animação do esqueleto (corpo
+   inteiro, termina na pose que fica parada) e em `pick_face` a expressão. Vazio = ele
+   comemora com os braços para cima (`gesture_cheer`). Gestos novos: uma coreografia em
+   `tools/personagens/gestos_escolha.gd`.
 
 Ele aparece no lugar de um dos "?" da grade de seleção.
 

@@ -16,6 +16,9 @@ o README do jogo).
 | `originais/ulysses-piloto.glb` | Modelo do Ulysses: 99 ossos (os do Jarbas + 4 auxiliares de cotovelo e joelho), as mesmas 10 animações, 2 texturas de 4096 px (cabeça da Tripo e corpo), 2 logos e o volante/guidão de referência |
 | `build_personagem.py` | Passo 1 (Python + Pillow): grava `assets/models/personagens/<nome>.glb` |
 | `gerar_animacoes.gd` | Passo 2 (Godot headless): grava `assets/models/personagens/<nome>_animacoes.res` |
+| `gestos_escolha.gd` | Gestos de escolha (o que cada piloto faz ao ser escolhido na seleção), usado pelo passo 2; vale também para o Celerino |
+| `quadros_gesto.gd` | Grava glb de um piloto em vários instantes do gesto de escolha (malhas deformadas na CPU) |
+| `render_gestos.py` | Renderiza esses glb no Blender e monta uma folha (uma linha por vista, uma coluna por quadro) |
 | `poses_nos_karts.gd` | Confere o encaixe de um piloto em cada veículo pelo checklist do documento (tabela abaixo) e grava um glb da cena posada por veículo |
 | `render_poses.py` | Renderiza esses glb no Blender (lado, 3/4, cima, perto do piloto e um corte que mostra pernas e pés) |
 | `medir_cockpit.gd` | Mapa de ocupação lateral de cada kart (banco, encosto, assoalho, pedais) com valores sugeridos para o grupo "Cockpit" do `KartData` (usado pelo `fit_seat`, hoje desligado nos três) |
@@ -29,6 +32,28 @@ O kart de cada um, o tamanho dos veículos e a medida do assento ficam em
 python3 tools/personagens/build_personagem.py jarbas     # ou henrique, ulysses
 Godot --headless --path . --import
 Godot --headless --path . -s res://tools/personagens/gerar_animacoes.gd -- jarbas
+```
+
+O Celerino ganha do passo 2 só o gesto de escolha (o resto vem do `celerino.glb`):
+`gerar_animacoes.gd -- celerino` grava `celerino_animacoes.res`, apontada pelo
+`data/personagens/celerino_esqueleto.tres` (os outros valores são os padrão).
+
+Modelo novo vindo do Blender: ponha em `originais/<nome>-piloto.glb` (não na raiz do
+projeto: um .glb em qualquer lugar de `res://` é importado e exportado com o jogo) e rode
+os três comandos. O `.glb` do jogo é gerado: não copie o arquivo do Blender por cima dele.
+
+Personagem novo: o import extrai o atlas sem compressão de VRAM na primeira vez; copie as
+opções de `henrique_atlas.png.import` (`compress/mode=2`, `detect_3d/compress_to=0`) para o
+`.import` do atlas novo e rode o `--import` de novo.
+
+O passo 2 lê o modelo importado e o `celerino.glb`: rode de novo depois de mudar qualquer
+um deles.
+
+Conferir o encaixe em todos os veículos (sem janela):
+
+```sh
+Godot --headless --path . -s res://tools/personagens/poses_nos_karts.gd -- /tmp/poses henrique
+Blender -b --factory-startup -P tools/personagens/render_poses.py -- /tmp/poses/r_ /tmp/poses/henrique_*.glb
 ```
 
 ## Passo 1: `build_personagem.py`
@@ -86,6 +111,8 @@ sentadas:
 | `idle`, `gesture_*`, `hand_*_L/R`, `eyes_*` | transferidas do Celerino |
 | `body_lean_*`, `body_bend_*`, `body_twist_*` | geradas: giro espalhado por `Spine`, `Spine1`, `Spine2`; pescoço e cabeça desfazem parte da inclinação para a frente (ele continua olhando a pista) |
 | `idle_stand` | gerada: parado em pé nas telas de seleção e nos retratos (`stand_idle` do esqueleto), corpo todo, laço de 12 s (veja abaixo) |
+| `face_smug` | Alegria de boca fechada com as pálpebras de cima 40% fechadas (convencido: a do Jarbas ao ser escolhido) |
+| `gesture_point_forward`, `gesture_arms_crossed`, `gesture_hair_fix` | gesto de escolha de cada um (`gestos` em `CHARACTERS`), gerado por `gestos_escolha.gd` (veja abaixo) |
 
 **A raiz na pose sentada.** Na `POSE_Kart` é o osso `Raiz` que desce o corpo 0,19 m até o
 assento (na `POSE_Moto` ela fica no lugar). O `CharacterRig` não anima a raiz, então
@@ -119,6 +146,56 @@ os do Celerino (o giro é espalhado: 25% no braço, 75% no antebraço, 100% na m
 respiração (`idle`, braços caídos) não, e as palmas ficam viradas para o corpo. Os dedos
 dobram na mesma proporção (0 = esticado, 1 = a mão fechada da `POSE_Kart`); o Celerino não
 tem anelar, o dos pilotos segue o médio.
+
+## Gestos de escolha (`gestos_escolha.gd`)
+
+Ao ser escolhido na seleção de personagem, cada piloto faz um gesto do corpo inteiro
+(`pick_gesture` e `pick_face` no `.tres` do personagem; o jogo toca com
+`CharacterRig.play_body_gesture`, por cima da animação parada, e a pose final fica parada):
+
+| Piloto | Gesto | Expressão | Duração |
+|---|---|---|---|
+| Celerino | `gesture_air_guitar`: guitarra invisível. Abaixa o corpo e inclina para trás, toca 4 palhetadas (0,24 s cada) balançando a cabeça, com a outra mão correndo pelo braço da guitarra; estica o braço direito acima da folha, gira pelo lado (moinho), dá a palhetada grande e termina com o braço esticado para cima fazendo chifrinho | `face_screaming` | 2,6 s |
+| Jarbas | `gesture_arms_crossed`: cruza os braços se achando. Respira (ombros sobem), cruza os braços na frente do peito (o esquerdo por cima), estufa o peito, ergue o queixo e vira a cabeça de lado, com o peso numa perna; depois olha de volta com um aceno curto | `face_smug` | 2,1 s |
+| Henrique | `gesture_point_forward`: aponta para quem está escolhendo. Puxa o braço para trás (o tronco gira), estica o braço de uma vez com o indicador e dá mais uma "cutucada"; o outro braço fica solto ao lado do corpo | `face_happy` | 2,0 s |
+| Ulysses | `gesture_hair_fix`: arruma o cabelo. A palma encosta na frente do cabelo e desliza para trás por cima da orelha, com a cabeça inclinando para o lado da mão; passa de novo, mais curto, e a mão desce solta; termina de queixo erguido | `face_smiling` | 2,4 s |
+
+Cada gesto é uma coreografia em curvas com chaves no tempo (deslocamento e giro do quadril,
+giro do peito, da cabeça e das clavículas; ponto do punho ou do meio da palma, direção dos
+dedos, da palma e do cotovelo; quanto cada dedo fecha). A cada quadro (30 por segundo):
+
+- o tronco gira (a coluna leva o giro do peito aos poucos) e as pernas seguem por IK com os
+  pés plantados;
+- cada braço por IK de dois ossos: o cotovelo aponta para o lado pedido e a dobra fica no
+  plano em que o cotovelo dobra na pose T (para a frente, nos dois esqueletos); a mão fica
+  na orientação pedida e metade da torção vai para o antebraço;
+- os dedos fecham entre a mão aberta do repouso e o punho fechado (da `POSE_Kart`; no
+  Celerino, das `hand_fist_*`);
+- os pontos dos braços podem acompanhar o peito ou a cabeça (a mão no cabelo segue a cabeça
+  que inclina; a guitarra segue o corpo), com uma curva de 0 a 1 para soltar aos poucos;
+- os pontos saem de medidas do modelo: ombros, braços caídos da `idle` (onde o gesto
+  começa), frente do peito e caixa da cabeça e do quadril (malha). Os braços cruzados do
+  Jarbas ficam a 6–8,5 cm da frente do peito; a palma do Ulysses anda 1–2 cm fora do cabelo;
+- "mão solta" (`limp_*`): a mão acompanha o antebraço com o punho reto. Sem isso, a mão do
+  Ulysses girava ao contrário do antebraço na descida (o punho chegava a dobrar 160°);
+- Celerino: braço elástico como no kart. Um ponto fora do alcance estica o braço reto (só o
+  osso do braço; o antebraço desfaz a escala e não entorta): no moinho e no chifrinho ele
+  chega a 1,9× o braço.
+
+O gerador imprime, por gesto, a maior dobra do punho, a maior torção do antebraço, quanto o
+braço esticou e quantos quadros o punho ou o pé não alcançaram o alvo (tem de ser 0; o pé
+sai do chão se o quadril subir, porque a perna em repouso já está quase esticada).
+
+Conferir sem janela (12 quadros do gesto, vistas da câmera da seleção e 3/4):
+
+```sh
+Godot --headless --path . -s res://tools/personagens/quadros_gesto.gd -- /tmp/gesto ulysses
+Blender -b --factory-startup -P tools/personagens/render_gestos.py -- /tmp/gesto/folha.png jogo,34 /tmp/gesto/ulysses_*.glb
+```
+
+Na tela de verdade: probe web (`PROBE=… tools/perf/export_probe.sh`) que chama
+`character_select._select(i, false)`, congela o rig (`set_process(false)`), toca o gesto e
+avança `rig._process(0.1)` por print; o personagem fica em ~(730, 40)–(1090, 480) a 1280×720.
 
 ## Encaixe piloto × kart (`data/personagens/*_esqueleto.tres`)
 
