@@ -18,7 +18,7 @@ void fragment() {
 	float x = uv.x * panel_aspect * direction;
 	float y = (uv.y - 0.5) * 2.0;
 	float aa = fwidth(x) * 1.5;
-	float c = fract(x * 0.8 - abs(y) * 0.32 - TIME * speed);
+	float c = fract(x * 0.8 + abs(y) * 0.32 - TIME * speed);
 	float arrow = smoothstep(0.2 - aa, 0.2 + aa, c) * (1.0 - smoothstep(0.62 - aa, 0.62 + aa, c)) * step(abs(y), 0.78);
 	vec3 col = mix(bg_color, arrow_color, arrow);
 	vec2 d = min(uv, 1.0 - uv) * vec2(panel_aspect, 1.0);

@@ -14,7 +14,7 @@ uniform float glow = 2.2;
 void fragment() {
 	vec2 uv = UV;
 	float aa = fwidth(uv.y) * 4.0;
-	float chev = fract((uv.y - abs(uv.x - 0.5) * 0.9) * 3.0 - TIME * speed);
+	float chev = fract((uv.y + abs(uv.x - 0.5) * 0.9) * 3.0 - TIME * speed);
 	float band = smoothstep(0.15, 0.15 + aa, chev) * (1.0 - smoothstep(0.55, 0.55 + aa, chev));
 	vec3 col = mix(color_a, color_b, band);
 	float pulse = 0.85 + 0.15 * sin(TIME * 8.0);
