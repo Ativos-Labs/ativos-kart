@@ -28,6 +28,12 @@ const CELL := 8.0
 const POP_TIME := 0.42
 const POP_RISE := 1.6 * KartScale.ITEMS
 const POP_POOL := 10
+## Sombra no chão (mancha redonda, como a das caixas de item): diâmetro em relação ao da
+## moeda e altura máxima da moeda acima do chão para ter sombra (as do voo de asa-delta,
+## lá no alto, ficam sem).
+const SHADOW_SIZE := 1.7
+const SHADOW_OPACITY := 0.65
+const SHADOW_MAX_HEIGHT := 4.0
 const GROW_TIME := 0.35
 
 ## Posições das moedas (espaço deste nó = espaço da pista).
@@ -35,6 +41,10 @@ var positions := PackedVector3Array()
 
 var _mm: MultiMesh
 var _bases: Array[Basis] = []
+## Sombras: uma MultiMesh à parte; `_shadow_of[i]` = instância da sombra da moeda i (-1 = sem).
+var _shadow_mm: MultiMesh
+var _shadow_of := PackedInt32Array()
+var _shadow_xf: Array[Transform3D] = []
 var _active := PackedByteArray()
 var _respawn_at := PackedFloat32Array()
 var _waiting := 0
@@ -83,7 +93,7 @@ static func coin_material(pop := false) -> ShaderMaterial:
 		_pop_material = _material.duplicate() as ShaderMaterial
 		_pop_material.set_shader_parameter("spin_speed", 16.0)
 		_pop_material.set_shader_parameter("bob_height", 0.0)
-		_pop_material.set_shader_parameter("glow", 0.5)
+		_pop_material.set_shader_parameter("glow", 0.65)
 	_lock.unlock()
 	return _pop_material if pop else _material
 
@@ -98,7 +108,9 @@ static func clear_cache() -> void:
 
 
 ## Monta as moedas. `with_collision` = false: só o visual (prévia da tela de pistas).
-func setup(p_positions: PackedVector3Array, directions: PackedVector3Array, with_collision: bool) -> void:
+## `grounds` = ponto do chão embaixo de cada moeda (onde fica a sombra; vazio = sem sombra).
+func setup(p_positions: PackedVector3Array, directions: PackedVector3Array, with_collision: bool,
+		grounds := PackedVector3Array()) -> void:
 	positions = p_positions
 	var count := positions.size()
 	_active.resize(count)
@@ -133,6 +145,7 @@ func setup(p_positions: PackedVector3Array, directions: PackedVector3Array, with
 	# Godot avisa e mantém um buffer de interpolação da MultiMesh inteira à toa).
 	mmi.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	add_child(mmi)
+	_build_shadows(directions, grounds)
 	var live := with_collision and not Engine.is_editor_hint()
 	set_physics_process(live)
 	set_process(live)
@@ -152,6 +165,53 @@ func setup(p_positions: PackedVector3Array, directions: PackedVector3Array, with
 		_pop_t.fill(-1.0)
 		_pop_from.resize(POP_POOL)
 		_pop_dir.resize(POP_POOL)
+
+
+## Mancha de sombra no chão embaixo de cada moeda baixa (uma chamada de desenho para
+## todas). Não usa a sombra de verdade do sol: a MultiMesh das moedas é uma peça só, e
+## sombreada ela seria desenhada inteira em cada divisão da sombra, a cada quadro.
+func _build_shadows(directions: PackedVector3Array, grounds: PackedVector3Array) -> void:
+	_shadow_of.resize(positions.size())
+	_shadow_of.fill(-1)
+	_shadow_xf.clear()
+	var mesh := coin_mesh()
+	if grounds.size() != positions.size() or mesh == null:
+		return
+	var diameter := maxf(mesh.get_aabb().size.x, mesh.get_aabb().size.y) * COIN_SCALE * SHADOW_SIZE
+	for i in positions.size():
+		var ground := grounds[i]
+		if positions[i].y - ground.y > SHADOW_MAX_HEIGHT:
+			continue
+		var dir := directions[i] if i < directions.size() else Vector3.FORWARD
+		if dir.length_squared() < 0.001:
+			dir = Vector3.FORWARD
+		# Deitada no asfalto (com a subida da pista), um pouco acima para não piscar.
+		var basis := Basis.looking_at(dir.normalized(), Vector3.UP)
+		_shadow_of[i] = _shadow_xf.size()
+		_shadow_xf.append(Transform3D(basis, ground + basis.y * 0.05))
+	if _shadow_xf.is_empty():
+		return
+	_shadow_mm = MultiMesh.new()
+	_shadow_mm.transform_format = MultiMesh.TRANSFORM_3D
+	_shadow_mm.mesh = ItemBox.make_shadow_mesh(diameter, SHADOW_OPACITY)
+	_shadow_mm.instance_count = _shadow_xf.size()
+	for k in _shadow_xf.size():
+		_shadow_mm.set_instance_transform(k, _shadow_xf[k])
+	var smi := MultiMeshInstance3D.new()
+	smi.name = "SombrasMoedas"
+	smi.multimesh = _shadow_mm
+	smi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	smi.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
+	add_child(smi)
+
+
+## Tamanho da sombra da moeda i (0 = escondida, junto com a moeda pega).
+func _scale_shadow(i: int, s: float) -> void:
+	var k := _shadow_of[i] if i < _shadow_of.size() else -1
+	if k < 0:
+		return
+	var xf := _shadow_xf[k]
+	_shadow_mm.set_instance_transform(k, Transform3D(xf.basis.scaled(Vector3.ONE * s), xf.origin))
 
 
 func _ready() -> void:
@@ -217,6 +277,7 @@ func _collect(i: int, kart: Kart) -> void:
 	_waiting += 1
 	_growing.erase(i)
 	_mm.set_instance_transform(i, Transform3D(Basis().scaled(Vector3.ZERO), positions[i]))
+	_scale_shadow(i, 0.0)
 	_spawn_pop(positions[i])
 	kart.add_coin()
 
@@ -264,6 +325,7 @@ func _process(delta: float) -> void:
 			var k := clampf(t / GROW_TIME, 0.0, 1.0)
 			var s := 1.0 + 2.70158 * pow(k - 1.0, 3.0) + 1.70158 * pow(k - 1.0, 2.0)
 			_mm.set_instance_transform(i, Transform3D(_bases[i].scaled(Vector3.ONE * maxf(s, 0.001)), positions[i]))
+			_scale_shadow(i, clampf(k, 0.001, 1.0))
 			if k >= 1.0:
 				_growing.erase(i)
 			else:

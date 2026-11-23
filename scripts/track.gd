@@ -998,6 +998,8 @@ func _build_item_boxes() -> void:
 func _build_coins() -> void:
 	var points := PackedVector3Array()
 	var dirs := PackedVector3Array()
+	# Ponto do asfalto embaixo de cada moeda (para a sombra).
+	var grounds := PackedVector3Array()
 	for line in coin_lines:
 		var count := maxi(int(line.z), 1)
 		var center := wrapf(line.x, 0.0, 1.0) * length
@@ -1008,6 +1010,7 @@ func _build_coins() -> void:
 			var xf := get_transform_at(d, line.y)
 			points.append(xf.origin + Vector3.UP * TrackCoins.HEIGHT)
 			dirs.append(get_direction_at(d))
+			grounds.append(xf.origin)
 	if coins_on_ramps:
 		var inner_half := road_width * 0.5 - curb_min_width - 0.1
 		for r in ramps:
@@ -1027,6 +1030,7 @@ func _build_coins() -> void:
 						var gy := base_y + TrackRamp.glide_height(gx, 27.0) + TrackCoins.KART_CENTER
 						points.append(Vector3(gp.x, maxf(gy, gp.y + TrackCoins.HEIGHT), gp.z))
 						dirs.append(get_direction_at(lip + gx))
+						grounds.append(gp)
 				continue
 			# Arco do kart saindo da borda a 27 m/s (com turbo, mais longo): altura do
 			# meio do kart = borda + subida - gravidade (como em Kart._launch).
@@ -1039,11 +1043,12 @@ func _build_coins() -> void:
 				var xf := get_transform_at(lip + x, lateral)
 				points.append(xf.origin + Vector3.UP * maxf(y, TrackCoins.HEIGHT))
 				dirs.append(get_direction_at(lip + x))
+				grounds.append(xf.origin)
 	if points.is_empty():
 		return
 	coins = TrackCoins.new()
 	coins.name = "MoedasAtivos"
-	coins.setup(points, dirs, with_collision)
+	coins.setup(points, dirs, with_collision, grounds)
 	_generated.add_child(coins)
 
 

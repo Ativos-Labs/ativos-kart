@@ -261,7 +261,7 @@ static func make_material(upside_down := false) -> ShaderMaterial:
 
 
 ## Sombra redonda e suave no asfalto, embaixo da caixa.
-static func make_shadow_mesh() -> PlaneMesh:
+static func make_shadow_mesh(size := TOUCH_SIZE, opacity := 0.4) -> PlaneMesh:
 	var gradient := Gradient.new()
 	gradient.set_color(0, Color(1, 1, 1, 1))
 	gradient.set_color(1, Color(1, 1, 1, 0))
@@ -275,9 +275,9 @@ static func make_shadow_mesh() -> PlaneMesh:
 	var mat := StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.albedo_color = Color(0.02, 0.03, 0.08, 0.4)
+	mat.albedo_color = Color(0.02, 0.03, 0.08, opacity)
 	mat.albedo_texture = tex
 	var plane := PlaneMesh.new()
-	plane.size = Vector2.ONE * TOUCH_SIZE
+	plane.size = Vector2.ONE * size
 	plane.material = mat
 	return plane

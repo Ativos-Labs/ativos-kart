@@ -13,8 +13,8 @@ uniform float metallic_amount = 0.55;
 uniform float roughness_amount = 0.3;
 // Brilho próprio (a moeda aparece de longe e na sombra) e contorno mais claro.
 uniform vec3 glow_color : source_color = vec3(1.0, 0.72, 0.18);
-uniform float glow = 0.18;
-uniform float rim_glow = 0.55;
+uniform float glow = 0.3;
+uniform float rim_glow = 1.0;
 // Giro extra (rad) e fase própria, para a moeda que voa ao ser pega.
 uniform float extra_spin = 0.0;
 // Verso: raio do disco liso (m, espaço da moeda) e a cor dele (sem a textura).
