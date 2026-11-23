@@ -58,6 +58,10 @@ var _g := {}
 ## O que conferir no último gesto: maior dobra do punho e torção do antebraço (graus) e
 ## quantos quadros o punho ou o pé não alcançaram o alvo.
 var stats := {}
+## Pegada da mão fechada de cada lado (espaço do osso da mão): [ponto, direção da barra
+## para o lado do polegar], a mesma do volante (CharacterSkeleton.grip_point/grip_axis).
+## Gestos com objeto na mão (`prop` na coreografia) põem o objeto nela.
+var prop_grip: Array = []
 
 
 ## Esqueleto Mixamo (Jarbas, Henrique, Ulysses).
@@ -439,6 +443,7 @@ func _arm(side: int, c: Dictionary, t: float, space_name: String) -> void:
 			stats.stretch = maxf(stats.get("stretch", 1.0), (a * stretch + b) / (a + b))
 		if dist > a * stretch + b:
 			stats.arm_short = stats.get("arm_short", 0) + 1
+			stats.short_at = stats.get("short_at", "") + " %s%.2f(%.0f%%)" % ["LR"[side], t, 100.0 * dist / (a + b)]
 		dist = minf(dist, a * stretch + b) if stretch > 1.0 else (a + b) * 0.999
 		wrist = shoulder + dir * dist
 	var side_dir := pole - dir * pole.dot(dir)
@@ -479,6 +484,8 @@ func _arm(side: int, c: Dictionary, t: float, space_name: String) -> void:
 	var bend_left := (hand_b * (fore_turn * rest_g[ha].basis).inverse()).get_rotation_quaternion()
 	if bend_left.w < 0.0:
 		bend_left = -bend_left
+	if rad_to_deg(bend_left.get_angle()) > stats.get("wrist", 0.0):
+		stats.wrist_at = "%s%.2f" % ["LR"[side], t]
 	stats.wrist = maxf(stats.get("wrist", 0.0), rad_to_deg(bend_left.get_angle()))
 	stats.twist = maxf(stats.get("twist", 0.0), absf(rad_to_deg(twist * 0.5)))
 
@@ -509,6 +516,8 @@ func bake(gesture_name: StringName) -> Animation:
 			c = _hair_fix()
 		&"gesture_air_guitar":
 			c = _air_guitar()
+		&"gesture_sextou":
+			c = _sextou()
 		_:
 			push_error("gesto desconhecido: %s" % gesture_name)
 			return null
@@ -557,7 +566,43 @@ func bake(gesture_name: StringName) -> Animation:
 	print("%s: %.2f s, %d quadros, %d ossos | punho dobra até %.0f°, antebraço torce até %.0f°, braço estica até %.2f× | punho fora do alcance em %d quadros, pé em %d" % [
 		gesture_name, length, count + 1, bones.size(), stats.get("wrist", 0.0), stats.get("twist", 0.0),
 		stats.get("stretch", 1.0), stats.get("arm_short", 0), stats.get("leg_short", 0)])
+	print("  maior dobra do punho em ", stats.get("wrist_at", ""))
+	if stats.has("short_at"):
+		print("  punho fora do alcance:", stats.short_at)
+	if c.has("prop"):
+		_prop_meta(anim, c)
 	return anim
+
+
+## Objeto na mão (a garrafa do Rafael): grava nos metadados da animação ("prop") o osso, a
+## transformação do objeto no espaço do osso e quando ele aparece. O objeto tem a origem no
+## ponto da pegada, +Y para o lado do polegar (a tampa) e +Z para a frente (o rótulo): o
+## giro em volta da barra deixa o rótulo o mais virado possível para a câmera (+Z do
+## personagem) no último quadro.
+func _prop_meta(anim: Animation, c: Dictionary) -> void:
+	var spec: Dictionary = c.prop
+	var side := 1 if spec.bone == "right" else 0
+	if prop_grip.size() < 2:
+		push_error("gesto com objeto sem prop_grip")
+		return
+	var grip: Array = prop_grip[side]
+	var point: Vector3 = grip[0]
+	var axis := (grip[1] as Vector3).normalized()
+	var hand := _b(r.arms[side][2])
+	_pose(c, c.length)
+	var hand_b := glob(hand).basis.orthonormalized()
+	var cam := hand_b.inverse() * Vector3.BACK
+	var label := (cam - axis * cam.dot(axis)).normalized()
+	var xf := Transform3D(Basis(axis.cross(label), axis, label), point)
+	anim.set_meta(&"prop", {"bone": String(sk.get_bone_name(hand)), "transform": xf, "show": float(spec.show)})
+	# Conferência: para onde a garrafa aponta (tampa) e o rótulo, no espaço do personagem.
+	for t in [spec.show, 0.26, 0.3, 0.36, 0.42, 0.5, 0.6, 0.75, 1.1, 1.7, 1.92, 2.08, c.length]:
+		_pose(c, t)
+		var g := glob(hand) * xf
+		var hf := _hand_frame(side, func(i: int) -> Vector3: return glob(i).origin)
+		var fore := (glob(hand).origin - glob(_b(r.arms[side][1])).origin).normalized()
+		print("  objeto em %.2f s: pegada %s tampa %s rótulo %s | punho dobra %.0f°" % [t, _v(g.origin),
+				_v(g.basis.y.normalized()), _v(g.basis.z.normalized()), rad_to_deg(fore.angle_to(hf.x))])
 
 
 # --- Coreografias ---------------------------------------------------------------------------
@@ -793,6 +838,132 @@ func _air_guitar() -> Dictionary:
 	c.chest = [[0.0, Vector3.ZERO], [0.28, Vector3(-8, 4, 0)], [1.26, Vector3(-8, 4, 0)], [1.42, Vector3(-16, 6, 0)],
 			[1.64, Vector3(8, 0, 0)], [1.95, Vector3(-14, 2, 3)], [2.3, Vector3(-12, 2, 3)]]
 	return c
+
+
+## Rafael: "SEXTOUU!" com uma long neck na mão direita, segurando pelo gargalo. A mão vai
+## para trás do quadril (pega a garrafa, que aparece ali, escondida pelo corpo; o tronco
+## gira e abaixa um pouco), sobe pelo lado num arco e ergue a garrafa acima do ombro, com o
+## braço aberto; o corpo inclina para trás e o queixo sobe no grito (a cara falada é a
+## face_sextou, no mesmo tempo). No "UUU" a mão esquerda fechada dá dois socos no ar na
+## frente do ombro e a garrafa sobe junto. Depois ele traz a garrafa para a frente, num
+## brinde para quem está escolhendo (empurra e volta, "tim-tim"), e pisca.
+##
+## A garrafa (CharacterData.pick_prop) entra pelos metadados da animação (veja bake): o
+## gargalo passa pelo bolso da mão fechada (entre a palma, os dedos e o polegar; `prop_grip`),
+## com a tampa para o lado do polegar e o rótulo virado para a câmera no brinde.
+func _sextou() -> Dictionary:
+	var il: Dictionary = m.idle[0]
+	var ir: Dictionary = m.idle[1]
+	var sl: Vector3 = m.shoulder[0]
+	var sr: Vector3 = m.shoulder[1]
+	var back_z: float = minf(m.hips_box.position.z, m.torso_box.position.z)
+	# Atrás do quadril direito: a garrafa aparece aqui.
+	var behind := Vector3(sr.x + 0.035, sr.y - 0.27, back_z - 0.035)
+	# Erguida ao lado da cabeça: o braço abre para o lado e o antebraço sobe inclinado para
+	# a frente, então a mão segue a linha do antebraço (o punho dobra pouco) e a garrafa,
+	# atravessada no punho, fica quase em pé. Com o antebraço em pé a mão teria de dobrar
+	# ~70° para a garrafa ficar em pé (parecia segurar com o punho virado).
+	var raised := sr + Vector3(-0.2, 0.13, 0.14)
+	var pump := Vector3(0.0, 0.03, 0.01)
+	# Brinde: na frente do ombro, para a câmera.
+	var toast := sr + Vector3(-0.03, 0.0, 0.25)
+	# Soco no ar da mão esquerda: na frente do ombro esquerdo.
+	var fist_l := sl + Vector3(0.03, -0.07, 0.2)
+	var fist := Vector4(1.0, 1.0, 1.0, 1.0)
+	# Mão da garrafa: dedos 90% e polegar 80% fechados, envolvendo o gargalo (prop_grip).
+	var bottle := Vector4(0.9, 0.9, 0.9, 0.8)
+	return {
+		"length": 2.6,
+		"space": ["chest", "chest"],
+		"prop": {"bone": "right", "show": 0.3},
+		"hips_pos": [[0.0, Vector3.ZERO], [0.26, Vector3(0.006, -0.014, 0.0)], [0.55, Vector3(0.012, -0.004, -0.006)],
+				[1.1, Vector3(0.012, -0.012, -0.006)], [1.2, Vector3(0.012, -0.005, -0.006)], [1.4, Vector3(0.012, -0.012, -0.006)],
+				[1.52, Vector3(0.012, -0.005, -0.006)], [2.0, Vector3(0.004, -0.008, 0.008)], [2.6, Vector3(0.004, -0.006, 0.006)]],
+		"hips_rot": [[0.0, Vector3.ZERO], [0.26, Vector3(2, -10, 0)], [0.6, Vector3(-2, 7, 3)], [1.7, Vector3(-2, 6, 3)],
+				[2.05, Vector3(2, 4, 1)], [2.6, Vector3(1, 3, 1)]],
+		"chest": [[0.0, Vector3.ZERO], [0.26, Vector3(6, -16, 0)], [0.6, Vector3(-9, 10, 4)], [1.1, Vector3(-11, 10, 4)],
+				[1.25, Vector3(-8, 10, 4)], [1.4, Vector3(-11, 10, 4)], [1.55, Vector3(-8, 10, 4)],
+				[2.05, Vector3(6, 6, -2)], [2.2, Vector3(4, 6, -2)], [2.6, Vector3(3, 5, -2)]],
+		"head": [[0.0, Vector3.ZERO], [0.26, Vector3(8, 12, 0)], [0.6, Vector3(-10, -6, 5)], [1.1, Vector3(-14, -6, 6)],
+				[1.25, Vector3(-10, -6, 6)], [1.4, Vector3(-14, -6, 6)], [1.6, Vector3(-11, -6, 6)],
+				[2.05, Vector3(-2, -6, 6)], [2.3, Vector3(-3, -8, 9)], [2.6, Vector3(-3, -7, 8)]],
+		"clav_r": [[0.0, Vector3.ZERO], [0.26, Vector3(-3, -6, 0)], [0.6, Vector3(14, 6, 0)], [1.7, Vector3(14, 6, 0)],
+				[2.05, Vector3(4, 8, 0)], [2.6, Vector3(3, 6, 0)]],
+		"clav_l": [[0.0, Vector3.ZERO], [0.6, Vector3(5, 4, 0)], [1.1, Vector3(2, 4, 0)], [1.4, Vector3(2, 4, 0)],
+				[1.7, Vector3(5, 4, 0)], [2.2, Vector3.ZERO]],
+		# Braço direito: atrás do quadril → arco pelo lado → erguido (sobe a cada "U") → brinde.
+		"wrist_r": [[0.0, ir.wrist], [0.26, behind], [0.42, sr + Vector3(-0.24, -0.08, 0.1), true],
+				[0.6, raised + Vector3(0.0, 0.015, 0.0)], [0.75, raised],
+				[1.1, raised + pump], [1.25, raised], [1.4, raised + pump], [1.55, raised], [1.7, raised],
+				[1.92, sr + Vector3(-0.06, 0.06, 0.22), true], [2.08, toast + Vector3(0.0, 0.01, 0.025)], [2.22, toast],
+				[2.6, toast]],
+		"fingers_r": [[0.0, ir.fingers], [0.26, Vector3(0.0, -0.9, 0.45)], [0.42, Vector3(-0.6, 0.15, 0.8), true],
+				[0.6, Vector3(0.0, 0.2, 1.0)], [1.7, Vector3(0.0, 0.2, 1.0)], [2.08, Vector3(0.05, 0.1, 1.0)]],
+		"palm_r": [[0.0, ir.palm], [0.26, Vector3(1.0, 0.0, 0.0)], [0.42, Vector3(0.8, 0.0, 0.6)],
+				[0.6, Vector3(1.0, -0.1, 0.0)], [1.7, Vector3(1.0, -0.1, 0.0)], [2.08, Vector3(1.0, 0.0, -0.1)]],
+		"elbow_r": [[0.0, ir.elbow], [0.26, Vector3(-0.8, 0.0, -0.6)], [0.42, Vector3(-1.0, -0.4, -0.2)],
+				[0.6, Vector3(-1.0, -0.3, -0.2)], [1.7, Vector3(-1.0, -0.3, -0.2)], [2.08, Vector3(-0.7, -1.0, 0.0)]],
+		"curl_r": [[0.0, RELAXED], [0.16, bottle], [2.6, bottle]],
+		# Braço esquerdo: soco no ar na frente do ombro a cada "U" e desce no brinde.
+		"wrist_l": [[0.0, il.wrist], [0.3, il.wrist + Vector3(0.01, 0.02, 0.05)], [0.85, fist_l + Vector3(0.0, 0.04, 0.0)],
+				[1.0, fist_l + Vector3(0.0, 0.05, -0.01)], [1.1, fist_l + Vector3(0.0, -0.03, 0.02)],
+				[1.28, fist_l + Vector3(0.0, 0.05, -0.01)], [1.4, fist_l + Vector3(0.0, -0.03, 0.02)],
+				[1.6, fist_l + Vector3(0.0, 0.02, 0.0)], [2.1, il.wrist + Vector3(0.0, 0.01, 0.02)], [2.6, il.wrist]],
+		"fingers_l": [[0.0, il.fingers], [0.85, Vector3(0.0, 0.5, 1.0)], [1.6, Vector3(0.0, 0.5, 1.0)], [2.1, il.fingers]],
+		"palm_l": [[0.0, il.palm], [0.85, Vector3(-1.0, 0.0, 0.0)], [1.6, Vector3(-1.0, 0.0, 0.0)], [2.1, il.palm]],
+		"elbow_l": [[0.0, il.elbow], [0.85, Vector3(0.6, -1.0, -0.2)], [1.6, Vector3(0.6, -1.0, -0.2)], [2.1, il.elbow]],
+		"curl_l": [[0.0, RELAXED], [0.8, fist], [1.65, fist], [2.1, RELAXED]],
+		"limp_l": [[0.0, 0.0], [1.7, 0.0], [2.1, 1.0], [2.6, 1.0]],
+	}
+
+
+## Caras animadas dos gestos de escolha (rosto por shape keys; gerar_animacoes.gd,
+## _face_timeline): chaves [tempo, {clipe: peso, "+blend shape": valor}].
+static func face_keys(face_name: StringName) -> Array:
+	match face_name:
+		&"face_sextou":
+			return _face_sextou()
+	push_error("cara desconhecida: %s" % face_name)
+	return [[0.0, {}], [0.1, {}]]
+
+
+## Rafael: "SEX-TOOUU!" ([sesˈtow], com o U esticado), no tempo do gesture_sextou. Sai do
+## sorriso da tela (EXP_Alegria), fecha a boca puxando o ar com as sobrancelhas subindo,
+## diz S-E-S-T-O e segura o U gritando (sobrancelhas no alto, olhos arregalados), abre um
+## sorrisão no brinde, pisca o olho esquerdo e fica sorrindo.
+static func _face_sextou() -> Array:
+	var hype := {"+brow_inner_up": 0.6, "+brow_outer_up_L": 0.75, "+brow_outer_up_R": 0.75,
+			"+eye_wide_L": 0.45, "+eye_wide_R": 0.45}
+	# O e U gritados: os visemas do modelo são discretos, então a boca ganha o bico
+	# (pucker/funnel), perde o sorriso de base do neutro e a mandíbula abre um pouco mais.
+	var o := {&"VIS_O": 1.0, "+mouth_funnel": 0.6, "+mouth_smile_L": -0.2, "+mouth_smile_R": -0.2,
+			&"EXP_Boca_Aberta": 0.3}
+	var u := {&"VIS_U": 1.0, "+mouth_pucker": 0.55, "+mouth_funnel": 0.5, "+mouth_smile_L": -0.2,
+			"+mouth_smile_R": -0.2, &"EXP_Boca_Aberta": 0.15}
+	var u_open := u.duplicate()
+	u_open[&"EXP_Boca_Aberta"] = 0.3
+	u_open["+mouth_pucker"] = 0.4
+	var say := func(mix: Dictionary) -> Dictionary:
+		var out := hype.duplicate()
+		out.merge(mix, true)
+		return out
+	return [
+		[0.0, {&"EXP_Alegria": 1.0}],
+		[0.26, {&"EXP_Sorriso_Fechado": 0.6, "+brow_inner_up": 0.35, "+brow_outer_up_L": 0.4, "+brow_outer_up_R": 0.4}],
+		[0.42, say.call({&"VIS_TD": 1.0, "+mouth_wide": 0.3})],  # S
+		[0.52, say.call({&"VIS_E": 1.0, &"EXP_Boca_Aberta": 0.2})],  # E
+		[0.62, say.call({&"VIS_TD": 0.9, "+mouth_wide": 0.3})],  # S
+		[0.7, say.call({&"VIS_TD": 1.0})],  # T
+		[0.8, say.call(o)],  # O
+		[0.95, say.call(u)],  # U...
+		[1.25, say.call(u_open)],
+		[1.6, say.call(u)],
+		[1.9, {&"EXP_Alegria": 1.0, "+brow_inner_up": 0.2}],
+		[2.12, {&"EXP_Alegria": 0.9}],
+		[2.22, {&"EXP_Piscada_L": 1.0, &"EXP_Alegria": 0.4}],  # pisca
+		[2.38, {&"EXP_Piscada_L": 1.0, &"EXP_Alegria": 0.4}],
+		[2.6, {&"EXP_Sorriso_Fechado": 1.0, &"EXP_Alegria": 0.3}],
+	]
 
 
 func _v(v: Vector3) -> String:

@@ -451,6 +451,7 @@ data/personagens/jarbas.tres         Dados do Jarbas (+ jarbas_esqueleto.tres: o
                                      animações e jeito de pilotar)
 data/personagens/henrique.tres       Dados do Henrique (+ henrique_esqueleto.tres)
 data/personagens/ulysses.tres        Dados do Ulysses (+ ulysses_esqueleto.tres)
+data/personagens/rafael.tres         Dados do Rafael (+ rafael_esqueleto.tres)
 data/rivais/*.tres                   Adversários do computador (Celerino recolorido)
 data/asas/*.tres                     Asas-deltas (Asa Rubra, Asa Ativos, Bandeirada, Pôr do Sol)
 assets/models/asas/                  Asa-delta (asa_delta.glb) e a textura de cada asa,
@@ -465,6 +466,10 @@ assets/models/personagens/henrique.glb   Modelo do Henrique (+ henrique_atlas.pn
                                      henrique_animacoes.res), gerados por tools/personagens/
 assets/models/personagens/ulysses.glb    Modelo do Ulysses (+ ulysses_atlas.png e
                                      ulysses_animacoes.res), gerados por tools/personagens/
+assets/models/personagens/rafael.glb     Modelo do Rafael (+ rafael_atlas.png e
+                                     rafael_animacoes.res), gerados por tools/personagens/
+scenes/props/garrafa_cerveja.tscn    A long neck do gesto do Rafael (scripts/garrafa_cerveja.gd;
+                                     rótulo de tools/personagens/build_garrafa.py)
 assets/models/moeda/moeda.glb        Moeda Ativos (gerada por tools/moeda/build_moeda.py)
 tools/karts/                         Gera bolido/cometa/motoca/bugre.glb e o
                                      standard_kart.glb (azul, com o "A" da Ativos) a
@@ -472,7 +477,7 @@ tools/karts/                         Gera bolido/cometa/motoca/bugre.glb e o
                                      pelas logos da Ativos) e escala cada kart para os
                                      pilotos (encaixe_karts.py, veja "Encaixe piloto ×
                                      kart"). O Godot ignora a pasta tools/.
-tools/personagens/                   Prepara o Jarbas, o Henrique e o Ulysses: limpa o
+tools/personagens/                   Prepara o Jarbas, o Henrique, o Ulysses e o Rafael: limpa o
                                      modelo e junta as texturas num atlas
                                      (build_personagem.py), monta as animações
                                      (gerar_animacoes.gd) e confere o encaixe em cada
@@ -501,9 +506,9 @@ macos/                               Export do aplicativo macOS (veja macos/READ
 
 ## Os pilotos
 
-São quatro pilotos jogáveis: o **Celerino** (folha de papel, mascote da Ativos), o
-**Jarbas** (piloto de macacão e luva), o **Henrique** (de boné e barba) e o **Ulysses**
-(de topete e macacão preto). Todos usam o mesmo `CharacterRig`; o que muda de um para o
+São cinco pilotos jogáveis: o **Celerino** (folha de papel, mascote da Ativos), o
+**Jarbas** (piloto de macacão e luva), o **Henrique** (de boné e barba), o **Ulysses**
+(de topete e macacão preto) e o **Rafael** (de barba curta e sorrisão). Todos usam o mesmo `CharacterRig`; o que muda de um para o
 outro (nomes dos ossos, animações extras, jeito de pilotar) fica no
 `CharacterSkeleton` de cada um (`scripts/character_skeleton.gd`: os valores padrão são
 os do Celerino; o do Jarbas é `data/personagens/jarbas_esqueleto.tres`).
@@ -511,7 +516,11 @@ os do Celerino; o do Jarbas é `data/personagens/jarbas_esqueleto.tres`).
 **Ao ser escolhido** na seleção de personagem, cada um faz o seu gesto, com o corpo
 inteiro: o Celerino toca guitarra invisível (e termina com o braço esticado fazendo
 chifrinho), o Jarbas cruza os braços se achando, o Henrique aponta para quem está
-escolhendo e o Ulysses arruma o cabelo. Jogando sozinho, a tela espera o gesto acabar e
+escolhendo, o Ulysses arruma o cabelo e o Rafael tira uma long neck de trás das costas,
+ergue a garrafa e grita "SEXTOUU!" (a boca fala, com um balão de quadrinho ao lado), e
+termina num brinde para quem está escolhendo, com uma piscadela. A garrafa e o balão só
+existem durante o gesto (`pick_prop`, `pick_shout` no `.tres`; `scripts/pick_extras.gd`)
+e somem quando ele acaba ou é desfeito. Jogando sozinho, a tela espera o gesto acabar e
 segue para os karts (A/Enter pula a espera, B/Esc desfaz a escolha); no multijogador a
 tela espera o gesto de quem confirmou por último. O gesto e a expressão ficam em
 `pick_gesture` e `pick_face` no `.tres` do personagem; as animações são geradas por
@@ -565,7 +574,12 @@ original por `tools/personagens/` (README lá, com todos os números).
 O **Henrique** e o **Ulysses** seguem o mesmo caminho do Jarbas (encaixe com a
 `POSE_Kart`, expressões próprias, gestos do Celerino, `idle_stand`, atlas numa
 superfície). Os três vieram do Blender com esqueleto, poses e expressões, já nas
-proporções finais. Os três têm ossos auxiliares no quadril (o Ulysses também no meio do
+proporções finais. O **Rafael** também, com uma diferença: o rosto dele é feito de shape
+keys (sorriso, piscada, sobrancelhas e os visemas da fala), não de ossos. O build separa o
+rosto numa malha com os blend shapes, o `CharacterMesh` junta o corpo numa superfície e o
+rosto noutra (só os ~5 mil vértices do rosto pagam a mistura dos blend shapes a cada
+quadro) e as camadas de rosto e de piscada do `CharacterRig` mexem neles pelo nome. Os
+quatro têm ossos auxiliares no quadril (o Ulysses e o Rafael também no meio do
 cotovelo e do joelho) que giram metade do osso seguinte (no Blender é uma restrição; no
 jogo, `follow_bones` no `CharacterSkeleton`), para a dobra não murchar. Detalhes e números
 em `tools/personagens/README.md`.
@@ -575,8 +589,8 @@ em `tools/personagens/README.md`.
 Segue o documento "Encaixe Piloto × Kart" (medidas da cena Proporcoes_Finais do
 kart-compare.blend):
 
-- **Os pilotos nunca mudam de escala.** Jarbas, Henrique e Ulysses entram em escala 1 (os
-  `.glb` já estão em metros: 1,03, 1,06 e 1,03 m de altura) em todo veículo.
+- **Os pilotos nunca mudam de escala.** Jarbas, Henrique, Ulysses e Rafael entram em escala
+  1 (os `.glb` já estão em metros: 1,03, 1,06, 1,03 e 1,03 m de altura) em todo veículo.
 - **O veículo é que se ajusta:** cada kart foi escalado pela distância do assento (S, o
   vinco entre o fundo do banco e o encosto, na linha central) ao centro do volante (W),
   igual à do kart de referência (0,370 m: o Kart Padrão, com o modelo original na escala
@@ -588,7 +602,7 @@ kart-compare.blend):
   sentada (`POSE_Kart`, ou `POSE_Moto` na moto) leva o corpo ao banco e as mãos ao volante.
   No Kart Padrão o resultado é o do documento: topo da cabeça a 0,836 / 0,872 / 0,839 m
   (Jarbas / Henrique / Ulysses), punho a 8,8 / 5,3 / 6,1 cm da pega, quadril 10 cm acima do
-  assento.
+  assento. O Rafael tem a mesma `POSE_Kart` e as mesmas mãos do Ulysses: 0,836 m e 6,1 cm.
 - `python3 tools/karts/encaixe_karts.py` imprime a conferência de cada kart (k, erro do
   volante, diâmetro da pega, inclinação do volante); com `--gravar`, escala um kart novo.
 - As pistas e a física não mudaram: a câmera, as caixas de batida, as caixas de item, as
@@ -940,8 +954,10 @@ sem certificado (veja os READMEs de cada pasta).
   emblema "A" no primeiro; adesivos da Ativos nos outros). Veja
   `assets/models/karts/CREDITOS.txt`.
 - Celerino: mascote da Ativos (`assets/models/personagens/`).
-- Jarbas, Henrique e Ulysses: pilotos da Ativos (`assets/models/personagens/*.glb`,
+- Jarbas, Henrique, Ulysses e Rafael: pilotos da Ativos (`assets/models/personagens/*.glb`,
   preparados a partir de `tools/personagens/originais/*-piloto.glb`).
+- Garrafa do Rafael: modelo e rótulo ("Sextou") originais, feitos por código
+  (`scripts/garrafa_cerveja.gd`, `tools/personagens/build_garrafa.py`).
 - Logos da Ativos (ícone "at" e marca "ativos"): `assets/logos/`.
 - Fontes Lilita One e Nunito — SIL Open Font License (`assets/fonts/`).
 - Músicas e efeitos sonoros: originais, gerados por código (`tools/music/`, `scripts/sfx.gd`).

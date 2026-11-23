@@ -45,8 +45,16 @@ extends Resource
 ## esqueleto (veja tools/personagens/gestos_escolha.gd). Vazio = comemora com os braços
 ## (gesture_cheer).
 @export var pick_gesture := &""
-## Expressão durante a animação de escolha.
+## Expressão durante a animação de escolha (pode ser animada: a fala do Rafael).
 @export var pick_face := &"face_surprised"
+## Objeto que aparece na mão durante o gesto de escolha (a garrafa do Rafael). O osso, a
+## posição na mão e quando ele aparece vêm da animação do gesto (metadado "prop", gravado
+## por tools/personagens/gestos_escolha.gd). Vazio = nenhum.
+@export var pick_prop: PackedScene
+## Fala do gesto de escolha, num balão ao lado da cabeça: as letras aparecem uma a uma a
+## partir de `pick_shout_time` (s desde o começo do gesto). Vazio = sem balão.
+@export var pick_shout := ""
+@export var pick_shout_time := 0.0
 
 @export_group("Cores")
 ## Cor principal (faixa do nome, destaque do retrato).

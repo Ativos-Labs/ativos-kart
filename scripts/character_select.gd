@@ -323,9 +323,8 @@ func _celebrate(rig: CharacterRig, data: CharacterData) -> float:
 	if not is_instance_valid(rig):
 		return 0.5
 	if data and data.pick_gesture != &"":
-		var length := rig.play_body_gesture(data.pick_gesture, PICK_HOLD)
+		var length := rig.play_pick_gesture(PICK_HOLD)
 		if length > 0.0:
-			rig.set_face(data.pick_face)
 			return length
 	_cheer(rig)
 	return 0.5

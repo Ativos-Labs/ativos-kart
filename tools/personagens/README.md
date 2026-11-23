@@ -1,11 +1,11 @@
-# Jarbas, Henrique e Ulysses — modelos e animações
+# Jarbas, Henrique, Ulysses e Rafael — modelos e animações
 
-O Jarbas, o Henrique e o Ulysses são os pilotos jogáveis de proporção de gente. Ao contrário do
+O Jarbas, o Henrique, o Ulysses e o Rafael são os pilotos jogáveis de proporção de gente. Ao contrário do
 Celerino (folha de papel, braço elástico), eles têm esqueleto estilo Mixamo, textura e
 cotovelos. Esta pasta guarda os modelos originais e os passos que os preparam para o
 jogo. O Godot ignora `tools/` (`.gdignore`).
 
-Os três vêm do Blender já nas proporções finais e em metros (1,03, 1,06 e 1,03 m de
+Os quatro vêm do Blender já nas proporções finais e em metros (1,03, 1,06, 1,03 e 1,03 m de
 altura) e entram no jogo em escala 1, pelo padrão "Encaixe piloto × kart" (veja abaixo e
 o README do jogo).
 
@@ -14,6 +14,7 @@ o README do jogo).
 | `originais/jarbas-piloto.glb` | Modelo do Jarbas como veio do Blender: 95 ossos (com controles de IK e 2 auxiliares no quadril), 27 texturas da Tripo, 2 logos, 10 animações (`ANIM_Piscar`, `EXP_*`, `POSE_Kart`, `POSE_Moto`) e o volante/guidão de referência |
 | `originais/henrique-piloto.glb` | Modelo do Henrique: o mesmo esqueleto de 95 ossos do Jarbas (com os nomes iguais), as mesmas 10 animações feitas para ele, 1 textura de 4096 px (+ normal), 2 logos e o volante/guidão de referência |
 | `originais/ulysses-piloto.glb` | Modelo do Ulysses: 99 ossos (os do Jarbas + 4 auxiliares de cotovelo e joelho), as mesmas 10 animações, 2 texturas de 4096 px (cabeça da Tripo e corpo), 2 logos e o volante/guidão de referência |
+| `originais/rafael-piloto.glb` (+ `.blend`) | Modelo do Rafael: o esqueleto do Ulysses (99 ossos), 1 textura de 4096 px da Tripo + boca e olhos de 1024, e o **rosto em shape keys** (35, veja abaixo), com 34 animações (as 10 de sempre, mais expressões, olhar, fala `ANIM_Fala` e os visemas `VIS_*`) |
 | `build_personagem.py` | Passo 1 (Python + Pillow): grava `assets/models/personagens/<nome>.glb` |
 | `gerar_animacoes.gd` | Passo 2 (Godot headless): grava `assets/models/personagens/<nome>_animacoes.res` |
 | `gestos_escolha.gd` | Gestos de escolha (o que cada piloto faz ao ser escolhido na seleção), usado pelo passo 2; vale também para o Celerino |
@@ -21,6 +22,7 @@ o README do jogo).
 | `render_gestos.py` | Renderiza esses glb no Blender e monta uma folha (uma linha por vista, uma coluna por quadro) |
 | `poses_nos_karts.gd` | Confere o encaixe de um piloto em cada veículo pelo checklist do documento (tabela abaixo) e grava um glb da cena posada por veículo |
 | `render_poses.py` | Renderiza esses glb no Blender (lado, 3/4, cima, perto do piloto e um corte que mostra pernas e pés) |
+| `build_garrafa.py` | Rótulo da garrafa do gesto do Rafael (`assets/textures/personagens/garrafa_rotulo.png`) |
 | `medir_cockpit.gd` | Mapa de ocupação lateral de cada kart (banco, encosto, assoalho, pedais) com valores sugeridos para o grupo "Cockpit" do `KartData` (usado pelo `fit_seat`, hoje desligado nos três) |
 
 O kart de cada um, o tamanho dos veículos e a medida do assento ficam em
@@ -29,7 +31,7 @@ O kart de cada um, o tamanho dos veículos e a medida do assento ficam em
 ## Regerar
 
 ```sh
-python3 tools/personagens/build_personagem.py jarbas     # ou henrique, ulysses
+python3 tools/personagens/build_personagem.py jarbas     # ou henrique, ulysses, rafael
 Godot --headless --path . --import
 Godot --headless --path . -s res://tools/personagens/gerar_animacoes.gd -- jarbas
 ```
@@ -97,6 +99,21 @@ parte da Tripo) viram uma peça só do atlas; mapas de normal e metal/rugosidade
 Com tudo numa textura só, o `CharacterMesh` junta o piloto numa superfície
 (`shaders/character_textured.gdshader`), como faz com o Celerino.
 
+- **Shape keys (Rafael).** As malhas escondidas no `.blend` saem (`drop` em `CHARACTERS`:
+  as pálpebras à parte, `Palpebras`, e a cópia do corpo sem esqueleto,
+  `_REF_Corpo_original`). As primitivas que algum shape key mexe vão para uma malha
+  própria, `Rafael_Rosto`, com os shape keys e as trilhas de peso das animações; o resto do
+  corpo (`Rafael_Corpo`: tecido e sapatos) fica sem eles (`_split_shape_keys`). Os shape
+  keys vêm do Blender como accessors esparsos (só os vértices que mexem): o
+  `tools/karts/gltf_util.py` lê e regrava assim. Os ossos de lábios, sobrancelhas e
+  pálpebras não têm peso no Rafael e saem (sobram 62).
+- **Luz embaixo dos olhos (Rafael).** A pálpebra de baixo do modelo aponta para baixo e para
+  dentro da órbita (normal com y ≈ −0,35); com a luz do jogo vindo de cima, a faixa
+  embaixo de cada olho ficava escura e parecia olheira (a textura ali é clara, e não era
+  sombra projetada). `fill_under_eyes` gira as normais dessa faixa (de 0,8 a 3,6 cm abaixo
+  do centro do olho, 3,4 cm para cada lado, com transição suave) 70% para a frente e um
+  pouco para cima: a malha não muda, só como ela recebe luz (878 vértices).
+
 ## Passo 2: `gerar_animacoes.gd`
 
 Monta uma `AnimationLibrary` com os nomes que o jogo usa (os do Celerino) e as poses
@@ -112,7 +129,30 @@ sentadas:
 | `body_lean_*`, `body_bend_*`, `body_twist_*` | geradas: giro espalhado por `Spine`, `Spine1`, `Spine2`; pescoço e cabeça desfazem parte da inclinação para a frente (ele continua olhando a pista) |
 | `idle_stand` | gerada: parado em pé nas telas de seleção e nos retratos (`stand_idle` do esqueleto), corpo todo, laço de 12 s (veja abaixo) |
 | `face_smug` | Alegria de boca fechada com as pálpebras de cima 40% fechadas (convencido: a do Jarbas ao ser escolhido) |
-| `gesture_point_forward`, `gesture_arms_crossed`, `gesture_hair_fix` | gesto de escolha de cada um (`gestos` em `CHARACTERS`), gerado por `gestos_escolha.gd` (veja abaixo) |
+| `gesture_point_forward`, `gesture_arms_crossed`, `gesture_hair_fix`, `gesture_sextou` | gesto de escolha de cada um (`gestos` em `CHARACTERS`), gerado por `gestos_escolha.gd` (veja abaixo) |
+| `face_sextou` (Rafael) | a fala animada do gesto dele (`falas` em `CHARACTERS`, `_face_timeline`, chaves em `gestos_escolha.gd`) |
+
+**Rosto por shape keys (Rafael).** Os sorrisos, sobrancelhas, piscada e a boca da fala são
+blend shapes da malha `Rafael_Rosto`, ligados no Blender por drivers a propriedades do osso
+`Controles` (o glb leva o resultado como trilhas de peso). No passo 2 as expressões levam
+as trilhas de blend shape (`shapes`), a piscada só `eye_blink_L/R` (`blink_shapes`), e as
+caras de sorriso e de convencido usam as expressões dele (`face_smiling` =
+`EXP_Sorriso_Fechado`, `face_smug` = `EXP_Debochado`; `faces`). No jogo:
+
+- o `CharacterMesh` junta o corpo numa superfície e as malhas com blend shapes numa
+  segunda ("Rosto", 5,1 mil vértices, 35 blend shapes, modo NORMALIZED: as formas em
+  posição absoluta, como o importador entrega). No Compatibility cada blend shape ligado é
+  um passe de transform feedback sobre a malha inteira a cada quadro em que o esqueleto
+  mexe: por isso o rosto fica separado dos 21 mil vértices do corpo;
+- as camadas de rosto e de piscada do `CharacterRig` (`SHAPE_GROUPS`) mexem nos blend
+  shapes pelo nome, em qualquer malha do modelo; a piscada soma por cima da expressão e
+  cada valor fica entre 0 e 1;
+- `eye_blink_L/R_corr` (o meio da piscada) não vêm das animações: são 4·w·(1 − w) do
+  `eye_blink` do mesmo lado, como o driver do Blender (`corrective_shapes` no esqueleto).
+
+Os visemas do modelo são discretos (no próprio Blender o "U" é uma abertura pequena); a
+fala do gesto soma o bico (`mouth_pucker`, `mouth_funnel`), tira o sorriso de base do
+neutro e abre um pouco a mandíbula no O e no U gritados.
 
 **A raiz na pose sentada.** Na `POSE_Kart` é o osso `Raiz` que desce o corpo 0,19 m até o
 assento (na `POSE_Moto` ela fica no lugar). O `CharacterRig` não anima a raiz, então
@@ -158,6 +198,7 @@ Ao ser escolhido na seleção de personagem, cada piloto faz um gesto do corpo i
 | Celerino | `gesture_air_guitar`: guitarra invisível. Abaixa o corpo e inclina para trás, toca 4 palhetadas (0,24 s cada) balançando a cabeça, com a outra mão correndo pelo braço da guitarra; estica o braço direito acima da folha, gira pelo lado (moinho), dá a palhetada grande e termina com o braço esticado para cima fazendo chifrinho | `face_screaming` | 2,6 s |
 | Jarbas | `gesture_arms_crossed`: cruza os braços se achando. Respira (ombros sobem), cruza os braços na frente do peito (o esquerdo por cima), estufa o peito, ergue o queixo e vira a cabeça de lado, com o peso numa perna; depois olha de volta com um aceno curto | `face_smug` | 2,1 s |
 | Henrique | `gesture_point_forward`: aponta para quem está escolhendo. Puxa o braço para trás (o tronco gira), estica o braço de uma vez com o indicador e dá mais uma "cutucada"; o outro braço fica solto ao lado do corpo | `face_happy` | 2,0 s |
+| Rafael | `gesture_sextou`: "SEXTOUU!" com uma long neck. A mão direita vai para trás do quadril e volta com a garrafa (que aparece ali, escondida pelo corpo), ergue a garrafa ao lado da cabeça (braço aberto, antebraço inclinado para a frente) e grita, com o tronco para trás e o queixo para cima; no "UUU" a garrafa sobe duas vezes e a mão esquerda fechada dá dois socos no ar. Termina num brinde para a câmera ("tim-tim") e pisca o olho esquerdo | `face_sextou` (fala animada) | 2,6 s |
 | Ulysses | `gesture_hair_fix`: arruma o cabelo. A palma encosta na frente do cabelo e desliza para trás por cima da orelha, com a cabeça inclinando para o lado da mão; passa de novo, mais curto, e a mão desce solta; termina de queixo erguido | `face_smiling` | 2,4 s |
 
 Cada gesto é uma coreografia em curvas com chaves no tempo (deslocamento e giro do quadril,
@@ -181,6 +222,35 @@ dedos, da palma e do cotovelo; quanto cada dedo fecha). A cada quadro (30 por se
 - Celerino: braço elástico como no kart. Um ponto fora do alcance estica o braço reto (só o
   osso do braço; o antebraço desfaz a escala e não entorta): no moinho e no chifrinho ele
   chega a 1,9× o braço.
+
+**Objeto na mão e balão (Rafael).** A coreografia pode ter `prop` (`{"bone": "right",
+"show": t}`): o `bake` grava no metadado "prop" da animação o osso, a transformação do
+objeto no espaço do osso e quando ele aparece. O gargalo passa pelo bolso da mão fechada
+(`prop_grip` em `CHARACTERS`), com a tampa para o lado do polegar e o rótulo virado o mais
+possível para a câmera no último quadro. O bolso foi medido com a luva deformada na CPU, em
+cortes perpendiculares ao gargalo: é o vão entre a palma, o gancho dos dedos (90% fechados
+na mão da garrafa) e o polegar (80%), ~1,2 cm de raio, 2,5 cm para o lado da palma em
+relação à pegada do volante (`grip_point`). A pegada do volante fica dentro da mão: na
+primeira versão a garrafa passava por ela e atravessava a palma e as costas da mão. A garrafa atravessa o punho
+perpendicular à mão, então para ela ficar em pé a mão tem de apontar para a frente: o
+antebraço também vai inclinado para a frente (com ele em pé o punho dobrava ~70° e parecia
+que ele segurava com o punho virado). O gerador imprime, nos instantes de conferência, para
+onde vão tampa e rótulo e quanto o punho dobra (erguida e no brinde: 31–38°). No jogo,
+`CharacterRig.play_pick_gesture` cria um `PickExtras` (`scripts/pick_extras.gd`) que põe o
+objeto (`CharacterData.pick_prop`, a `scenes/props/garrafa_cerveja.tscn`) na mão a cada
+quadro, crescendo com um pulinho, e o balão de fala (`pick_shout` "SEXTOUU!", letras uma a
+uma a cada 0,1 s a partir de `pick_shout_time` 0,32 s; elipse em `shaders/balao_fala.gdshader`,
+de frente para a câmera e por cima de tudo, ao lado dos olhos). Quando o gesto acaba (ou é
+desfeito), os dois encolhem e somem e a expressão volta para a padrão.
+
+A garrafa (`scripts/garrafa_cerveja.gd`) é uma malha de revolução feita por código, nas
+medidas da mão: 27 cm, corpo de Ø 5,8 cm e gargalo reto e fino (Ø 2,4 cm) por 9 cm, porque o
+punho fechado cobre 9,1 cm dele (de 4,4 cm abaixo a 4,7 cm acima da pegada). Assim o ombro
+alarga abaixo do mindinho, o anel e a tampinha saem acima do polegar e o rótulo fica todo à
+mostra embaixo da mão. Vidro verde
+opaco com reflexos em faixas, borda acesa e gotinhas (`shaders/garrafa_vidro.gdshader`),
+tampinha de metal ondulada e o rótulo oval (estrela vermelha, faixa branca "Sextou",
+`build_garrafa.py`). Lembra a lager da foto de referência sem usar nome nem marca.
 
 O gerador imprime, por gesto, a maior dobra do punho, a maior torção do antebraço, quanto o
 braço esticou e quantos quadros o punho ou o pé não alcançaram o alvo (tem de ser 0; o pé
@@ -257,8 +327,12 @@ O topo da cabeça é medido acima da origem do piloto (no Kart Padrão, o chão)
 referência sai igual ao documento (0,836 / 0,872 / 0,839 m). Na Motoca as manoplas ficam a
 ±0,32 m do meio (a pose segura a ±0,16): os braços abrem para alcançar.
 
-Em `data/personagens/<nome>.tres`: `standard_fit` ligado, `showcase_scale` 1,85 nos três
+O **Rafael** tem a mesma `POSE_Kart` e as mesmas mãos do Ulysses (pegada recalculada pelos
+pontos do documento: igual até a 4ª casa): topo da cabeça 0,836, punho a 6,1 cm da pega,
+erro do IK 0,0 cm em todos os veículos, cotovelos e joelhos como os do Ulysses.
+
+Em `data/personagens/<nome>.tres`: `standard_fit` ligado, `showcase_scale` 1,85 nos quatro
 (em pé na seleção, todos na mesma escala), retrato `portrait_scale` 2,6 com
-`portrait_offset` −0,80 (Jarbas), −0,86 (Henrique) e −0,75 (Ulysses), para os olhos
-ficarem na mesma altura da grade. Recoloração (jogador repetindo o personagem): só os
+`portrait_offset` −0,80 (Jarbas), −0,86 (Henrique), −0,75 (Ulysses) e −0,78 (Rafael), para
+os olhos ficarem na mesma altura da grade. Recoloração (jogador repetindo o personagem): só os
 pontos com matiz perto da `tint_reference` trocam de cor.

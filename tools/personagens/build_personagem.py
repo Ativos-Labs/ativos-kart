@@ -26,7 +26,7 @@ kart) e grava assets/models/personagens/<nome>.glb:
 As animações do arquivo (expressões, piscada, POSE_Kart, POSE_Moto) vão junto. As que o
 jogo usa são montadas no Godot por gerar_animacoes.gd (veja o README desta pasta).
 
-Uso: python3 tools/personagens/build_personagem.py jarbas|henrique|ulysses
+Uso: python3 tools/personagens/build_personagem.py jarbas|henrique|ulysses|rafael
 """
 import colorsys
 import io
@@ -40,7 +40,7 @@ from PIL import Image, ImageDraw, ImageMath
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "karts"))
-from gltf_util import Glb  # noqa: E402
+from gltf_util import Glb, xf_point  # noqa: E402
 
 PROJ = os.path.abspath(os.path.join(HERE, "..", ".."))
 CHARACTERS = {
@@ -57,6 +57,18 @@ CHARACTERS = {
     # Duas texturas de 4096 (cabeça da Tripo e corpo refeito) usando só 27% e 40% da área:
     # inteiras, cada uma viraria ~1000 px no atlas; por ilha de UV, o dobro.
     "ulysses": {"src": "ulysses-piloto.glb", "islands": True},
+    # Rosto por shape keys (sorriso, piscada, visemas da fala), não por ossos. As pálpebras
+    # à parte (Palpebras) e a cópia do corpo sem esqueleto (_REF_Corpo_original) ficam
+    # escondidas no .blend: saem. As partes do corpo com shape keys vão para uma malha
+    # própria (Rafael_Rosto); o resto do corpo fica sem eles.
+    "rafael": {"src": "rafael-piloto.glb", "drop": ("Palpebras", "_REF_Corpo_original"),
+               # A pálpebra de baixo aponta para baixo e para dentro da órbita: com a luz do
+               # jogo vindo de cima, a faixa embaixo de cada olho ficava escura (parecia
+               # olheira). Faixa: do contorno do olho (1,1 cm abaixo do centro) até 3,6 cm,
+               # 3,4 cm para cada lado.
+               "fill_under_eyes": {"mesh": "Rafael_Rosto", "eyes": ("Olho.L", "Olho.R"),
+                                   "band": (0.008, 0.014, 0.026, 0.036), "half_width": (0.02, 0.034),
+                                   "toward": (0.0, 0.35, 0.94), "amount": 0.7}},
 }
 
 ATLAS = 2048
@@ -78,12 +90,15 @@ def main():
     dst = os.path.join(PROJ, "assets", "models", "personagens", name + ".glb")
     g = Glb(src)
     js = g.js
-    _drop_scene_nodes(g, DROP_NODES)
+    _drop_scene_nodes(g, DROP_NODES + tuple(cfg.get("drop", ())))
     _strip_unused_attributes(js)
+    _split_shape_keys(g)
     _clean_skeleton(g)
     _rename_bones(js)
     for rule in cfg.get("no_shadow", []):
         _split_no_shadow(g, rule)
+    if "fill_under_eyes" in cfg:
+        _fill_under_eyes(g, cfg["fill_under_eyes"])
     _build_atlas(g, cfg.get("islands", False))
     js["asset"]["generator"] = "Ativos Kart build_personagem.py (de: %s)" % js["asset"].get("generator", "")
     js.pop("extensionsUsed", None)
@@ -169,7 +184,8 @@ def _clean_skeleton(g):
     joints = skin["joints"]
     weighted = set()
     prims = []
-    for m in js["meshes"]:
+    # Só as malhas que ficaram na cena (as de nós tirados saem no compact).
+    for m in (js["meshes"][i] for i in sorted({n["mesh"] for n in js["nodes"] if "mesh" in n})):
         for p in m["primitives"]:
             if "JOINTS_0" in p["attributes"]:
                 J = g.read_accessor(p["attributes"]["JOINTS_0"], raw=True)
@@ -222,6 +238,112 @@ def _rename_bones(js):
         name = n.get("name", "")
         if name.startswith("mixamorig:"):
             n["name"] = name[len("mixamorig:"):]
+
+
+# --- Shape keys ---------------------------------------------------------------------------
+
+def _split_shape_keys(g):
+    """Malha com shape keys (o rosto do Rafael): as primitivas que algum shape key mexe vão
+    para uma malha nova, "<nó sem o _Corpo>_Rosto", num nó irmão com o mesmo esqueleto, e
+    levam os shape keys e as trilhas de peso das animações; as outras (tecido, sapatos)
+    ficam na malha original, sem shape keys. No jogo cada vértice de uma malha com shape
+    keys passa pela mistura deles a cada quadro (na web, um passe de GPU por shape key
+    ligado): assim só os ~5 mil vértices do rosto pagam isso."""
+    js = g.js
+    for node_index, node in enumerate(list(js["nodes"])):
+        if "mesh" not in node:
+            continue
+        mesh = js["meshes"][node["mesh"]]
+        prims = mesh["primitives"]
+        if not any(p.get("targets") for p in prims):
+            continue
+        moving, still = [], []
+        for p in prims:
+            moved = any(any(x != 0 for v in g.read_accessor(acc) for x in v)
+                        for t in p.get("targets", []) for key, acc in t.items() if key == "POSITION")
+            (moving if moved else still).append(p)
+        if not still or not moving:
+            continue
+        face_name = node["name"].replace("_Corpo", "") + "_Rosto"
+        face_mesh = {"name": face_name, "primitives": moving}
+        for key in ("extras", "weights"):
+            if key in mesh:
+                face_mesh[key] = mesh.pop(key)
+        for p in still:
+            p.pop("targets", None)
+        mesh["primitives"] = still
+        js["meshes"].append(face_mesh)
+        face_node = {k: v for k, v in node.items() if k not in ("mesh", "children", "name")}
+        face_node["name"] = face_name
+        face_node["mesh"] = len(js["meshes"]) - 1
+        js["nodes"].append(face_node)
+        face_index = len(js["nodes"]) - 1
+        parent = next((n for n in js["nodes"] if node_index in n.get("children", [])), None)
+        if parent is not None:
+            parent["children"].append(face_index)
+        else:
+            for scene in js["scenes"]:
+                if node_index in scene["nodes"]:
+                    scene["nodes"].append(face_index)
+        for anim in js.get("animations", []):
+            for ch in anim["channels"]:
+                if ch["target"]["path"] == "weights" and ch["target"].get("node") == node_index:
+                    ch["target"]["node"] = face_index
+        names = face_mesh.get("extras", {}).get("targetNames", [])
+        print("shape keys: %s -> %s (%d primitivas, %d shape keys); %d primitivas ficam sem" % (
+            node["name"], face_name, len(moving), len(names), len(still)))
+
+
+# --- Luz embaixo dos olhos --------------------------------------------------------------
+
+def _smooth(e0, e1, x):
+    t = min(1.0, max(0.0, (x - e0) / (e1 - e0)))
+    return t * t * (3.0 - 2.0 * t)
+
+
+def _fill_under_eyes(g, rule):
+    """Gira as normais da faixa embaixo de cada olho para `toward` (para a frente e um
+    pouco para cima), como uma luz de preenchimento: a malha não muda, só como ela recebe
+    luz. Peso por vértice: em altura, de 0 no contorno do olho (`band[0]` abaixo do
+    centro) a 1 entre `band[1]` e `band[2]`, de volta a 0 em `band[3]`; para os lados, 1
+    até `half_width[0]` e 0 em `half_width[1]`. Os shape keys somam o deslocamento de
+    normal deles por cima (a piscada continua igual)."""
+    js = g.js
+    world = g.world_matrices()
+    eyes = [xf_point(world[i], (0.0, 0.0, 0.0)) for i, n in enumerate(js["nodes"]) if n.get("name") in rule["eyes"]]
+    mesh = next(m for m in js["meshes"] if m["name"] == rule["mesh"])
+    b0, b1, b2, b3 = rule["band"]
+    w0, w1 = rule["half_width"]
+    tx, ty, tz = rule["toward"]
+    tl = math.sqrt(tx * tx + ty * ty + tz * tz)
+    toward = (tx / tl, ty / tl, tz / tl)
+    total = 0
+    for p in mesh["primitives"]:
+        pos = g.read_accessor(p["attributes"]["POSITION"])
+        nor = g.read_accessor(p["attributes"]["NORMAL"])
+        out = []
+        moved = 0
+        for v, n in zip(pos, nor):
+            w = 0.0
+            for e in eyes:
+                if v[2] < e[2] - 0.01:
+                    continue
+                below = e[1] - v[1]
+                wy = _smooth(b0, b1, below) * (1.0 - _smooth(b2, b3, below))
+                wx = 1.0 - _smooth(w0, w1, abs(v[0] - e[0]))
+                w = max(w, wy * wx)
+            if w <= 0.0:
+                out.append(n)
+                continue
+            k = w * rule["amount"]
+            m = [n[i] + (toward[i] - n[i]) * k for i in range(3)]
+            ml = math.sqrt(sum(c * c for c in m)) or 1.0
+            out.append(tuple(c / ml for c in m))
+            moved += 1
+        if moved:
+            p["attributes"]["NORMAL"] = g.add_accessor(out, "VEC3")
+            total += moved
+    print("luz embaixo dos olhos: %d vértices" % total)
 
 
 # --- Partes sem sombra ------------------------------------------------------------------

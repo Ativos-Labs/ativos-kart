@@ -42,6 +42,15 @@ extends Resource
 @export var follow_bones := {}
 @export_range(0.0, 1.0, 0.05) var follow_share := 0.5
 
+@export_group("Rosto por shape keys")
+## Modelos com o rosto em blend shapes (o Rafael): as animações das camadas de rosto e de
+## piscada mexem também nos blend shapes de mesmo nome (o CharacterRig acha pelo nome em
+## qualquer malha do modelo). Blend shapes que saem de outro, como os corretivos da
+## piscada (o meio da piscada, que estufa a pálpebra): nome → blend shape de origem. O
+## valor é 4·w·(1 − w) do de origem, a mesma conta do driver do Blender; o que as
+## animações dizem para eles não vale.
+@export var corrective_shapes := {}
+
 @export_group("Animações")
 ## Animações que completam ou substituem as do modelo (mesmos nomes do Celerino:
 ## idle, gesture_*, face_*, hand_*, body_*, eyes_look_*, blink...).

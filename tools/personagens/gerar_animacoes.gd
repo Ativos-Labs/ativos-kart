@@ -29,7 +29,14 @@ extends SceneTree
 ##   Godot --headless --path . -s res://tools/personagens/gerar_animacoes.gd -- jarbas
 ##   Godot --headless --path . -s res://tools/personagens/gerar_animacoes.gd -- henrique
 ##   Godot --headless --path . -s res://tools/personagens/gerar_animacoes.gd -- ulysses
+##   Godot --headless --path . -s res://tools/personagens/gerar_animacoes.gd -- rafael
 ##   Godot --headless --path . -s res://tools/personagens/gerar_animacoes.gd -- celerino
+##
+## Rosto por shape keys (o Rafael): as expressões e a piscada levam também as trilhas de
+## blend shape do modelo (o CharacterRig mexe neles pelo nome); as caras de sorriso e de
+## convencido usam as expressões dele (EXP_Sorriso_Fechado, EXP_Debochado) em vez das
+## misturas, e a fala do gesto de escolha ("SEXTOUU!") é montada com os visemas (VIS_*)
+## por _face_timeline.
 
 const CELERINO := "res://assets/models/personagens/celerino.glb"
 ## Modelo e saída de cada personagem.
@@ -50,6 +57,25 @@ const CHARACTERS := {
 		"model": "res://assets/models/personagens/ulysses.glb",
 		"out": "res://assets/models/personagens/ulysses_animacoes.res",
 		"gestos": [&"gesture_hair_fix"],
+	},
+	# Rosto por shape keys: `shapes` liga as trilhas de blend shape nas expressões,
+	# `blink_shapes` são os da piscada, `faces` troca misturas por expressões do modelo e
+	# `falas` são as caras animadas do gesto de escolha (gestos_escolha.gd, face_keys).
+	"rafael": {
+		"model": "res://assets/models/personagens/rafael.glb",
+		"out": "res://assets/models/personagens/rafael_animacoes.res",
+		"gestos": [&"gesture_sextou"],
+		"shapes": true,
+		"blink_shapes": [&"eye_blink_L", &"eye_blink_R"],
+		"faces": {&"face_smiling": &"EXP_Sorriso_Fechado", &"face_smug": &"EXP_Debochado"},
+		"falas": [&"face_sextou"],
+		# Onde o gargalo da garrafa do gesto passa pela mão fechada (espaço do osso da mão):
+		# o bolso entre a palma, o gancho dos dedos (90% fechados) e o polegar (80%), medido
+		# com a luva deformada na CPU. A pegada do volante (grip_point) fica 2,5 cm para
+		# dentro da mão: lá a garrafa atravessava a palma e as costas da mão. A barra vai para
+		# o lado do polegar. [esquerda, direita (espelho em X)].
+		"prop_grip": [[Vector3(0.0001, 0.0644, -0.0288), Vector3(1.0, 0.0004, 0.0004)],
+				[Vector3(-0.0001, 0.0644, -0.0288), Vector3(-1.0, 0.0004, 0.0004)]],
 	},
 	"celerino": {
 		"out": "res://assets/models/personagens/celerino_animacoes.res",
@@ -193,6 +219,8 @@ var c: Skel
 var j_anims := {}
 var c_anims := {}
 var _prefix := ""
+## Blend shapes que as cópias de expressão levam ([&"*"] = todos; vazio = nenhum).
+var _face_shapes: Array = []
 var _frames := 0
 ## Giro (espaço do personagem) que leva a mão do Jarbas em repouso para a orientação
 ## da mão do Celerino em repouso, por lado ("L"/"R").
@@ -254,12 +282,17 @@ func _run(cfg: Dictionary) -> void:
 		print("alinhamento da mão %s: %.0f°" % [side, rad_to_deg((_hand_align[side] as Quaternion).get_angle())])
 
 	var lib := AnimationLibrary.new()
+	_face_shapes = [&"*"] if cfg.get("shapes", false) else []
+	var faces: Dictionary = cfg.get("faces", {})
 	# Expressões, piscada e poses sentadas do próprio modelo.
 	for clip in FACE_CLIPS:
-		lib.add_animation(clip, _copy(j_anims[FACE_CLIPS[clip]], FACE))
-	lib.add_animation(&"face_smiling", _mixed_face(&"EXP_Alegria", {&"Mandibula": [&"EXP_Neutro", 1.0]}))
+		lib.add_animation(clip, _copy(j_anims[FACE_CLIPS[clip]], FACE, _face_shapes))
+	for clip in faces:
+		lib.add_animation(clip, _copy(j_anims[faces[clip]], FACE, _face_shapes))
+	if not faces.has(&"face_smiling"):
+		lib.add_animation(&"face_smiling", _mixed_face(&"EXP_Alegria", {&"Mandibula": [&"EXP_Neutro", 1.0]}))
 	lib.add_animation(&"face_screaming", _mixed_face(&"EXP_Surpresa", {&"Mandibula": [&"EXP_Boca_Aberta", 1.0]}))
-	lib.add_animation(&"blink", _copy(j_anims[&"ANIM_Piscar"], LIDS))
+	lib.add_animation(&"blink", _copy(j_anims[&"ANIM_Piscar"], LIDS, cfg.get("blink_shapes", [])))
 	var drive_bones: Array = []
 	for i in j.parent.size():
 		var name := StringName(j.sk.get_bone_name(i))
@@ -285,10 +318,14 @@ func _run(cfg: Dictionary) -> void:
 	lib.add_animation(&"idle_stand", _idle_stand(lib.get_animation(&"idle")))
 
 	# Escolha na seleção de personagem: gestos do corpo inteiro e a cara de convencido.
-	lib.add_animation(&"face_smug", _mixed_face(&"EXP_Alegria", {&"Mandibula": [&"EXP_Neutro", 1.0],
-			&"Palpebra_Sup.L": [&"EXP_Olhos_Fechados", 0.4], &"Palpebra_Sup.R": [&"EXP_Olhos_Fechados", 0.4]}))
+	if not faces.has(&"face_smug"):
+		lib.add_animation(&"face_smug", _mixed_face(&"EXP_Alegria", {&"Mandibula": [&"EXP_Neutro", 1.0],
+				&"Palpebra_Sup.L": [&"EXP_Olhos_Fechados", 0.4], &"Palpebra_Sup.R": [&"EXP_Olhos_Fechados", 0.4]}))
+	for fala in cfg.get("falas", []):
+		lib.add_animation(fala, _face_timeline(fala, Gestos.face_keys(fala)))
 	var gestos := Gestos.new(j.sk, Gestos.mixamo(), _prefix, j.sample(j_anims[&"POSE_Kart"], 0.0),
 			j.sample(lib.get_animation(&"idle"), 0.0), model)
+	gestos.prop_grip = cfg.get("prop_grip", [])
 	for g in cfg.get("gestos", []):
 		lib.add_animation(g, gestos.bake(g))
 
@@ -347,14 +384,102 @@ func _hand_frame(s: Skel, hand: String, middle: String, index: String, pinky: St
 
 # --- Cópias das animações do modelo ------------------------------------------------------
 
-## Cópia de `src` só com as trilhas dos ossos de `bones`.
-func _copy(src: Animation, bones: Array) -> Animation:
+## Cópia de `src` só com as trilhas dos ossos de `bones` e dos blend shapes de `shapes`
+## ([&"*"] = todos).
+func _copy(src: Animation, bones: Array, shapes: Array = []) -> Animation:
 	var anim := src.duplicate(true) as Animation
 	for t in range(anim.get_track_count() - 1, -1, -1):
-		var bone_name := StringName(anim.track_get_path(t).get_concatenated_subnames())
-		if not bones.has(bone_name):
+		var target := StringName(anim.track_get_path(t).get_concatenated_subnames())
+		var keep := bones.has(target)
+		if anim.track_get_type(t) == Animation.TYPE_BLEND_SHAPE:
+			keep = shapes.has(&"*") or shapes.has(target)
+		if not keep:
 			anim.remove_track(t)
 	return anim
+
+
+## Cara animada (a fala do gesto de escolha). `keys`: [tempo, {clipe: peso, "+blend shape":
+## valor}]. Cada chave parte do EXP_Neutro e soma, para cada clipe (EXP_*, VIS_*), a
+## diferença dele para o neutro (blend shapes e ossos do rosto) vezes o peso, mais os
+## valores "+". Entre as chaves a curva entra e sai devagar (smoothstep). Sem loop: o último
+## quadro fica.
+func _face_timeline(face_name: StringName, keys: Array) -> Animation:
+	var neutral: Animation = j_anims[&"EXP_Neutro"]
+	var shape_paths := {}  # blend shape → caminho da trilha
+	for t in neutral.get_track_count():
+		if neutral.track_get_type(t) == Animation.TYPE_BLEND_SHAPE:
+			shape_paths[StringName(neutral.track_get_path(t).get_concatenated_subnames())] = neutral.track_get_path(t)
+	var bones: Array[int] = []
+	for bone_name in FACE:
+		if j.bone(bone_name) >= 0:
+			bones.append(j.bone(bone_name))
+	var poses := []
+	for key in keys:
+		var shapes := {}
+		for shape in shape_paths:
+			shapes[shape] = _shape_at(neutral, shape)
+		var base := j.sample(neutral, 0.0)
+		var rots := {}
+		for b in bones:
+			rots[b] = base[b]
+		var mix: Dictionary = key[1]
+		for clip in mix:
+			var w: float = mix[clip]
+			if String(clip).begins_with("+"):
+				var shape := StringName(String(clip).substr(1))
+				if not shapes.has(shape):
+					push_error("blend shape não existe: %s" % shape)
+				shapes[shape] = float(shapes.get(shape, 0.0)) + w
+				continue
+			var src: Animation = j_anims[clip]
+			for shape in shape_paths:
+				shapes[shape] += w * (_shape_at(src, shape) - _shape_at(neutral, shape))
+			var pose := j.sample(src, 0.0)
+			for b in bones:
+				var d := (base[b] as Quaternion).inverse() * (pose[b] as Quaternion)
+				rots[b] = (rots[b] as Quaternion) * Quaternion.IDENTITY.slerp(d, w)
+		poses.append([shapes, rots])
+	var anim := Animation.new()
+	anim.length = keys[-1][0]
+	anim.loop_mode = Animation.LOOP_NONE
+	var shape_tracks := {}
+	for shape in shape_paths:
+		var tr := anim.add_track(Animation.TYPE_BLEND_SHAPE)
+		anim.track_set_path(tr, shape_paths[shape])
+		shape_tracks[shape] = tr
+	var bone_tracks := {}
+	for b in bones:
+		var tr := anim.add_track(Animation.TYPE_ROTATION_3D)
+		anim.track_set_path(tr, NodePath("%s:%s" % [_prefix, j.sk.get_bone_name(b)]))
+		bone_tracks[b] = tr
+	var count := int(round(anim.length * FPS))
+	for f in count + 1:
+		var t := minf(f / FPS, anim.length)
+		var i := 0
+		while i < keys.size() - 2 and keys[i + 1][0] <= t:
+			i += 1
+		var t0: float = keys[i][0]
+		var t1: float = keys[i + 1][0]
+		var s := smoothstep(0.0, 1.0, clampf((t - t0) / maxf(t1 - t0, 1e-4), 0.0, 1.0))
+		var a: Array = poses[i]
+		var b2: Array = poses[i + 1]
+		for shape in shape_tracks:
+			anim.blend_shape_track_insert_key(shape_tracks[shape], t,
+					clampf(lerpf(a[0][shape], b2[0][shape], s), 0.0, 1.0))
+		for b in bones:
+			anim.rotation_track_insert_key(bone_tracks[b], t, (a[1][b] as Quaternion).slerp(b2[1][b], s))
+	print("%s: %.2f s, %d chaves, %d blend shapes, %d ossos" % [face_name, anim.length, keys.size(),
+			shape_tracks.size(), bones.size()])
+	return anim
+
+
+## Valor do blend shape `shape` no começo da animação (0 sem trilha).
+static func _shape_at(anim: Animation, shape: StringName) -> float:
+	for t in anim.get_track_count():
+		if anim.track_get_type(t) == Animation.TYPE_BLEND_SHAPE \
+				and StringName(anim.track_get_path(t).get_concatenated_subnames()) == shape:
+			return anim.blend_shape_track_interpolate(t, 0.0)
+	return 0.0
 
 
 ## Pose sentada (POSE_Kart, POSE_Moto): cópia só com os ossos de `bones` e com o giro e
@@ -409,7 +534,7 @@ func _bone_pose(anim: Animation, bone_name: StringName, rest: Transform3D) -> Tr
 
 ## Expressão `base` com alguns ossos trocados: osso → [animação, quanto do giro dela].
 func _mixed_face(base: StringName, swaps: Dictionary) -> Animation:
-	var anim := _copy(j_anims[base], FACE)
+	var anim := _copy(j_anims[base], FACE, _face_shapes)
 	for bone_name in swaps:
 		var b := j.bone(bone_name)
 		var src: Animation = j_anims[swaps[bone_name][0]]

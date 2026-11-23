@@ -21,6 +21,8 @@ signal face_changed(face_name: StringName)
 
 enum Mode { STAND, DRIVE }
 
+## Camadas que mexem nos blend shapes do rosto (modelos com shape keys).
+const SHAPE_GROUPS := [&"face", &"blink"]
 ## Ordem de aplicação das camadas (menor primeiro).
 const ORDER := {
 	&"body": 0, &"body_add": 1, &"legs": 2, &"hands": 3, &"gesture": 4,
@@ -50,6 +52,11 @@ class Layer:
 	var s_pos := PackedVector3Array()
 	var s_rot: Array[Quaternion] = []
 	var s_scl := PackedVector3Array()
+	## Blend shapes (rosto por shape keys): índice em CharacterRig._shape_w, trilha da
+	## animação e, na pose parada, o valor.
+	var shapes := PackedInt32Array()
+	var shape_tracks := PackedInt32Array()
+	var s_shape := PackedFloat32Array()
 
 
 var data: CharacterData
@@ -124,6 +131,8 @@ var _gesture_hold := 0.0
 ## Rapidez com que o gesto se desfaz quando `_gesture_hold` acaba.
 var _gesture_fade := 5.0
 var _gesture_arms := 0
+## Objeto na mão e balão de fala do gesto de escolha (play_pick_gesture), enquanto ele dura.
+var _pick_extras: PickExtras
 var _ik_l := 1.0
 var _ik_r := 1.0
 var _steer_s := 0.0
@@ -151,6 +160,15 @@ var _hips_bone := -1
 var _neck_bones := PackedInt32Array()
 ## Ossos auxiliares (CharacterSkeleton.follow_bones): x = auxiliar, y = osso seguido.
 var _followers: Array[Vector2i] = []
+## Blend shapes do rosto (CharacterSkeleton "Rosto por shape keys"): nome → índice; por
+## índice, as malhas que têm ele ([MeshInstance3D, índice nela]...), o valor do quadro e o
+## último aplicado (só muda a malha quando ele muda).
+var _shape_index := {}
+var _shape_targets: Array[Array] = []
+var _shape_w := PackedFloat32Array()
+var _shape_set := PackedFloat32Array()
+## Corretivos: x = índice do corretivo, y = índice do blend shape de origem.
+var _correctives: Array[Vector2i] = []
 ## Pálpebras que giram: eixo e ângulo de fechar de cada uma (tirados da piscada).
 var _lid_axis := {}
 var _lid_closed := {}
@@ -174,6 +192,8 @@ var _lean_angle := deg_to_rad(20.0)
 static var _track_cache := {}
 ## Trilhas constantes de cada animação (id da animação -> PackedByteArray, 1 = constante).
 static var _constant_cache := {}
+## Trilhas de blend shape de cada animação (id da animação -> {nome do blend shape: trilha}).
+static var _shape_cache := {}
 
 
 func _ready() -> void:
@@ -202,6 +222,7 @@ func _ready() -> void:
 		for anim_name in library.get_animation_list():
 			_anims[anim_name] = library.get_animation(anim_name)
 	_setup_skeleton()
+	_setup_shapes()
 	_apply_mode()
 	# Cada piloto começa numa fase diferente: com `update_every` > 1 eles não refazem a
 	# pose (e a deformação da malha na GPU) todos no mesmo quadro.
@@ -298,6 +319,49 @@ func _setup_skeleton() -> void:
 		var upper := _arm_bones[side][0]
 		if upper >= 0 and _parent[upper] >= 0:
 			_arm_parent_rest[side] = _rest_global_basis(_parent[upper])
+
+
+## Blend shapes do modelo (pelo nome, em todas as malhas: juntas pelo CharacterMesh ou não).
+func _setup_shapes() -> void:
+	_shape_index.clear()
+	_shape_targets.clear()
+	for node in model.find_children("*", "MeshInstance3D", true, false):
+		var mi := node as MeshInstance3D
+		var mesh := mi.mesh as ArrayMesh
+		if mesh == null:
+			continue
+		for k in mesh.get_blend_shape_count():
+			var shape := mesh.get_blend_shape_name(k)
+			if not _shape_index.has(shape):
+				_shape_index[shape] = _shape_targets.size()
+				_shape_targets.append([])
+			_shape_targets[_shape_index[shape]].append([mi, k])
+	_shape_w.resize(_shape_targets.size())
+	_shape_w.fill(0.0)
+	_shape_set.resize(_shape_targets.size())
+	_shape_set.fill(-1.0)
+	_correctives.clear()
+	for shape in skeleton_data.corrective_shapes:
+		var c: int = _shape_index.get(StringName(shape), -1)
+		var src: int = _shape_index.get(StringName(skeleton_data.corrective_shapes[shape]), -1)
+		if c >= 0 and src >= 0:
+			_correctives.append(Vector2i(c, src))
+
+
+## Aplica os blend shapes do quadro: os corretivos saem do de origem, todos ficam entre 0
+## e 1 (a piscada soma por cima de uma expressão que já aperta os olhos) e só os que
+## mudaram vão para as malhas.
+func _apply_shapes() -> void:
+	for c in _correctives:
+		var w := clampf(_shape_w[c.y], 0.0, 1.0)
+		_shape_w[c.x] = 4.0 * w * (1.0 - w)
+	for i in _shape_w.size():
+		var w := clampf(_shape_w[i], 0.0, 1.0)
+		if absf(w - _shape_set[i]) < 0.002:
+			continue
+		_shape_set[i] = w
+		for target in _shape_targets[i]:
+			(target[0] as MeshInstance3D).set_blend_shape_value(target[1], w)
 
 
 ## Base global (espaço do esqueleto) de um osso na pose de repouso.
@@ -473,6 +537,19 @@ func _store_neutral_hands(pose: Animation) -> void:
 
 # --- Camadas ---------------------------------------------------------------------------
 
+## Trilhas de blend shape da animação: nome do blend shape → trilha.
+static func _shape_track_map(anim: Animation) -> Dictionary:
+	var key := anim.get_instance_id()
+	if _shape_cache.has(key):
+		return _shape_cache[key]
+	var map := {}
+	for t in anim.get_track_count():
+		if anim.track_get_type(t) == Animation.TYPE_BLEND_SHAPE:
+			map[StringName(anim.track_get_path(t).get_concatenated_subnames())] = t
+	_shape_cache[key] = map
+	return map
+
+
 static func _track_map(anim: Animation) -> Dictionary:
 	var key := anim.get_instance_id()
 	if _track_cache.has(key):
@@ -528,6 +605,12 @@ static func _constant_tracks(anim: Animation) -> PackedByteArray:
 						if not anim.scale_track_interpolate(t, anim.track_get_key_time(t, k)).is_equal_approx(first):
 							same = false
 							break
+				Animation.TYPE_BLEND_SHAPE:
+					var first := anim.blend_shape_track_interpolate(t, anim.track_get_key_time(t, 0))
+					for k in range(1, count):
+						if not is_equal_approx(anim.blend_shape_track_interpolate(t, anim.track_get_key_time(t, k)), first):
+							same = false
+							break
 				_:
 					same = false
 		out[t] = 1 if same else 0
@@ -542,6 +625,12 @@ func _bake_static(layer: Layer) -> void:
 		for t in [tr.x, tr.y, tr.z]:
 			if t >= 0 and constant[t] == 0:
 				return
+	for t in layer.shape_tracks:
+		if constant[t] == 0:
+			return
+	layer.s_shape.resize(layer.shapes.size())
+	for k in layer.shapes.size():
+		layer.s_shape[k] = layer.anim.blend_shape_track_interpolate(layer.shape_tracks[k], 0.0)
 	var count := layer.bones.size()
 	layer.s_pos.resize(count)
 	layer.s_rot.resize(count)
@@ -577,6 +666,13 @@ func _add_layer(anim_name: StringName, mask: StringName, group: StringName, addi
 		if map.has(key):
 			layer.bones.append(b)
 			layer.tracks.append(map[key])
+	if not _shape_index.is_empty() and SHAPE_GROUPS.has(group):
+		var shape_map := _shape_track_map(anim)
+		for shape in shape_map:
+			var i: int = _shape_index.get(shape, -1)
+			if i >= 0 and not skeleton_data.corrective_shapes.has(String(shape)):
+				layer.shapes.append(i)
+				layer.shape_tracks.append(shape_map[shape])
 	_bake_static(layer)
 	# Insere depois da última camada de mesma ordem (ou menor).
 	var order: int = ORDER.get(group, 99)
@@ -639,6 +735,8 @@ func _apply_layer(l: Layer) -> void:
 	var w := l.weight
 	if w <= 0.001:
 		return
+	if not l.shapes.is_empty():
+		_apply_layer_shapes(l, w)
 	if l.static_pose:
 		_apply_static_layer(l, w)
 		return
@@ -661,6 +759,17 @@ func _apply_layer(l: Layer) -> void:
 				_pos[b] = _pos[b].lerp(p, w)
 		if tr.z >= 0 and not l.additive:
 			_scl[b] = _scl[b].lerp(l.anim.scale_track_interpolate(tr.z, t), w)
+
+
+## Blend shapes da camada: somados (aditiva: a piscada) ou misturados pelo peso.
+func _apply_layer_shapes(l: Layer, w: float) -> void:
+	for k in l.shapes.size():
+		var v := l.s_shape[k] if l.static_pose else l.anim.blend_shape_track_interpolate(l.shape_tracks[k], l.time)
+		var i := l.shapes[k]
+		if l.additive:
+			_shape_w[i] += v * w
+		else:
+			_shape_w[i] = lerpf(_shape_w[i], v, w)
 
 
 ## Mesmo que _apply_layer, com a pose parada já lida (Layer.static_pose).
@@ -736,11 +845,38 @@ func play_body_gesture(gesture_name: StringName, hold := 1.5) -> float:
 	return layer.anim.length
 
 
+## Gesto de escolha do personagem (CharacterData.pick_gesture, corpo inteiro), com a
+## expressão dele (pick_face, que pode ser animada: a fala), o objeto na mão (pick_prop) e o
+## balão de fala (pick_shout). A pose final fica parada por `hold` s e depois tudo volta: o
+## corpo para a animação parada, o rosto para a expressão padrão, objeto e balão somem.
+## Devolve a duração da animação (0 = ele não tem gesto próprio).
+func play_pick_gesture(hold := 1.5) -> float:
+	if skeleton == null or data == null or data.pick_gesture == &"":
+		return 0.0
+	var length := play_body_gesture(data.pick_gesture, hold)
+	if length <= 0.0:
+		return 0.0
+	set_face(data.pick_face, length + hold)
+	_end_pick_extras()
+	if data.pick_prop or data.pick_shout != "":
+		_pick_extras = PickExtras.new()
+		add_child(_pick_extras)
+		_pick_extras.setup(self, _anims[data.pick_gesture], data)
+	return length
+
+
+func _end_pick_extras() -> void:
+	if is_instance_valid(_pick_extras):
+		_pick_extras.end()
+	_pick_extras = null
+
+
 ## Desfaz o gesto (de braços ou do corpo inteiro) aos poucos.
 func end_gesture(fade := 3.0) -> void:
 	_fade_group(&"gesture", fade)
 	_gesture_hold = 0.0
 	_gesture_arms = 0
+	_end_pick_extras()
 
 
 ## Posição global da mão (`side`: 0 = esquerda, 1 = direita) na pose atual, para prender
@@ -835,9 +971,12 @@ func _process(delta: float) -> void:
 		_pos[i] = _rest_pos[i]
 		_rot[i] = _rest_rot[i]
 		_scl[i] = _rest_scl[i]
+	_shape_w.fill(0.0)
 	for l in _layers:
 		_apply_layer(l)
 	_clamp_eyelids()
+	if not _shape_w.is_empty():
+		_apply_shapes()
 
 	if mode == Mode.DRIVE:
 		var fit := _fitting()
@@ -861,6 +1000,10 @@ func _process(delta: float) -> void:
 		skeleton.set_bone_pose_position(i, _pos[i])
 		skeleton.set_bone_pose_rotation(i, _rot[i])
 		skeleton.set_bone_pose_scale(i, _scl[i])
+	for child in get_children():
+		# O que está sumindo depois de end() também precisa do tempo.
+		if child is PickExtras:
+			(child as PickExtras).advance(delta)
 
 
 ## Ossos auxiliares: a fração `follow_share` do giro do osso seguido (a partir do
@@ -891,6 +1034,7 @@ func _update_timers(delta: float) -> void:
 		if _gesture_hold <= 0.0:
 			_fade_group(&"gesture", _gesture_fade)
 			_gesture_arms = 0
+			_end_pick_extras()
 	_glance_timer -= delta
 	if _glance_timer <= 0.0:
 		_glance_timer = randf_range(1.5, 4.0)

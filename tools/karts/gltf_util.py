@@ -108,7 +108,33 @@ class Glb:
         return len(self.views) - 1
 
     def read_accessor(self, index, raw=False):
+        """Valores do accessor (tuplas). Accessors esparsos (os shape keys que o Blender
+        exporta: só os vértices que mexem) voltam completos, com zero no resto."""
         a = self.js["accessors"][index]
+        if "bufferView" in a:
+            out = self._read_dense(a, raw)
+        else:
+            zero = (0.0 if a["componentType"] == 5126 else 0,) * TYPE_N[a["type"]]
+            out = [zero] * a["count"]
+        sparse = a.get("sparse")
+        if sparse:
+            si = sparse["indices"]
+            sv = sparse["values"]
+            idx = self._unpack(si["bufferView"], si.get("byteOffset", 0), si["componentType"], 1, sparse["count"])
+            vals = self._unpack(sv["bufferView"], sv.get("byteOffset", 0), a["componentType"], TYPE_N[a["type"]],
+                                sparse["count"])
+            out = list(out)
+            for i, v in zip(idx, vals):
+                out[i[0]] = v
+        return out
+
+    def _unpack(self, view, offset, component, n, count):
+        fmt = COMP_FMT[component]
+        size = struct.calcsize(fmt) * n
+        data = self.views[view]
+        return [struct.unpack_from("<" + fmt * n, data, offset + i * size) for i in range(count)]
+
+    def _read_dense(self, a, raw=False):
         bv = self.js["bufferViews"][a["bufferView"]]
         raw = self.views[a["bufferView"]]
         n = TYPE_N[a["type"]]
@@ -319,6 +345,24 @@ class Glb:
         index_accs = {p["indices"] for m in js["meshes"] for p in m["primitives"] if "indices" in p}
         views, bvs = [], []
         for ai, a in enumerate(js["accessors"]):
+            if a.get("sparse") is not None:
+                # Esparso (shape keys): continua esparso, só com os valores que não são zero.
+                vals = self.read_accessor(ai, raw=True)
+                fmt = COMP_FMT[a["componentType"]]
+                nz = [i for i, v in enumerate(vals) if any(x != 0 for x in v)]
+                a.pop("bufferView", None)
+                a.pop("byteOffset", None)
+                a.pop("sparse")
+                if nz:
+                    idx_data = struct.pack("<%dI" % len(nz), *nz)
+                    flat = [x for i in nz for x in vals[i]]
+                    val_data = struct.pack("<" + fmt * len(flat), *flat)
+                    a["sparse"] = {"count": len(nz),
+                                   "indices": {"bufferView": len(views), "componentType": 5125},
+                                   "values": {"bufferView": len(views) + 1}}
+                    views += [idx_data, val_data]
+                    bvs += [{"buffer": 0, "byteLength": len(idx_data)}, {"buffer": 0, "byteLength": len(val_data)}]
+                continue
             if "bufferView" not in a:
                 continue
             vals = self.read_accessor(ai, raw=True)

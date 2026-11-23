@@ -1,0 +1,31 @@
+[gd_resource type="Resource" script_class="CharacterData" format=3]
+
+[ext_resource type="Script" path="res://scripts/character_data.gd" id="1_data"]
+[ext_resource type="PackedScene" path="res://assets/models/personagens/rafael.glb" id="2_model"]
+[ext_resource type="Resource" path="res://data/personagens/rafael_esqueleto.tres" id="3_skel"]
+[ext_resource type="PackedScene" path="res://scenes/props/garrafa_cerveja.tscn" id="4_prop"]
+
+[resource]
+script = ExtResource("1_data")
+display_name = "Rafael"
+tagline = "Piloto de barba curta e sorrisão"
+description = "Barba curta, sorriso largo e a cabeça na sexta-feira. O mais veloz na reta, como quem corre para o happy hour, mas entra nas curvas sem muita paciência."
+model_scene = ExtResource("2_model")
+skeleton = ExtResource("3_skel")
+standard_fit = true
+kart_scale = 1.0
+showcase_scale = 1.85
+portrait_scale = 2.6
+portrait_offset = Vector3(0, -0.78, 0)
+pick_gesture = &"gesture_sextou"
+pick_face = &"face_sextou"
+pick_prop = ExtResource("4_prop")
+pick_shout = "SEXTOUU!"
+pick_shout_time = 0.32
+color = Color(0.13, 0.6, 0.29, 1)
+color_dark = Color(0.03, 0.2, 0.09, 1)
+tint_reference = Color(0.19, 0.18, 0.4, 1)
+speed = 5
+acceleration = 3
+handling = 2
+weight = 3
