@@ -5,7 +5,7 @@ extends Node3D
 ##   Campo  → pneus gigantes atravessando a pista aos pulos (dá para passar por baixo
 ##            no alto do pulo);
 ##   Praia  → ondas do mar que passam por cima da mureta e varrem a pista;
-##   Deserto → fardos de feno rolando aos trancos;
+##   Deserto → tambores de coluna de templo (arenito pintado) rolando aos trancos;
 ##   Neve   → bolas de neve enormes descendo do lado do morro.
 ## Cada trecho (Track.obstacle_zones) tem alguns obstáculos. O movimento de cada um é
 ## uma função do relógio (`clock`), sem física: o padrão se repete igual a cada
@@ -14,7 +14,7 @@ extends Node3D
 ## anima sozinha. Quem é atingido roda e perde moedas (Kart.hit_by_obstacle); a onda
 ## empurra e balança o kart.
 
-enum Kind { PNEU, ONDA, FENO, NEVE }
+enum Kind { PNEU, ONDA, TAMBOR, NEVE }
 
 const SHADER := preload("res://shaders/obstacle.gdshader")
 const WAVE_SHADER := preload("res://shaders/obstacle_wave.gdshader")
@@ -44,7 +44,7 @@ const WAVE_BAND_FRONT := 1.4
 const ROLLERS := {
 	Kind.PNEU: {"radius": 1.05, "half_len": 0.42, "speed": 8.5, "reach": 30.0, "rest": 1.6,
 			"along": [-7.0, 0.0, 7.0], "sides": [1.0, -1.0, 1.0], "push": 6.0, "slow": 0.35},
-	Kind.FENO: {"radius": 0.85, "half_len": 0.85, "speed": 7.0, "reach": 28.0, "rest": 1.4,
+	Kind.TAMBOR: {"radius": 0.9, "half_len": 0.95, "speed": 7.0, "reach": 28.0, "rest": 1.4,
 			"along": [-9.0, -3.0, 3.0, 9.0], "sides": [-1.0, 1.0, -1.0, 1.0], "push": 5.5, "slow": 0.4},
 	Kind.NEVE: {"radius": 1.35, "half_len": 1.35, "speed": 6.5, "reach": 32.0, "rest": 1.6,
 			"along": [-8.0, 0.0, 8.0], "sides": [0.0, 0.0, 0.0], "push": 7.0, "slow": 0.3},
@@ -108,7 +108,7 @@ static func kind_for(scenery: int) -> int:
 		TrackTheme.Scenery.PRAIA:
 			return Kind.ONDA
 		TrackTheme.Scenery.DESERTO:
-			return Kind.FENO
+			return Kind.TAMBOR
 		TrackTheme.Scenery.NEVE:
 			return Kind.NEVE
 	return Kind.PNEU
@@ -153,8 +153,8 @@ func _shared_parts() -> Dictionary:
 	var mat := ShaderMaterial.new()
 	mat.shader = SHADER
 	match kind:
-		Kind.FENO:
-			mat.set_shader_parameter("mode", 0)
+		Kind.TAMBOR:
+			mat.set_shader_parameter("mode", 3)
 			var cyl := CylinderMesh.new()
 			cyl.top_radius = 1.0
 			cyl.bottom_radius = 1.0
@@ -227,10 +227,10 @@ func _add_rollers(zi: int, z: Zone, track: Track, terrain: TrackTerrain, shared:
 
 func _make_roller_node(shared: Dictionary) -> Node3D:
 	var root := Node3D.new()
-	root.name = {Kind.PNEU: "Pneu", Kind.FENO: "Feno", Kind.NEVE: "BolaDeNeve"}[kind]
+	root.name = {Kind.PNEU: "Pneu", Kind.TAMBOR: "TamborDeColuna", Kind.NEVE: "BolaDeNeve"}[kind]
 	var body := MeshInstance3D.new()
 	body.mesh = shared.mesh
-	# Fardo e pneu deitados com o eixo ao longo da pista (rolam atravessando-a).
+	# Tambor e pneu deitados com o eixo ao longo da pista (rolam atravessando-a).
 	if kind != Kind.NEVE:
 		body.rotation = Vector3(PI * 0.5, 0.0, 0.0)
 	root.add_child(body)
@@ -395,8 +395,9 @@ func _roller_state(m: Mover, t: float) -> Vector4:
 			# Quica alto: no topo do pulo o kart passa por baixo (~1/3 do tempo).
 			var b := sin(PI * dist / 9.0)
 			hop = b * b * 2.0
-		Kind.FENO:
-			hop = absf(sin(PI * dist / 2.7)) * (0.22 + 0.4 * absf(sin(dist * 0.31 + m.phase)))
+		Kind.TAMBOR:
+			# Pedra pesada: pula pouco a cada pedra do chão.
+			hop = absf(sin(PI * dist / 2.9)) * (0.12 + 0.25 * absf(sin(dist * 0.31 + m.phase)))
 	# Pulo por cima das muretas.
 	var x := (absf(lat) - (_wall_in + _wall_out) * 0.5) / (m.radius * s + 1.7)
 	var wall := (_wall_height + 0.25) * (0.5 + 0.5 * cos(PI * x)) if absf(x) < 1.0 else 0.0

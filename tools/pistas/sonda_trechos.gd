@@ -46,7 +46,10 @@ func _process(_d: float) -> bool:
 		race = load("res://scenes/race.tscn").instantiate()
 		root.add_child(race)
 		current_scene = race
-	elif frame == 4:
+	elif frame >= 4 and ref_ai == null:
+		# A pista é gerada numa thread (tela de carregamento): espera a corrida montar.
+		if race.get("kart") == null:
+			return false
 		var ai = load("res://scripts/kart_ai.gd").new()
 		var line = load("res://scripts/racing_line.gd").build(race.track)
 		ai.setup(race.kart, race.track, line, race._karts, float(args.skill))
@@ -74,7 +77,7 @@ func _process(_d: float) -> bool:
 					print("  ASA FECHOU no vao: %s em %.3f h %.1f" % [k.name, tr.distances[i] / tr.length, tr.to_local(k.global_position).y - tr.samples[i].y]))
 		race.kart.splashed.connect(func(_e): splashes += 1)
 		t0 = Time.get_ticks_msec()
-	elif frame > 4:
+	elif ref_ai != null:
 		var dt := 1.0 / 150.0 * 2.5
 		for k in race._karts:
 			_track_kart(k)
@@ -170,7 +173,7 @@ func _report() -> void:
 			mx_a = maxf(mx_a, f.after)
 	print("VOOS %d ar %.2f-%.2fs dist %.0f-%.0fm pouso %.0f-%.0fm depois da beira, folga minima na beira do pouso %.1fm QUEDAS NO VALE %d" % [
 			flights.size(), mn_air, mx_air, mn_d, mx_d, mn_a, mx_a, min_margin, falls])
-	var names := ["asfalto", "areia", "areia_fofa", "movedica", "gelo", "neve"]
+	var names := ["asfalto", "areia", "areia_fofa", "movedica", "gelo", "neve", "areia_batida"]
 	var s := []
 	for key in surf:
 		s.append("%s %.1fs" % [names[key], surf[key]])

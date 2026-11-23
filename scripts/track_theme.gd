@@ -23,7 +23,10 @@ static func terrain_params(scenery: int) -> Dictionary:
 				"mowed_light": Color(0.86, 0.6, 0.38), "mowed_dark": Color(0.79, 0.52, 0.32),
 				"sand": Color(0.95, 0.8, 0.56), "rock": Color(0.82, 0.44, 0.25), "rock_dark": Color(0.56, 0.26, 0.16),
 				"rock_band": Color(0.95, 0.68, 0.45), "band_mix": 0.45, "strata": 0.16, "strata_freq": 0.55,
-				"rock_slope": 0.24, "snow_height": 9999.0, "sand_band": 1.4, "stripe_strength": 0.3,
+				"rock_slope": 0.24, "snow_height": 9999.0, "sand_band": 0.9, "stripe_strength": 0.3,
+				# Margens verdes do oásis e do rio.
+				"shore_grass": Color(0.36, 0.6, 0.15), "grass_band": 3.4,
+				"dune_light": Color(0.9, 0.71, 0.45), "dune_dark": Color(0.76, 0.52, 0.3),
 			}
 		Scenery.NEVE:
 			return {
@@ -43,7 +46,8 @@ static func water_params(scenery: int) -> Dictionary:
 		Scenery.PRAIA:
 			return {"shallow_color": Color(0.24, 0.93, 0.86), "deep_color": Color(0.0, 0.42, 0.78), "depth_range": 7.0}
 		Scenery.DESERTO:
-			return {"shallow_color": Color(0.36, 0.78, 0.68), "deep_color": Color(0.05, 0.36, 0.5), "depth_range": 4.0}
+			# Água de oásis: verde-azulada e clara.
+			return {"shallow_color": Color(0.3, 0.86, 0.74), "deep_color": Color(0.03, 0.4, 0.52), "depth_range": 5.0}
 		Scenery.NEVE:
 			# O mesmo gelo da pista de gelo (snow_road.gdshader).
 			return {"ice": 1.0, "shallow_color": Color(0.6, 0.86, 0.97), "deep_color": Color(0.09, 0.33, 0.52), "depth_range": 5.0}
@@ -57,6 +61,8 @@ static func underwater_fog(scenery: int) -> Color:
 			return Color(0.06, 0.52, 0.66)
 		Scenery.NEVE:
 			return Color(0.32, 0.5, 0.66)
+		Scenery.DESERTO:
+			return Color(0.08, 0.5, 0.5)
 	return Color(0.1, 0.42, 0.42)
 
 
@@ -66,7 +72,7 @@ static func grass_colors(scenery: int) -> Array[Color]:
 		Scenery.PRAIA:
 			return [Color(0.12, 0.42, 0.08), Color(0.55, 0.88, 0.25)]
 		Scenery.DESERTO:
-			return [Color(0.42, 0.34, 0.14), Color(0.9, 0.78, 0.42)]
+			return [Color(0.46, 0.36, 0.18), Color(0.8, 0.68, 0.4)]
 		Scenery.NEVE:
 			return [Color(0.16, 0.3, 0.16), Color(0.86, 0.92, 0.98)]
 	return [Color(0.12, 0.36, 0.08), Color(0.5, 0.8, 0.22)]

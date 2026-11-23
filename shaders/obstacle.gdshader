@@ -2,22 +2,22 @@ shader_type spatial;
 render_mode diffuse_burley, specular_schlick_ggx;
 // Obstáculos que rolam pela pista (veja scripts/track_obstacles.gd). Um shader para
 // os três (um só para compilar na web), escolhido por `mode`:
-//   0 = fardo de feno (CylinderMesh, eixo Y): palha com espiral nas pontas e duas
-//       cintas azuis da Ativos;
 //   1 = bola de neve (SphereMesh de raio 1): neve irregular com brilhos e pedrinhas;
-//   2 = pneu gigante (TorusMesh, eixo Y): borracha com sulcos e uma faixa amarela.
+//   2 = pneu gigante (TorusMesh, eixo Y): borracha com sulcos e uma faixa amarela;
+//   3 = tambor de coluna de templo (CylinderMesh, eixo Y): arenito com caneluras, faixas
+//       de lápis-lazúli e ouro e marcas entalhadas e pintadas.
 // Tudo no espaço do objeto: o desenho gira junto quando ele rola.
 
 #include "res://shaders/noise.gdshaderinc"
 
-uniform int mode = 0;
-uniform vec3 straw_light : source_color = vec3(0.95, 0.8, 0.42);
-uniform vec3 straw_dark : source_color = vec3(0.7, 0.5, 0.2);
-uniform vec3 band_color : source_color = vec3(0.149, 0.239, 0.749);
+uniform int mode = 2;
 uniform vec3 snow_color : source_color = vec3(0.96, 0.98, 1.0);
 uniform vec3 snow_shade : source_color = vec3(0.72, 0.8, 0.95);
 uniform vec3 rubber_color : source_color = vec3(0.07, 0.07, 0.08);
 uniform vec3 stripe_color : source_color = vec3(1.0, 0.82, 0.1);
+uniform vec3 stone_light : source_color = vec3(0.87, 0.7, 0.47);
+uniform vec3 stone_dark : source_color = vec3(0.66, 0.48, 0.31);
+uniform vec3 lapis_color : source_color = vec3(0.11, 0.22, 0.62);
 
 varying vec3 obj;
 varying vec3 obj_n;
@@ -36,22 +36,7 @@ void fragment() {
 	vec3 col;
 	float rough = 0.9;
 	float spec = 0.3;
-	if (mode == 0) {
-		float cap = step(0.7, abs(obj_n.y));
-		float r = length(obj.xz);
-		float ang = atan(obj.z, obj.x);
-		// Pontas: palha enrolada em espiral. Lateral: fios ao redor do fardo.
-		float spiral = sin(r * 46.0 + ang * 1.0 + vnoise(obj.xz * 9.0) * 3.0) * 0.5 + 0.5;
-		float strands = vnoise(vec2(ang * 24.0, obj.y * 5.0)) * 0.7 + vnoise(vec2(ang * 70.0, obj.y * 14.0)) * 0.3;
-		float t = mix(strands, spiral, cap);
-		col = mix(straw_dark, straw_light, smoothstep(0.2, 0.85, t));
-		// Fios soltos mais claros.
-		col = mix(col, straw_light * 1.08, step(0.86, vnoise(vec2(ang * 120.0, obj.y * 30.0))) * (1.0 - cap));
-		float band = (1.0 - cap) * (1.0 - smoothstep(0.035, 0.06, abs(abs(obj.y) - 0.42)));
-		col = mix(col, band_color, band);
-		rough = mix(0.95, 0.6, band);
-		spec = 0.15;
-	} else if (mode == 1) {
+	if (mode == 1) {
 		float n = fbm(obj.xy * 3.0 + obj.z * 2.0, 3);
 		col = mix(snow_shade, snow_color, smoothstep(0.25, 0.75, n));
 		// Pedrinhas e gravetos presos na neve.
@@ -62,6 +47,34 @@ void fragment() {
 		// Brilhinhos de gelo.
 		float glint = step(0.985, hash12(floor(obj.xz * 60.0 + obj.y * 37.0)));
 		EMISSION = vec3(0.5, 0.6, 0.7) * glint * 0.8;
+	} else if (mode == 3) {
+		float cap = step(0.7, abs(obj_n.y));
+		float r = length(obj.xz);
+		float ang = atan(obj.z, obj.x);
+		float n = vnoise(vec2(ang * 5.0, obj.y * 3.0)) * 0.6 + vnoise(obj.xz * 6.0 + obj.y * 4.0) * 0.4;
+		col = mix(stone_dark, stone_light, 0.35 + 0.55 * n);
+		// Caneluras (sulcos em volta) e, nas pontas, o anel do encaixe dos tambores.
+		float flute = smoothstep(0.75, 1.0, sin(ang * 16.0) * 0.5 + 0.5) * (1.0 - cap);
+		col *= 1.0 - flute * 0.18;
+		col = mix(col, stone_dark * 0.75, cap * (1.0 - smoothstep(0.02, 0.05, abs(r - 0.55))));
+		// Faixas pintadas perto das pontas.
+		float y = abs(obj.y);
+		float lap = (1.0 - cap) * step(0.6, y) * step(y, 0.74);
+		float gold = (1.0 - cap) * step(0.78, y) * step(y, 0.86);
+		col = mix(col, lapis_color, lap * 0.9);
+		col = mix(col, stripe_color * 0.95, gold * 0.9);
+		// Marcas entalhadas e pintadas no meio (como hieróglifos de longe).
+		vec2 g = vec2(ang * 12.0 / 6.2831, obj.y * 3.2);
+		vec2 gc = floor(g);
+		vec2 gf = fract(g);
+		float h = hash12(gc + 4.0);
+		float mark = (1.0 - cap) * step(y, 0.5) * step(0.35, h)
+				* step(0.25, gf.x) * step(gf.x, 0.75) * step(0.2, gf.y) * step(gf.y, 0.8)
+				* step(0.5, fract(gf.x * 3.0 + gf.y * 2.0 * h));
+		vec3 paint = h < 0.55 ? lapis_color : (h < 0.75 ? vec3(0.66, 0.2, 0.1) : stripe_color);
+		col = mix(col, mix(col * 0.6, paint, 0.5), mark);
+		rough = 0.9;
+		spec = 0.2;
 	} else {
 		float ang = atan(obj.z, obj.x);
 		float r = length(obj.xz);

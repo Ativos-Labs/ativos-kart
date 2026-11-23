@@ -1,17 +1,14 @@
-[gd_resource type="Resource" script_class="TrackData" format=3]
+[gd_resource type="Resource" script_class="TrackData" format=3 uid="uid://cphpc5gu5poho"]
 
-[ext_resource type="Script" path="res://scripts/track_data.gd" id="1_data"]
-[ext_resource type="PackedScene" path="res://scenes/tracks/ilha_ativos.tscn" id="2_scene"]
+[ext_resource type="Script" uid="uid://crj76uik6y37b" path="res://scripts/track_data.gd" id="1_data"]
+[ext_resource type="PackedScene" uid="uid://covv62n4xyf3v" path="res://scenes/tracks/ilha_ativos.tscn" id="2_scene"]
 
 [resource]
 script = ExtResource("1_data")
 id = "ilha_ativos"
 display_name = "Ilha Ativos"
-cup_name = "Copa Ativos"
 description = "Uma ilha tropical ao pôr do sol: cruze a lagoa pela ponte estaiada da Ativos, plane sobre a enseada dos penhascos e mergulhe no recife de corais, entre peixes e um navio naufragado."
 scene = ExtResource("2_scene")
-difficulty = 2
-laps = 3
 color = Color(0.04, 0.6, 0.68, 1)
 color_dark = Color(0.02, 0.2, 0.27, 1)
 background = "res://assets/pistas/ilha_ativos_fundo.jpg"

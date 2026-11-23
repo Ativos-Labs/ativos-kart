@@ -1,17 +1,15 @@
-[gd_resource type="Resource" script_class="TrackData" format=3]
+[gd_resource type="Resource" script_class="TrackData" format=3 uid="uid://b7bomynahmxn7"]
 
-[ext_resource type="Script" path="res://scripts/track_data.gd" id="1_data"]
-[ext_resource type="PackedScene" path="res://scenes/tracks/canion_ativos.tscn" id="2_scene"]
+[ext_resource type="Script" uid="uid://crj76uik6y37b" path="res://scripts/track_data.gd" id="1_data"]
+[ext_resource type="PackedScene" uid="uid://im3gwqd3c8ld" path="res://scenes/tracks/canion_ativos.tscn" id="2_scene"]
 
 [resource]
 script = ExtResource("1_data")
 id = "canion_ativos"
 display_name = "Cânion Ativos"
-cup_name = "Copa Ativos"
-description = "Um oito no deserto escaldante: cruze o rio pela ponte em arco azul, voe de asa-delta pela garganta do cânion, passe por cima da própria pista e enfrente as dunas e a areia movediça."
+description = "Deserto do Egito, só areia: voe de asa-delta pela garganta do cânion, enfrente as dunas, mergulhe no oásis entre as ruínas e passe pelo templo das esfinges até as pirâmides."
 scene = ExtResource("2_scene")
 difficulty = 3
-laps = 3
 color = Color(0.86, 0.42, 0.14, 1)
 color_dark = Color(0.3, 0.12, 0.05, 1)
 background = "res://assets/pistas/canion_ativos_fundo.jpg"

@@ -14,6 +14,10 @@ const WALL_SHADER := preload("res://shaders/wall.gdshader")
 const BOOST_SHADER := preload("res://shaders/boost_pad.gdshader")
 const SNOW_ROAD_SHADER := preload("res://shaders/snow_road.gdshader")
 const SNOW_BANK_SHADER := preload("res://shaders/snow_bank.gdshader")
+const SAND_ROAD_SHADER := preload("res://shaders/sand_road.gdshader")
+const SAND_BANK_SHADER := preload("res://shaders/sand_bank.gdshader")
+## Hieróglifos (grade 4×4, veja tools/deserto/gerar_hieroglifos.py) das pedras do Egito.
+const GLYPHS := preload("res://assets/textures/hieroglifos.png")
 ## Ruído branco dos shaders que usam noise_tex.gdshaderinc (neve, gelo e água congelada).
 const NOISE_TEXTURE := preload("res://assets/textures/ruido.png")
 const LOGO_ICON := preload("res://assets/logos/ativos_icone.png")
@@ -47,6 +51,20 @@ const ICE_ROAD_LIFT := 0.06
 @export var snow_track := false:
 	set(value):
 		snow_track = value
+		_queue_rebuild()
+## Pista inteira de areia, sem asfalto (deserto do Egito): areia batida com trilhas de
+## pneu, ondinhas do vento e pedrinhas (solta um pouco a traseira), montes de areia com
+## blocos de arenito cheios de hieróglifos no lugar das muretas e leira de areia no
+## lugar das zebras. As dunas e o mergulho continuam como trechos especiais.
+@export var sand_track := false:
+	set(value):
+		sand_track = value
+		_queue_rebuild()
+## Quanto do chão em volta vira mar de dunas (0 = relevo comum, 1 = só dunas; as
+## montanhas do horizonte ficam).
+@export_range(0.0, 1.0, 0.05) var dune_cover := 0.0:
+	set(value):
+		dune_cover = value
 		_queue_rebuild()
 
 @export_group("Pontes")
@@ -109,7 +127,7 @@ const ICE_ROAD_LIFT := 0.06
 
 @export_group("Obstáculos")
 ## Trechos com obstáculos que se mexem (frações da volta). O tipo vem do cenário:
-## pneus gigantes quicando (Campo), ondas do mar (Praia), fardos de feno (Deserto) e
+## pneus gigantes quicando (Campo), ondas do mar (Praia), tambores de coluna (Deserto) e
 ## bolas de neve (Neve). Ponha em trechos sem ponte, rampa nem caixas, com uns 30 m
 ## de chão livre dos dois lados da pista (veja track_obstacles.gd).
 @export var obstacle_zones := PackedFloat32Array():
@@ -233,6 +251,16 @@ const ICE_ROAD_LIFT := 0.06
 @export var hill_bias := 2.0:
 	set(value):
 		hill_bias = value
+		_queue_rebuild()
+## Distância (m) do centro do mapa onde as montanhas do horizonte começam a subir e
+## onde chegam na altura toda.
+@export var mountain_start := 300.0:
+	set(value):
+		mountain_start = value
+		_queue_rebuild()
+@export var mountain_end := 650.0:
+	set(value):
+		mountain_end = value
 		_queue_rebuild()
 ## Colinas em degraus (0 = lisas). Ex.: 7 = mesas e paredões de deserto.
 @export var terrace_step := 0.0:
@@ -426,6 +454,8 @@ func surface_at(index: int, lateral: float) -> int:
 	var kind := section_kind_at(index)
 	if snow_track and kind != TrackSection.Kind.GELO:
 		return Kart.Surface.NEVE
+	if sand_track and kind != TrackSection.Kind.AREIA and kind != TrackSection.Kind.GELO:
+		return Kart.Surface.AREIA_BATIDA
 	match kind:
 		TrackSection.Kind.GELO:
 			return Kart.Surface.GELO
@@ -536,6 +566,9 @@ func build_geometry(defer_physics := false) -> void:
 		terrain.hill_bias = hill_bias
 		terrain.mountain_height = mountain_height
 		terrain.terrace_step = terrace_step
+		terrain.dune_cover = dune_cover
+		terrain.mountain_start = mountain_start
+		terrain.mountain_end = mountain_end
 		terrain.sea_distance = sea_distance
 		terrain.river_width = river_width
 		terrain.river_depth = river_depth
@@ -1080,7 +1113,7 @@ func _terrain_key(rivers: Array[PackedVector2Array]) -> String:
 		special.append(path.curve.get_baked_length())
 		special.append(path.curve.sample_baked(0.0))
 	return var_to_str([track_id, scenery, samples.size(), length, sum, bridged, river_points, river_sum, special,
-			decoration_seed, water_level, hill_height, hill_bias, mountain_height, terrace_step,
+			decoration_seed, water_level, hill_height, hill_bias, mountain_height, terrace_step, dune_cover, mountain_start, mountain_end,
 			sea_distance, river_width, river_depth, river_bank, river_valley, road_width,
 			shoulder_width, wall_thickness])
 
@@ -1166,6 +1199,10 @@ func _build_road() -> void:
 		mat.shader = SNOW_ROAD_SHADER
 		mat.set_shader_parameter("sun_dir", _sun_dir())
 		mat.set_shader_parameter("noise_tex", NOISE_TEXTURE)
+	elif sand_track:
+		mat.shader = SAND_ROAD_SHADER
+		mat.set_shader_parameter("noise_tex", NOISE_TEXTURE)
+		mat.set_shader_parameter("soft_edge", SOFT_SAND_EDGE)
 	else:
 		mat.shader = ROAD_SHADER
 		mat.set_shader_parameter("curb_min", curb_min_width)
@@ -1174,7 +1211,7 @@ func _build_road() -> void:
 	mat.set_shader_parameter("track_length", length)
 	mat.set_shader_parameter("logo_texture", LOGO_ICON)
 	var road := _add_mesh(md.to_mesh(mat))
-	road.name = "Neve" if snow_track else "Asfalto"
+	road.name = "Neve" if snow_track else ("Areia" if sand_track else "Asfalto")
 	road.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	if with_collision and not _is_flat():
 		# Pista com subidas/pontes: o chão de colisão acompanha a pista de mureta a
@@ -1195,6 +1232,9 @@ func _build_road() -> void:
 func _build_curbs() -> void:
 	if snow_track:
 		_build_snow_lips()
+		return
+	if sand_track:
+		_build_sand_lips()
 		return
 	var half := road_width * 0.5
 	var mat := ShaderMaterial.new()
@@ -1239,6 +1279,8 @@ func _build_curbs() -> void:
 func _build_walls() -> void:
 	if snow_track:
 		_build_snow_banks()
+	elif sand_track:
+		_build_sand_banks()
 	var outer_mat := ShaderMaterial.new()
 	outer_mat.shader = WALL_SHADER
 	outer_mat.set_shader_parameter("outer_side", true)
@@ -1268,7 +1310,7 @@ func _build_walls() -> void:
 		_add_strip(rest, top_in, top_out, _repeat(Vector3.UP), wall_height, wall_height)
 		_add_strip(rest, top_out, _offset_rail(outer, wall_height - bevel), _slope_normals(side, bevel, -bevel), wall_height, wall_height - bevel)
 		_add_strip(rest, _offset_rail(outer, wall_height - bevel), _offset_rail(outer, -0.3), _scaled_rights(side), wall_height - bevel, -0.3)
-		if not snow_track:
+		if not snow_track and not sand_track:
 			var wall := _add_mesh(face.to_mesh(inner_mat))
 			wall.name = "Mureta"
 			_add_mesh(rest.to_mesh(outer_mat))
@@ -1446,6 +1488,87 @@ func _build_snow_lips() -> void:
 	lips.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
+# --- Pista de areia (deserto) ---------------------------------------------------------
+
+## Perfil do monte de areia: (para fora da linha da mureta, altura) em m. Mais largo e
+## baixo que o de neve, com a face de fora comprida (como uma duna pequena).
+const SAND_BANK_PROFILE := [Vector2(-0.95, -0.3), Vector2(-0.78, 0.03), Vector2(-0.52, 0.3),
+		Vector2(-0.22, 0.64), Vector2(0.12, 0.95), Vector2(0.48, 1.14), Vector2(0.85, 1.2),
+		Vector2(1.3, 1.1), Vector2(1.85, 0.86), Vector2(2.45, 0.52), Vector2(3.1, 0.2), Vector2(3.8, -0.3)]
+## Leira de areia empurrada na borda da pista.
+const SAND_LIP_PROFILE := [Vector2(-0.9, 0.01), Vector2(-0.55, 0.04), Vector2(-0.22, 0.08),
+		Vector2(0.1, 0.095), Vector2(0.5, 0.05), Vector2(0.85, -0.05)]
+
+
+## Cor de cada amostra para os montes de areia: r = debaixo d'água, g = dunas.
+func _sand_colors() -> PackedColorArray:
+	var road := _road_colors()
+	var out := PackedColorArray()
+	out.resize(road.size())
+	for i in road.size():
+		out[i] = Color(road[i].g, road[i].r, 0.0)
+	return out
+
+
+## Em cima das pontes o perfil do monte some para dentro da beira do tabuleiro (os
+## pontos com x > 0,5 m são puxados para dentro).
+func _pull_profile_on_bridges(md: MeshData, first: int, profile: Array, widths: PackedFloat32Array, side: float) -> void:
+	if bridge_spans.is_empty():
+		return
+	var cols := profile.size()
+	for i in samples.size():
+		if bridge_mask[i] == 0 or bridge_mask[i] == 3:
+			continue
+		for c in cols:
+			var raw: Vector2 = profile[c]
+			if raw.x <= 0.5:
+				continue
+			var k := first + i * cols + c
+			md.verts[k] -= rights[i] * side * (raw.x - 0.5) * widths[i] * 0.75
+
+
+## Montes de areia na linha das muretas (só visual; a colisão é a da mureta), com um
+## bloco de arenito entalhado (marca da Ativos e hieróglifos) a cada trecho.
+func _build_sand_banks() -> void:
+	var offset := road_width * 0.5 + shoulder_width
+	var colors := _sand_colors()
+	for side: float in [-1.0, 1.0]:
+		var heights := _snow_lumps(side * 1.7, 1.0, 0.22)
+		var widths := _snow_lumps(-side * 2.3, 1.0, 0.22)
+		var md := MeshData.new()
+		_add_profile(md, side, offset, SAND_BANK_PROFILE, heights, widths, colors, 0.1)
+		_pull_profile_on_bridges(md, 0, SAND_BANK_PROFILE, widths, side)
+		var mat := ShaderMaterial.new()
+		mat.shader = SAND_BANK_SHADER
+		mat.set_shader_parameter("noise_tex", NOISE_TEXTURE)
+		mat.set_shader_parameter("glyph_tex", GLYPHS)
+		mat.set_shader_parameter("mirror", -side)
+		mat.set_shader_parameter("wordmark", WORDMARK)
+		mat.set_shader_parameter("wordmark_aspect", float(WORDMARK.get_width()) / WORDMARK.get_height())
+		var bank := _add_mesh(md.to_mesh(mat))
+		bank.name = "MonteDeAreia"
+
+
+## Leira baixa de areia empurrada nas duas bordas da pista (no lugar das zebras).
+func _build_sand_lips() -> void:
+	var half := road_width * 0.5
+	var colors := _sand_colors()
+	var md := MeshData.new()
+	for side: float in [-1.0, 1.0]:
+		var heights := _snow_lumps(side * 2.6, 0.7, 0.7)
+		for i in heights.size():
+			heights[i] = maxf(heights[i], 0.08)
+		_add_profile(md, side, half, SAND_LIP_PROFILE, heights, _snow_lumps(side * 4.0, 1.0, 0.25), colors, 0.02)
+	var mat := ShaderMaterial.new()
+	mat.shader = SAND_BANK_SHADER
+	mat.set_shader_parameter("noise_tex", NOISE_TEXTURE)
+	mat.set_shader_parameter("glyph_tex", GLYPHS)
+	mat.set_shader_parameter("lip", true)
+	var lips := _add_mesh(md.to_mesh(mat))
+	lips.name = "LeiraDeAreia"
+	lips.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+
 ## Pórtico de largada: colunas azuis, viga com a marca da Ativos dos dois lados
 ## e faixa quadriculada embaixo.
 func _build_start_gate() -> void:
@@ -1453,6 +1576,10 @@ func _build_start_gate() -> void:
 	gate.name = "Largada"
 	gate.transform = get_transform_at(0.0)
 	_generated.add_child(gate)
+	if scenery == TrackTheme.Scenery.DESERTO:
+		# No deserto, um portal de templo egípcio (veja track_egypt.gd).
+		TrackEgypt.new(self, terrain, _generated).build_start_gate(gate)
+		return
 	var half := road_width * 0.5 + 1.4
 	var span := half * 2.0
 	var blue := TrackScenery.color_material(TrackScenery.BRAND_BLUE, 0.35, 0.15)

@@ -35,6 +35,10 @@ uniform float band_mix = 0.0;
 uniform float caustic_strength = 0.6;
 uniform vec3 dune_light : source_color = vec3(0.96, 0.8, 0.55);
 uniform vec3 dune_dark : source_color = vec3(0.84, 0.6, 0.36);
+// Grama verde na beira da água (oásis e margens do rio no deserto): até `grass_band` m
+// acima da água (0 = sem).
+uniform vec3 shore_grass : source_color = vec3(0.34, 0.58, 0.16);
+uniform float grass_band = 0.0;
 
 varying vec3 world_pos;
 varying vec3 world_normal;
@@ -105,6 +109,13 @@ void fragment() {
 		vec3 dcol = mix(dune_dark, dune_light, smoothstep(0.25, 0.85, n_big + (1.0 - slope) * 0.3));
 		dcol *= 0.95 + 0.07 * ripple * (1.0 - lod);
 		col = mix(col, dcol, dune * (1.0 - rock_mask * 0.6));
+	}
+
+	if (grass_band > 0.0) {
+		float above = world_pos.y - water_level + (n_mid - 0.5) * 1.4;
+		float g = smoothstep(0.1, 0.5, above) * (1.0 - smoothstep(grass_band * 0.55, grass_band, above)) * (1.0 - rock_mask);
+		vec3 gc = mix(shore_grass * 0.7, shore_grass * 1.15, n_fine) * (0.88 + 0.24 * n_big);
+		col = mix(col, gc, g * (1.0 - near_track * 0.6));
 	}
 
 	ALBEDO = col;

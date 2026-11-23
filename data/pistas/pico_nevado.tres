@@ -1,17 +1,15 @@
-[gd_resource type="Resource" script_class="TrackData" format=3]
+[gd_resource type="Resource" script_class="TrackData" format=3 uid="uid://liu46jpg8so8"]
 
-[ext_resource type="Script" path="res://scripts/track_data.gd" id="1_data"]
-[ext_resource type="PackedScene" path="res://scenes/tracks/pico_nevado.tscn" id="2_scene"]
+[ext_resource type="Script" uid="uid://crj76uik6y37b" path="res://scripts/track_data.gd" id="1_data"]
+[ext_resource type="PackedScene" uid="uid://3kf5ec7h5tjp" path="res://scenes/tracks/pico_nevado.tscn" id="2_scene"]
 
 [resource]
 script = ExtResource("1_data")
 id = "pico_nevado"
 display_name = "Pico Nevado"
-cup_name = "Copa Ativos"
 description = "Sem asfalto: neve batida e rio congelado do começo ao fim. Voe de asa-delta sobre o vale glacial e desça o riacho congelado sob o arco de gelo, com peixes nadando embaixo."
 scene = ExtResource("2_scene")
 difficulty = 4
-laps = 3
 color = Color(0.33, 0.58, 0.86, 1)
 color_dark = Color(0.07, 0.13, 0.3, 1)
 background = "res://assets/pistas/pico_nevado_fundo.jpg"

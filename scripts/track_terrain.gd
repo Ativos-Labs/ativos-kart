@@ -26,6 +26,9 @@ var mountain_start := 300.0
 var mountain_end := 650.0
 ## Altura dos degraus das colinas (0 = colinas lisas; ex.: 7 = mesas de deserto).
 var terrace_step := 0.0
+## Quanto do chão vira mar de dunas (0..1; veja Track.dune_cover). As dunas crescem
+## longe da pista.
+var dune_cover := 0.0
 ## Ilha: a partir dessa distância da pista o chão desce para o mar (0 = sem mar).
 var sea_distance := 0.0
 var sea_depth := 9.0
@@ -415,16 +418,21 @@ func _sample(x: float, z: float) -> Vector4:
 		var ks := _sand.find(x, z)
 		if ks >= 0:
 			sand = sand_strength[_sand.ids[ks]] * (1.0 - smoothstep(70.0, 190.0, Vector2(x, z).distance_to(_sand.pts[ks])))
+	# As montanhas do horizonte continuam de pedra (sem o mar de dunas).
+	var ring := smoothstep(mountain_start, mountain_end, Vector2(x, z).distance_to(center))
+	sand = maxf(sand, dune_cover * (1.0 - ring))
 	if m > 0.0:
-		var relief := _hills.get_noise_2d(x, z) * hill_height + hill_bias
-		var ring := smoothstep(mountain_start, mountain_end, Vector2(x, z).distance_to(center))
-		if ring > 0.0:
-			relief += ring * mountain_height * (0.3 + 0.7 * clampf(_ridges.get_noise_2d(x, z) * 0.6 + 0.5, 0.0, 1.2))
-		if terrace_step > 0.0:
-			relief = _terrace(relief)
+		var relief := 0.0
+		# Só dunas (sem montanha): o relevo comum seria jogado fora, nem calcula.
+		if sand < 1.0 or ring > 0.0:
+			relief = _hills.get_noise_2d(x, z) * hill_height + hill_bias
+			if ring > 0.0:
+				relief += ring * mountain_height * (0.3 + 0.7 * clampf(_ridges.get_noise_2d(x, z) * 0.6 + 0.5, 0.0, 1.2))
+			if terrace_step > 0.0:
+				relief = _terrace(relief)
 		if sand > 0.0:
 			# Perto das dunas da pista o relevo vira um mar de dunas (sem mesas).
-			relief = lerpf(relief, _dune_relief(x, z) + ring * relief, sand)
+			relief = lerpf(relief, _dune_relief(x, z, d) + ring * relief, sand)
 		h += m * relief
 	if sea_distance > 0.0:
 		var coast := _coast.get_noise_2d(x, z) * 14.0
@@ -442,12 +450,15 @@ func _sample(x: float, z: float) -> Vector4:
 
 ## Dunas: cristas compridas atravessadas ao vento, com a face de trás suave e a da
 ## frente mais íngreme, e a altura variando aos poucos.
-func _dune_relief(x: float, z: float) -> float:
-	var warp := _hills.get_noise_2d(x * 0.7 + 300.0, z * 0.7) * 34.0
-	var u := (x * 0.8 + z * 0.6 + warp) / 42.0
+func _dune_relief(x: float, z: float, d_track := 0.0) -> float:
+	# No mar de dunas (dune_cover) elas ficam mais altas e espaçadas longe da pista.
+	var grow := dune_cover * smoothstep(60.0, 320.0, d_track)
+	# Entorta as cristas (ruído de 2 oitavas: é chamado em todo vértice do mar de dunas).
+	var warp := _coast.get_noise_2d(x * 0.26 + 300.0, z * 0.26) * 30.0
+	var u := (x * 0.8 + z * 0.6 + warp) / (42.0 * (1.0 + grow * 0.8))
 	var ph := u - floorf(u)
 	var ridge := smoothstep(0.0, 0.72, ph) if ph < 0.72 else 1.0 - smoothstep(0.72, 1.0, ph)
-	var amp := 6.0 + _coast.get_noise_2d(x * 0.25, z * 0.25) * 4.0
+	var amp := (6.0 + _coast.get_noise_2d(x * 0.25, z * 0.25) * 4.0) * (1.0 + grow * 1.6)
 	return ridge * amp + 1.2
 
 

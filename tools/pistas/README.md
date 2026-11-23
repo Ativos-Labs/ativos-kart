@@ -62,6 +62,24 @@ A/B contra o asfalto antigo (mesma build, 200 s): J1 passa ~25% do tempo no gelo
 +1–5% (mais no 50cc), nenhum resgate, nenhuma queda no vale. As curvas fechadas do platô
 (raios de 33–45 m) ficaram de neve de propósito: gelo ali derrubaria a IA.
 
+### Cânion do Egito (2026-11-23, mais tarde)
+
+O Cânion virou deserto do Egito sem asfalto (`Track.sand_track`, aderência ×0,84) e
+ganhou um laço de baixo maior (1664 → 2003 m): dunas 0,565–0,676, rampa de pulo em 0,699 e
+o oásis numa depressão (o traçado desce até y −9; `SUBMERSO` 0,755–0,795, `ramp` 55 m,
+`depth` 7, `basin` 78). Frações da parte de cima (largada até o viaduto) = antigas ×
+1664,5/2003. Recordes do Cânion recomeçam (`GameState.TRACK_LAYOUT_OF`).
+A sonda agora espera a corrida montar (a pista é gerada numa thread).
+
+| Classe | Voltas do J1 | Voos (ar / pouso depois da beira / folga mínima) | Debaixo d'água | Resgates |
+| --- | --- | --- | --- | --- |
+| 50cc | 93–99 s | 4,9–6,3 s / 6–18 m / 1,1 m | ~6 s por volta | nenhum |
+| 100cc | ~75 s (antes 58–63 s em 1664 m) | 3,8–5,6 s / 14–30 m / 4,4 m | ~4 s | nenhum |
+| 150cc | 60–62 s | 3,3–4,2 s / 26–42 m / 7,5 m | ~5 s | nenhum |
+
+Velocidade média do J1 no 100cc: 26,7 m/s (antes 27,9): a areia batida, a areia fofa das
+dunas (o J1 passa ~4 s por volta nela) e o mergulho custam ~4%.
+
 ## Cuidados
 
 - O terreno não tem colisão: quem passa da mureta ou cai no vale só para em `y < -20` (ou

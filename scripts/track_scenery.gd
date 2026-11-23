@@ -54,7 +54,7 @@ func build(preview: bool) -> void:
 	# Decorações de cada cenário (farol, caixa-d'água, chalés...). Usam um sorteio
 	# próprio para não mudar a decoração das pistas que já existem.
 	var props := TrackProps.new(self)
-	props.build_landmarks()
+	props.build_landmarks(preview)
 	if track.scenery == TrackTheme.Scenery.CAMPO:
 		_build_trees()
 	else:
@@ -312,8 +312,12 @@ func _build_billboards() -> void:
 	var last := -INF
 	var n := 0
 	var i := int(60.0 / step_len)
+	# No deserto, a reta do templo (portal, colunata e esfinges) fica sem outdoor.
+	var temple := TrackEgypt.temple_center(track) if track.scenery == TrackTheme.Scenery.DESERTO else -1
 	while i < count and track.distances[i] < track.length - 50.0:
 		var ok := track.distances[i] - last > 105.0 and absf(track.curvature[i]) < 0.012 and not track.is_bridge(i)
+		if temple >= 0 and absf(wrapf(track.distances[i] - track.distances[temple], -track.length * 0.5, track.length * 0.5)) < 110.0:
+			ok = false
 		if ok:
 			var side := track.outer_side_at(i)
 			var dist_out := _outside + 8.0

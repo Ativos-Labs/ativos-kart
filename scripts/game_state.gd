@@ -7,6 +7,9 @@ extends Node
 const RECORDS_PATH := "user://recordes.cfg"
 ## Versão do traçado das pistas (veja record_section).
 const TRACK_LAYOUT := 2
+## Pistas que mudaram de traçado de novo depois disso (versão própria): o Cânion virou o
+## deserto do Egito com o oásis em 2026-11-23.
+const TRACK_LAYOUT_OF := {"canion_ativos": 3}
 
 const SCENE_MAIN_MENU := "res://scenes/main_menu.tscn"
 const SCENE_MODE_SELECT := "res://scenes/mode_select.tscn"
@@ -735,7 +738,7 @@ func get_record(track_id: String, key: String) -> float:
 ## gelo e o vale da asa-delta) e ficaram mais compridas em 2026-11: os tempos de antes
 ## não dá para comparar, então os recordes (e fantasmas) recomeçam no traçado novo.
 static func record_section(track_id: String) -> String:
-	return "%s@%d" % [track_id, TRACK_LAYOUT]
+	return "%s@%d" % [track_id, TRACK_LAYOUT_OF.get(track_id, TRACK_LAYOUT)]
 
 
 ## Salva o tempo se for recorde. Retorna true quando é um recorde novo.

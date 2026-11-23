@@ -4,8 +4,9 @@ extends RefCounted
 ## Decorações típicas de cada cenário (veja TrackTheme), sempre com a marca da Ativos:
 ## - Praia: coqueiros, guarda-sóis azuis e amarelos, veleiros com o logo na vela e
 ##   um farol listrado com o logo "at".
-## - Deserto: cactos, pedras, caixa-d'água com o logo, letreiro gigante "ativos" e
-##   um arco de pedra por cima da pista.
+## - Deserto (Egito): pirâmides, esfinge, templo com obeliscos e colunas, ruínas e
+##   camelos (veja track_egypt.gd); tamareiras perto da água, pedras e poucas tamareiras
+##   no resto.
 ## - Neve: pinheiros nevados, pedras, chalés com placa da Ativos, bonecos de neve de
 ##   cachecol azul e neve caindo.
 ## Usa um sorteio próprio (não muda a decoração que o TrackScenery já gerou).
@@ -25,14 +26,12 @@ func _init(p_scenery: TrackScenery) -> void:
 	rng.seed = track.decoration_seed * 7919 + 13
 
 
-func build_landmarks() -> void:
+func build_landmarks(preview := false) -> void:
 	match track.scenery:
 		TrackTheme.Scenery.PRAIA:
 			_build_lighthouse()
 		TrackTheme.Scenery.DESERTO:
-			_build_water_tower()
-			_build_giant_sign()
-			_build_rock_arch()
+			TrackEgypt.new(track, terrain, s.root).build_landmarks(s._reserved, preview)
 		TrackTheme.Scenery.NEVE:
 			_build_chalets()
 
@@ -167,7 +166,7 @@ func build_trees() -> void:
 		var keep := (0.25 + 0.75 * smoothstep(-0.2, 0.35, forest.get_noise_2d(x, z))) * lerpf(1.0, 0.35, smoothstep(40.0, 280.0, d))
 		if rng.randf() > keep:
 			continue
-		var kind := _pick_kind()
+		var kind := _pick_kind(y)
 		var sc := rng.randf_range(0.8, 1.4)
 		var basis := Basis(Vector3.UP, rng.randf() * TAU)
 		if kind == "rock":
@@ -189,9 +188,6 @@ func build_trees() -> void:
 			"broadleaf":
 				mesh = TrackScenery._broadleaf_mesh()
 				label = "Arvores"
-			"cactus":
-				mesh = _cactus_mesh()
-				label = "Cactos"
 			"pine":
 				mesh = TrackScenery._pine_mesh(1.0)
 				label = "Pinheiros"
@@ -201,13 +197,16 @@ func build_trees() -> void:
 		s._add_multimesh(mesh, groups[kind][0], groups[kind][1], label)
 
 
-func _pick_kind() -> String:
+func _pick_kind(y := 0.0) -> String:
 	var r := rng.randf()
 	match track.scenery:
 		TrackTheme.Scenery.PRAIA:
 			return "palm" if r < 0.8 else "broadleaf"
 		TrackTheme.Scenery.DESERTO:
-			return "cactus" if r < 0.55 else "rock"
+			# Tamareiras na beira da água (oásis e rio); no resto, pedras e algumas palmeiras.
+			if y < terrain.water_level + 7.0:
+				return "palm" if r < 0.9 else "rock"
+			return "palm" if r < 0.22 else "rock"
 		TrackTheme.Scenery.NEVE:
 			return "pine" if r < 0.86 else "rock"
 	return "broadleaf"
@@ -221,8 +220,6 @@ func _kind_color(kind: String) -> Color:
 			if rng.randf() < 0.15:
 				return Color.from_hsv(rng.randf_range(0.95, 1.0), rng.randf_range(0.45, 0.6), 1.0)
 			return Color.from_hsv(rng.randf_range(0.25, 0.33), rng.randf_range(0.7, 0.9), rng.randf_range(0.55, 0.8))
-		"cactus":
-			return Color.from_hsv(rng.randf_range(0.27, 0.33), rng.randf_range(0.45, 0.6), rng.randf_range(0.42, 0.58))
 		"pine":
 			return Color.from_hsv(rng.randf_range(0.37, 0.43), rng.randf_range(0.55, 0.75), rng.randf_range(0.28, 0.42))
 	return TrackTheme.rock_color(track.scenery, rng)
@@ -305,35 +302,6 @@ static func _quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector
 		st.add_vertex(tri[1])
 		st.set_normal(-n)
 		st.add_vertex(tri[2])
-
-
-## Cacto: tronco e dois braços (cápsulas), sem balançar com o vento.
-static func _cactus_mesh() -> ArrayMesh:
-	var st := MeshMerge.new()
-	var trunk := CapsuleMesh.new()
-	trunk.radius = 0.42
-	trunk.height = 4.8
-	trunk.radial_segments = 10
-	trunk.rings = 4
-	st.append_from(trunk, 0, Transform3D(Basis(), Vector3(0.0, 2.2, 0.0)))
-	for arm: Vector4 in [Vector4(1.0, 1.7, 1.5, 0.3), Vector4(-1.0, 2.4, 1.1, 0.27)]:
-		var side := arm.x
-		var elbow := CapsuleMesh.new()
-		elbow.radius = arm.w
-		elbow.height = 1.05
-		elbow.radial_segments = 8
-		elbow.rings = 2
-		st.append_from(elbow, 0, Transform3D(Basis(Vector3.BACK, PI * 0.5), Vector3(side * 0.62, arm.y, 0.0)))
-		var up := CapsuleMesh.new()
-		up.radius = arm.w
-		up.height = arm.z + arm.w * 2.0
-		up.radial_segments = 8
-		up.rings = 2
-		st.append_from(up, 0, Transform3D(Basis(), Vector3(side * 1.02, arm.y + arm.z * 0.5, 0.0)))
-	var m := TrackScenery._foliage_material(0.0, 4.6, Vector3(0.0, 2.2, 0.0), 0.15)
-	m.set_shader_parameter("wind_strength", 0.0)
-	st.set_material(m)
-	return st.commit()
 
 
 ## Pedra: bolotas de poucas faces juntas.
@@ -501,165 +469,6 @@ func _build_boats() -> void:
 		var mi := s._add_mesh(sail, Transform3D(Basis(Vector3.UP, PI * 0.5), Vector3(0, 4.6, 1.6)), node)
 		mi.material_override = sails[placed % sails.size()]
 		placed += 1
-
-
-# --- Deserto: caixa-d'água, letreiro gigante e arco de pedra ------------------------------
-
-func _build_water_tower() -> void:
-	var p := _find_spot(s._outside + 10.0, s._outside + 34.0, 4.5, 900)
-	if p == Vector3.INF:
-		return
-	s._reserved.append(Vector3(p.x, p.z, 8.0))
-	var node := Node3D.new()
-	node.name = "CaixaDagua"
-	node.position = p
-	node.basis = _face_track(p)
-	s.root.add_child(node)
-	var steel := TrackScenery.color_material(Color(0.78, 0.8, 0.85), 0.4, 0.5)
-	var navy := TrackScenery.color_material(TrackScenery.NAVY, 0.45)
-	var leg_h := 13.0
-	for c: Vector2 in [Vector2(-2.2, -2.2), Vector2(2.2, -2.2), Vector2(-2.2, 2.2), Vector2(2.2, 2.2)]:
-		s._add_mesh(_box(Vector3(0.4, leg_h + 1.5, 0.4)), Transform3D(Basis(), Vector3(c.x, leg_h * 0.5 - 0.75, c.y)), node).material_override = steel
-	for y: float in [4.0, 8.5]:
-		for side in 4:
-			var b := Basis(Vector3.UP, PI * 0.5 * side)
-			s._add_mesh(_box(Vector3(4.4, 0.18, 0.18)), Transform3D(b, b * Vector3(0, y, 2.2)), node).material_override = steel
-	var radius := 3.5
-	var h := 5.2
-	var tank := s._add_mesh(_cyl(radius, radius, h, 32), Transform3D(Basis(), Vector3(0, leg_h + h * 0.5, 0)), node)
-	tank.material_override = TrackScenery.brand_material(TrackScenery.LOGO_ICON, TrackScenery.BRAND_BLUE, TAU * radius / h,
-			{"logo_fill": 0.62, "logo_count": 3, "recolor": true, "recolor_main": Color.WHITE, "recolor_accent": TrackScenery.YELLOW})
-	s._add_mesh(_cyl(0.0, radius + 0.35, 2.2, 32), Transform3D(Basis(), Vector3(0, leg_h + h + 1.1, 0)), node).material_override = navy
-	s._add_mesh(_cyl(radius + 0.1, radius + 0.1, 0.3, 32), Transform3D(Basis(), Vector3(0, leg_h + 0.15, 0)), node).material_override = navy
-
-
-## Letreiro gigante com a marca, num morro de frente para a reta de largada.
-func _build_giant_sign() -> void:
-	var start := track.get_point_at(0.0)
-	var fwd := track.get_direction_at(0.0)
-	fwd.y = 0.0
-	fwd = fwd.normalized()
-	var best := Vector3.INF
-	var best_score := -INF
-	for t in 500:
-		var x := start.x + rng.randf_range(-380.0, 380.0)
-		var z := start.z + rng.randf_range(-380.0, 380.0)
-		var to := Vector3(x - start.x, 0.0, z - start.z)
-		var dist := to.length()
-		if dist < 140.0 or dist > 360.0:
-			continue
-		var d := terrain.distance_to_track(x, z)
-		if d < 55.0:
-			continue
-		var y := terrain.height_at(x, z)
-		if y < terrain.water_level + 2.0:
-			continue
-		var score := to.normalized().dot(fwd) * 2.0 - absf(dist - 240.0) / 200.0 + clampf(y / 30.0, 0.0, 0.6)
-		if score > best_score:
-			best_score = score
-			best = Vector3(x, y, z)
-	if best == Vector3.INF:
-		return
-	var node := Node3D.new()
-	node.name = "Letreiro"
-	var facing := Vector3(start.x - best.x, 0.0, start.z - best.z)
-	node.basis = TrackScenery._panel_basis(facing)
-	node.position = best
-	s.root.add_child(node)
-	var size := Vector2(52.0, 13.0)
-	var steel := TrackScenery.color_material(Color(0.7, 0.72, 0.78), 0.45, 0.5)
-	var ground_max := -INF
-	var legs: Array[Vector3] = []
-	for k in 6:
-		var lx := lerpf(-size.x * 0.42, size.x * 0.42, k / 5.0)
-		var wp := node.transform * Vector3(lx, 0.0, -0.6)
-		var gy := terrain.height_at(wp.x, wp.z)
-		ground_max = maxf(ground_max, gy)
-		legs.append(Vector3(lx, gy - best.y, -0.6))
-	var center_y := ground_max - best.y + 6.0 + size.y * 0.5
-	for leg in legs:
-		var h := center_y - leg.y + 1.0
-		s._add_mesh(_box(Vector3(0.7, h, 0.7)), Transform3D(Basis(), Vector3(leg.x, leg.y + h * 0.5 - 1.0, leg.z)), node).material_override = steel
-	s._add_mesh(_box(Vector3(size.x + 1.0, size.y + 1.0, 0.6)), Transform3D(Basis(), Vector3(0, center_y, -0.32)), node).material_override = TrackScenery.color_material(TrackScenery.NAVY, 0.5)
-	var board := QuadMesh.new()
-	board.size = size
-	var mi := s._add_mesh(board, Transform3D(Basis(), Vector3(0, center_y, 0.0)), node)
-	mi.material_override = TrackScenery.brand_material(TrackScenery.WORDMARK, Color.WHITE, size.x / size.y, {"logo_fill": 0.72, "border_width": 0.05, "border_color": TrackScenery.YELLOW, "emission": 0.08})
-
-
-## Arco de pedra natural por cima da pista, num trecho reto.
-func _build_rock_arch() -> void:
-	var count := track.samples.size()
-	var best := -1
-	var best_score := INF
-	for i in range(int(count * 0.62), int(count * 0.96)):
-		if track.is_bridge(i) or absf(track.curvature[i]) > 0.008:
-			continue
-		var ok := true
-		for k in range(-6, 7):
-			var j := (i + k + count) % count
-			if track.is_bridge(j) or absf(track.curvature[j]) > 0.012:
-				ok = false
-				break
-		if not ok:
-			continue
-		var score := absf(track.curvature[i]) + absf(float(i) / count - 0.8)
-		if score < best_score:
-			best_score = score
-			best = i
-	if best < 0:
-		return
-	var c := track.samples[best]
-	var r := track.rights[best]
-	var t := track.tangents[best]
-	t.y = 0.0
-	t = t.normalized()
-	var radius := s._outside + 5.5
-	# Pedra em camadas (o shader de blocos com blocos largos e juntas quase da
-	# mesma cor vira faixas de arenito).
-	var mat := ShaderMaterial.new()
-	mat.shader = preload("res://shaders/stone.gdshader")
-	mat.set_shader_parameter("stone_a", Color(0.88, 0.52, 0.31))
-	mat.set_shader_parameter("stone_b", Color(0.72, 0.36, 0.21))
-	mat.set_shader_parameter("mortar", Color(0.62, 0.32, 0.19))
-	mat.set_shader_parameter("block_w", 9.0)
-	mat.set_shader_parameter("block_h", 1.3)
-	var st := MeshMerge.new()
-	var lumps := 34
-	for k in lumps + 1:
-		var a := lerpf(-0.1, PI + 0.1, float(k) / lumps)
-		var edge := 1.0 - smoothstep(0.0, 0.25, minf(a, PI - a))
-		# Mais grosso nos pés, mais fino e irregular no alto.
-		var lump := rng.randf_range(2.4, 4.0) + edge * 1.6
-		var p := c + r * cos(a) * radius + Vector3.UP * (sin(a) * radius * 0.92)
-		p += t * rng.randf_range(-1.4, 1.4) + Vector3.UP * rng.randf_range(-0.6, 0.6)
-		for extra in 2:
-			var sp := SphereMesh.new()
-			var rr := lump * (1.0 if extra == 0 else rng.randf_range(0.5, 0.75))
-			sp.radius = rr
-			sp.height = rr * 2.0 * rng.randf_range(0.8, 1.0)
-			sp.radial_segments = 7
-			sp.rings = 4
-			var off := Vector3.ZERO if extra == 0 else Vector3(rng.randf_range(-1, 1), rng.randf_range(-1, 1), rng.randf_range(-1, 1)).normalized() * lump * 0.6
-			st.append_from(sp, 0, Transform3D(Basis(Vector3.UP, rng.randf() * TAU), p + off))
-	# Pés do arco descendo até o chão.
-	for side: float in [-1.0, 1.0]:
-		for k in 4:
-			var p := c + r * side * (radius + rng.randf_range(-0.5, 2.0)) + Vector3.UP * (-2.0 + k * 1.5) + t * rng.randf_range(-2.0, 2.0)
-			var sp := SphereMesh.new()
-			sp.radius = 5.2 - k * 0.5
-			sp.height = sp.radius * 1.8
-			sp.radial_segments = 7
-			sp.rings = 4
-			st.append_from(sp, 0, Transform3D(Basis(Vector3.UP, rng.randf() * TAU), p))
-	st.set_material(mat)
-	var mi := MeshInstance3D.new()
-	mi.name = "ArcoDePedra"
-	mi.mesh = st.commit()
-	s.root.add_child(mi)
-	for side: float in [-1.0, 1.0]:
-		var p := c + r * side * radius
-		s._reserved.append(Vector3(p.x, p.z, 9.0))
 
 
 # --- Neve: chalés, bonecos de neve e neve caindo -------------------------------------------

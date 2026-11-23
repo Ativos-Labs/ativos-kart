@@ -44,7 +44,7 @@ rodapé mostra as teclas ou os botões do controle, conforme o último que foi u
   canto superior esquerdo só mostra o item guardado (vazio, ele some). O tempo e o recorde aparecem no canto superior direito quando você cruza a
   chegada — no contra-relógio o relógio fica na tela o tempo todo.
 - **Obstáculos que se mexem**, um tipo por pista (o Circuito não tem): **ondas do mar**
-  que passam por cima da mureta e varrem a pista na Ilha, **fardos de feno** rolando aos
+  que passam por cima da mureta e varrem a pista na Ilha, **tambores de coluna de templo** rolando aos
   trancos no Cânion e **bolas de neve** enormes descendo do lado do morro no Pico. Quem
   é atingido roda (a onda só empurra e balança), perde velocidade e **3 moedas**. O
   movimento segue o relógio da corrida: o padrão é o mesmo em toda corrida, dá para
@@ -68,11 +68,12 @@ rodapé mostra as teclas ou os botões do controle, conforme o último que foi u
   leva um golpe de item no meio do voo perde a asa e cai no vale — e volta para a pista
   do outro lado. Moedas no ar pelo caminho (uma fileira de cada lado).
 - **Trechos especiais** (cada pista tem o seu):
-  - **Debaixo d'água** (Circuito e Ilha): a pista mergulha no lago ou no mar. Lá embaixo a
+  - **Debaixo d'água** (Circuito, Ilha e Cânion): a pista mergulha no lago, no mar ou no
+    oásis. Lá embaixo a
     câmera fica azul-esverdeada, a superfície brilha lá em cima, raios de sol, algas, peixes,
     bolhas saindo do kart e respingo ao entrar e sair. O kart fica **mais leve** (pulos
     longos e lentos, gravidade pela metade) e um pouco mais lento.
-  - **Dunas** (Cânion): o asfalto vira areia batida que sobe e desce; rápido, o kart dá
+  - **Dunas** (Cânion): a areia sobe e desce; rápido, o kart dá
     um **pulinho na crista** de cada duna. A **areia fofa** junto das muretas segura o
     kart, e os **redemoinhos de areia movediça** puxam para o meio e giram o kart (com
     turbo dá para escapar).
@@ -85,6 +86,13 @@ rodapé mostra as teclas ou os botões do controle, conforme o último que foi u
     descida do platô é um riacho congelado que deságua no lago, e a reta final é outro
     riacho (com as bolas de neve). Cristais de gelo gigantes nas margens e um arco de
     gelo sobre cada riacho; no céu, o halo de 22° em volta do sol.
+  - **Pista de areia** (Cânion, deserto do Egito): também sem asfalto. A pista inteira é
+    **areia batida** (trilhas de pneu, ondinhas do vento, areia solta soprada por cima,
+    pedrinhas; o kart solta um pouquinho a traseira e levanta um véu de areia quando anda
+    rápido), com montes de areia no lugar das muretas — com blocos de arenito meio
+    enterrados, entalhados com a marca da Ativos e hieróglifos pintados — e uma leira de
+    areia no lugar das zebras. Depois das dunas a pista desce uma depressão até o
+    **oásis** e passa por baixo d'água no meio das ruínas de um templo afundado.
 - **Caixas de item** (com o logo "at"): passe por elas para pegar um item. Elas estouram e
   voltam depois de alguns segundos. O item aparece no **slot do canto superior esquerdo**
   (como no Mario Kart) depois de uma **roleta vertical** (os ícones descem e freiam até
@@ -331,7 +339,7 @@ traçado, extensão, voltas, curvas, dificuldade e recordes. Vagas sem pista apa
 |------------------|---------|---------------------------------------------------------------------------|
 | Circuito Ativos  | Campo   | 1,5 km. Lagos, montanhas nevadas, "S" apertado no meio. Nova volta pelo leste: sobe uma colina, salta de asa-delta sobre o **Vale da Cachoeira** (cânion de pedra com rio, pedras, ponte pênsil de madeira, cachoeira com arco-íris e pássaros) e depois **mergulha no lago** (algas, nenúfares, cardumes, barco a remo afundado, píer com a bandeira da Ativos) |
 | Ilha Ativos      | Praia   | 1,3 km. Ilha com lagoa no meio, ponte estaiada com o logo na torre (com rampa de turbo), coqueiros, guarda-sóis, veleiros, farol e ondas do mar invadindo a pista. A asa-delta sai de um penhasco sobre a **Enseada dos Penhascos** (rochas no mar, golfinhos pulando, barco encalhado, cachoeira caindo no mar com arco-íris) e a pista **mergulha no recife** (corais, estrelas-do-mar, cardumes coloridos, navio pirata naufragado com o baú do tesouro da Ativos e o submarino amarelo da Ativos) |
-| Cânion Ativos    | Deserto | 1,7 km. Traçado em "8" com o viaduto passando por cima da própria pista, ponte em arco azul sobre o rio, caixa-d'água, letreiro gigante e fardos de feno. A asa-delta cruza a **Garganta do Cânion** (paredões em degraus, rio turquesa, cachoeira no paredão, torres de pedra, arco de pedra natural, urubus) e o laço da largada virou o **mar de dunas** (sobe e desce com pulinhos, areia fofa, três redemoinhos de areia movediça, bandeirinhas de rali, esqueletos de fóssil, areia voando, arco de pedra) |
+| Cânion Ativos    | Deserto | 2,0 km, **deserto do Egito sem asfalto**: areia batida do começo ao fim num mar de dunas, largada num portal de templo (pilonos com hieróglifos, bandeiras e o disco alado com o logo). Traçado em "8" com o viaduto por cima da própria pista e um viaduto de pedra sobre o rio; a asa-delta cruza a **Garganta do Cânion** (paredões, rio com margens verdes, cachoeira, tamareiras, urubus). O laço de baixo, maior, passa pelas **dunas** (pulinhos, areia fofa, areia movediça), pula de uma rampa e desce até o **oásis** — tamareiras, papiros, lótus azuis, um cais com obeliscos e um barco à vela da Ativos, camelos bebendo água — e **mergulha** entre colunas de um templo afundado, a cabeça de um faraó e ânforas. Na volta, a **avenida de esfinges**, o portal do templo com colunata e obeliscos e a esfinge gigante; a pirâmide com a ponta de ouro e o logo "at" no meio do laço (com uma caravana de camelos dando a volta) e mais duas no horizonte |
 | Pico Nevado      | Neve    | 1,6 km, **sem asfalto**: neve batida e rio congelado do começo ao fim, num dia de sol com halo em volta do sol. Subida até o platô, viaduto de pedra sobre o rio congelado, pinheiros, chalés, bonecos de neve e bolas de neve rolando. Do alto do platô a asa-delta atravessa o **Vale Glacial** (paredões de pedra nevada, cascata congelada, rio congelado, teleférico com cabines azul e amarela indo e vindo, águias); na volta, um **riacho congelado** desce do platô por baixo de um arco de gelo e deságua no **lago congelado** (blocos de gelo, cabanas de pesca, pinguins patinando em roda), e a reta final é outro riacho com bolas de neve. Cristais de gelo gigantes nas margens e peixes nadando debaixo do gelo |
 
 Todas usam as logos da Ativos no pórtico, nas muretas, outdoors, bandeiras, balões, dirigível,
@@ -396,8 +404,10 @@ scripts/
   track_scenery.gd      Decoração: árvores, grama, flores, outdoors, placas, bandeiras,
                         arquibancada, dirigível e balões (com as logos da Ativos)
   track_theme.gd        Cores e vegetação de cada cenário (Campo, Praia, Deserto, Neve)
-  track_props.gd        Decorações de cada cenário (coqueiros, farol, veleiros, cactos,
-                        caixa-d'água, letreiro, arco de pedra, chalés, bonecos de neve)
+  track_props.gd        Decorações de cada cenário (coqueiros, farol, veleiros,
+                        tamareiras, chalés, bonecos de neve)
+  track_egypt.gd        Monumentos do deserto: pirâmides, esfinges, obeliscos, templo com
+                        colunata, ruínas, camelos (caravan.gd) e o portal de largada
   track_bridge.gd       Recurso com os dados de uma ponte (trecho, altura, rampa, estilo)
   track_bridges.gd      Monta as pontes (tabuleiro, pilares, torre estaiada, arco, viaduto)
   track_ramp.gd         Recurso com os dados de uma rampa de pulo ou de asa-delta (posição,
@@ -412,7 +422,7 @@ scripts/
   item_box.gd           Caixa de item (gira e flutua no shader, estoura e volta)
   track_coins.gd        Moedas Ativos da pista (MultiMesh, giro no shader, coleta por
                         distância, voltam depois de 12 s)
-  track_obstacles.gd    Obstáculos que se mexem (pneus, ondas, feno, bolas de neve): cada
+  track_obstacles.gd    Obstáculos que se mexem (pneus, ondas, tambores de coluna, bolas de neve): cada
                         um é uma função do relógio da corrida, sem física
   mesh_merge.gd         Junta malhas primitivas numa só sem ler a malha de volta da GPU
                         (use no lugar de SurfaceTool.append_from); gera LODs se pedir
@@ -819,6 +829,14 @@ para mudar:
   (`assets/textures/ruido.png`, `shaders/noise_tex.gdshaderinc`): com ruído por hash, a
   pista custava até ~2,7 ms a mais por quadro na web (1080p, M4); com a textura, o mesmo
   que o asfalto.
+- **Sand Track** (pista de areia, ligado no Cânion): igual ao Snow Track, com areia batida
+  (`shaders/sand_road.gdshader`, `Kart.Surface.AREIA_BATIDA`, aderência ×0,84), montes de
+  areia com blocos de arenito (`shaders/sand_bank.gdshader`) e a leira de areia; as dunas
+  e o mergulho continuam como trechos especiais. Os hieróglifos são uma textura gerada
+  (`assets/textures/hieroglifos.png`, `tools/deserto/gerar_hieroglifos.py`) usada também
+  pelo arenito dos monumentos (`shaders/egypt_stone.gdshader`). **Dune Cover** transforma o
+  chão em volta num mar de dunas (mais altas longe da pista); `mountain_start` /
+  `mountain_end` afastam as montanhas do horizonte.
 - **Paisagem:** além das alturas, `hill_bias` (colinas mais altas/baixas), `terrace_step`
   (colinas em degraus, como mesas de deserto) e `sea_distance` (a partir dessa distância da
   pista o chão desce para o mar — vira uma ilha).
@@ -947,7 +965,7 @@ o piloto do computador pega todas.
 ### Obstáculos
 
 No nó raiz, em **Obstáculos**: `obstacle_zones` são os trechos (frações da volta). O tipo
-vem do cenário (pneus gigantes quicando no Campo, ondas na Praia, feno no Deserto, neve
+vem do cenário (pneus gigantes quicando no Campo, ondas na Praia, tambores de coluna no Deserto, neve
 na Neve; o Circuito está sem trechos, mas os pneus continuam prontos para usar) e os
 ajustes de cada tipo ficam em `track_obstacles.gd` (`ROLLERS`, constantes `WAVE_*`).
 Ponha os trechos em lugares sem ponte, rampa, caixas nem turbo, com ~30 m de chão livre

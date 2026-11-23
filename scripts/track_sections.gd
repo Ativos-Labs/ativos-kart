@@ -280,6 +280,7 @@ func _build_underwater(s: TrackSection, preview: bool) -> void:
 		return
 	var node := _node("Submerso")
 	var sea := track.scenery == TrackTheme.Scenery.PRAIA
+	var oasis := track.scenery == TrackTheme.Scenery.DESERTO
 	var box := AABB(track.samples[ids[0]], Vector3.ZERO)
 	for i in ids:
 		box = box.expand(track.samples[i])
@@ -345,7 +346,7 @@ func _build_underwater(s: TrackSection, preview: bool) -> void:
 		var sc := rng.randf_range(0.6, 2.4)
 		rocks.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(sc, sc * rng.randf_range(0.5, 0.9), sc)), p - Vector3.UP * 0.3 * sc))
 		var v := rng.randf_range(0.35, 0.55)
-		rock_colors.append(Color(v, v * 0.98, v * 0.92))
+		rock_colors.append(Color(v, v * 0.98, v * 0.92) if not oasis else Color(v * 1.5, v * 1.15, v * 0.8))
 	_multimesh(TrackProps._rock_mesh(_tint), rocks, rock_colors, "Pedras", node)
 
 	if sea:
@@ -384,7 +385,232 @@ func _build_underwater(s: TrackSection, preview: bool) -> void:
 				continue
 			_add_bubble_column(node, p, wl - p.y, bubble_mat)
 
-	_build_wreck(ids, node, reach, sea)
+	if oasis:
+		_build_oasis(ids, node, reach)
+	else:
+		_build_wreck(ids, node, reach, sea)
+
+
+# --- Oásis (deserto) ------------------------------------------------------------------
+
+## Ponto da margem (na altura da água) saindo da amostra `i` para o lado `side`, ou
+## Vector3.INF (outro trecho da pista no caminho ou margem longe demais).
+func _shore_point(i: int, side: float, wl: float) -> Vector3:
+	var out := track.rights[i] * side
+	for d in range(int(_outside) + 6, 130, 2):
+		var p := track.samples[i] + out * d
+		if terrain.distance_to_track(p.x, p.z) < d - 4.0:
+			return Vector3.INF
+		if terrain.height_at(p.x, p.z) > wl + 0.15:
+			return Vector3(p.x, wl, p.z)
+	return Vector3.INF
+
+
+## O oásis do deserto em volta do mergulho: tamareiras e papiros na margem verde, um
+## cais de pedra com obeliscos e um barco à vela (felucca) com a marca, camelos bebendo
+## água e, no fundo, as ruínas de um templo afundado (colunas saindo da água, colunas
+## caídas, a cabeça de um faraó e ânforas).
+func _build_oasis(ids: PackedInt32Array, node: Node3D, reach: float) -> void:
+	var wl := track.water_level
+	var egypt := TrackEgypt.new(track, terrain, root)
+	# Margens: pontos onde a água encontra a areia, dos dois lados.
+	var shores: Array[Array] = []
+	for n in range(0, ids.size(), 2):
+		for side: float in [-1.0, 1.0]:
+			var sp := _shore_point(ids[n], side, wl)
+			if sp != Vector3.INF:
+				shores.append([sp, track.rights[ids[n]] * side])
+	if shores.is_empty():
+		return
+	# Tamareiras inclinadas para a água.
+	var palm_x: Array[Transform3D] = []
+	var palm_c: Array[Color] = []
+	var tries := 0
+	while palm_x.size() < 90 and tries < 1200:
+		tries += 1
+		var sh: Array = shores[rng.randi() % shores.size()]
+		var out: Vector3 = sh[1]
+		var along := Vector3(-out.z, 0.0, out.x)
+		var p: Vector3 = sh[0] + out * rng.randf_range(1.5, 22.0) + along * rng.randf_range(-6.0, 6.0)
+		var y := terrain.height_at(p.x, p.z)
+		if y < wl + 0.3 or y > wl + 7.0 or terrain.distance_to_track(p.x, p.z) < _outside + 4.0:
+			continue
+		var lean := Basis(out.cross(Vector3.UP).normalized(), rng.randf_range(0.04, 0.22))
+		var sc := rng.randf_range(0.85, 1.45)
+		palm_x.append(Transform3D(lean * Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * sc), Vector3(p.x, y - 0.15, p.z)))
+		palm_c.append(Color.from_hsv(rng.randf_range(0.24, 0.32), rng.randf_range(0.65, 0.85), rng.randf_range(0.5, 0.72)))
+	_multimesh(TrackProps._palm_mesh(), palm_x, palm_c, "Tamareiras", node, true)
+	# Touceiras de papiro na linha d'água.
+	var papyrus := _papyrus_mesh()
+	var pap_x: Array[Transform3D] = []
+	var pap_c: Array[Color] = []
+	for k in 160:
+		var sh: Array = shores[rng.randi() % shores.size()]
+		var out: Vector3 = sh[1]
+		var along := Vector3(-out.z, 0.0, out.x)
+		var p: Vector3 = sh[0] + out * rng.randf_range(-2.5, 1.5) + along * rng.randf_range(-6.0, 6.0)
+		var y := terrain.height_at(p.x, p.z)
+		if y < wl - 1.2 or y > wl + 0.8 or terrain.distance_to_track(p.x, p.z) < _outside + 1.0:
+			continue
+		pap_x.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * rng.randf_range(0.7, 1.3)), Vector3(p.x, y - 0.1, p.z)))
+		pap_c.append(Color.from_hsv(rng.randf_range(0.22, 0.3), rng.randf_range(0.55, 0.8), rng.randf_range(0.55, 0.8)))
+	_multimesh(papyrus, pap_x, pap_c, "Papiros", node)
+
+	# Templo afundado: colunas em pé saindo da água, colunas caídas e a cabeça do faraó.
+	var col_mesh := egypt.column_mesh(10.0, 0.85)
+	var cols: Array[Transform3D] = []
+	for k in 40:
+		if cols.size() >= 7:
+			break
+		var p := _spot_beside(ids, _outside + 5.0, minf(reach * 0.6, 36.0), 4.0)
+		if p == Vector3.INF or p.y > wl - 3.0:
+			continue
+		var h := rng.randf_range(0.65, 1.0) if cols.size() > 1 else 1.0
+		var tilt := Basis(Vector3(rng.randf_range(-1, 1), 0, rng.randf_range(-1, 1)).normalized(), rng.randf_range(0.0, 0.12))
+		cols.append(Transform3D(tilt * Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(1.0, h, 1.0)), p - Vector3.UP * 0.6))
+	for k in 4:
+		var p := _spot_beside(ids, _outside + 3.0, minf(reach * 0.6, 34.0), 3.0)
+		if p == Vector3.INF or p.y > wl - 2.0:
+			continue
+		var lie := Basis(Vector3.UP, rng.randf() * TAU) * Basis(Vector3.FORWARD, PI * 0.5 + rng.randf_range(-0.08, 0.08))
+		cols.append(Transform3D(lie.scaled(Vector3(1.0, rng.randf_range(0.5, 0.9), 1.0)), p + Vector3.UP * 0.6))
+	_multimesh(col_mesh, cols, [], "ColunasAfundadas", node, true)
+	for k in 30:
+		var p := _spot_beside(ids, _outside + 8.0, minf(reach * 0.55, 30.0), 6.0)
+		if p == Vector3.INF or p.y > wl - 4.0:
+			continue
+		var near_i := terrain.nearest_track_index(p.x, p.z)
+		var face := _facing(track.samples[near_i] - p) if near_i >= 0 else Basis()
+		var tilt := Basis(face.x, rng.randf_range(0.15, 0.35)) * Basis(face.z, rng.randf_range(-0.25, 0.25))
+		_add(egypt.pharaoh_head_mesh(), Transform3D(tilt * face.scaled(Vector3.ONE * 1.25), p - Vector3.UP * 1.1), node).name = "CabecaDoFarao"
+		break
+	# Ânforas espalhadas no fundo.
+	var amphora := _amphora_mesh()
+	var am_x: Array[Transform3D] = []
+	for k in 60:
+		var p := _spot_beside(ids, _outside + 1.0, minf(reach * 0.6, 34.0), 1.0)
+		if p == Vector3.INF or p.y > wl - 1.5:
+			continue
+		var lying := rng.randf() < 0.55
+		var b := Basis(Vector3.UP, rng.randf() * TAU)
+		if lying:
+			b = b * Basis(Vector3.FORWARD, PI * 0.5 + rng.randf_range(-0.3, 0.3))
+		am_x.append(Transform3D(b.scaled(Vector3.ONE * rng.randf_range(0.8, 1.3)), p + Vector3.UP * (0.3 if lying else -0.05)))
+	_multimesh(amphora, am_x, [], "Anforas", node)
+
+	# Cais de pedra entrando na água, com dois obeliscos, o barco e camelos.
+	var best: Array = []
+	var best_slope := INF
+	for sh: Array in shores:
+		var p: Vector3 = sh[0]
+		var out: Vector3 = sh[1]
+		var land := p + out * 8.0
+		var rise := terrain.height_at(land.x, land.z) - wl
+		if rise > 0.6 and rise < best_slope and terrain.distance_to_track(p.x, p.z) > _outside + 16.0:
+			best_slope = rise
+			best = sh
+	if best.is_empty():
+		return
+	var shore: Vector3 = best[0]
+	var out: Vector3 = best[1]
+	var face := _facing(-out)
+	var quay := Node3D.new()
+	quay.name = "Cais"
+	quay.transform = Transform3D(face, shore)
+	node.add_child(quay)
+	# Plataforma (frente = +Z, para dentro d'água) e degraus descendo para a água.
+	var floor_y := terrain.height_at(shore.x - out.x * 6.0, shore.z - out.z * 6.0) - wl
+	var md := Track.MeshData.new()
+	TrackEgypt.frustum(md, 9.0, 9.0, 9.0, 9.0, 0.7 - floor_y + 0.5, floor_y - 0.5, Vector3(0, 0, 1.0))
+	for k in 3:
+		TrackEgypt.frustum(md, 7.0, 1.0, 7.0, 1.0, 0.5 - 0.3 * (k + 1) - floor_y, floor_y, Vector3(0, 0, 5.9 + k * 0.95))
+	_add(md.to_mesh(egypt.stone({"block_w": 1.6, "block_h": 0.5, "sand_cover": 0.3})), Transform3D(), quay)
+	var ob := egypt.obelisk_mesh(8.0, 1.0)
+	for sx: float in [-3.6, 3.6]:
+		_add(ob, Transform3D(Basis(), Vector3(sx, 0.7, -2.6)), quay)
+	_build_felucca(quay, Vector3(5.5, 0.0, 9.5))
+	# Camelos na margem, olhando a água.
+	var camel := egypt.camel_mesh()
+	for k in 3:
+		var sh: Array = shores[rng.randi() % shores.size()]
+		var p: Vector3 = sh[0] + (sh[1] as Vector3) * rng.randf_range(3.0, 6.0)
+		var y := terrain.height_at(p.x, p.z)
+		if y < wl + 0.2 or y > wl + 3.0 or terrain.distance_to_track(p.x, p.z) < _outside + 6.0:
+			continue
+		var cf := _facing(-(sh[1] as Vector3)).rotated(Vector3.UP, rng.randf_range(-0.6, 0.6))
+		_add(camel, Transform3D(cf, Vector3(p.x, y, p.z)), node).name = "Camelo"
+
+
+## Touceira de papiro: hastes finas e a copa em leque no alto (cor do caule em COLOR).
+func _papyrus_mesh() -> ArrayMesh:
+	var st := MeshMerge.new()
+	for k in 7:
+		var a := TAU * k / 7.0 + 0.3
+		var lean := Basis(Vector3(cos(a), 0.0, sin(a)).cross(Vector3.UP).normalized(), -0.12 - (k % 3) * 0.06)
+		var h := 1.8 + (k % 3) * 0.45
+		st.append_from(_cyl(0.025, 0.045, h, 5), 0, Transform3D(lean, lean * Vector3(0, h * 0.5, 0)))
+		st.append_from(_sphere(0.22, 7), 0, Transform3D(lean * Basis.from_scale(Vector3(1.0, 0.55, 1.0)), lean * Vector3(0, h + 0.05, 0)), Color(0.8, 0.9, 0.55))
+	st.set_material(_tint)
+	return st.commit()
+
+
+## Ânfora de barro com uma faixa pintada.
+func _amphora_mesh() -> ArrayMesh:
+	var clay := Color(0.74, 0.4, 0.24)
+	var st := MeshMerge.new()
+	st.append_from(_sphere(1.0, 10), 0, Transform3D(Basis.from_scale(Vector3(0.36, 0.52, 0.36)), Vector3(0, 0.55, 0)), clay)
+	st.append_from(_cyl(0.37, 0.37, 0.1, 10), 0, Transform3D(Basis(), Vector3(0, 0.62, 0)), Color(0.15, 0.12, 0.12))
+	st.append_from(_cyl(0.11, 0.15, 0.4, 8), 0, Transform3D(Basis(), Vector3(0, 1.15, 0)), clay)
+	st.append_from(_cyl(0.16, 0.13, 0.08, 8), 0, Transform3D(Basis(), Vector3(0, 1.36, 0)), clay)
+	st.append_from(_cyl(0.0, 0.12, 0.25, 6), 0, Transform3D(Basis(Vector3.RIGHT, PI), Vector3(0, 0.08, 0)), clay)
+	for side: float in [-1.0, 1.0]:
+		st.append_from(_box(Vector3(0.05, 0.32, 0.06)), 0, Transform3D(Basis(Vector3.BACK, side * 0.4), Vector3(side * 0.2, 1.1, 0)), clay)
+	st.set_material(_tint)
+	return st.commit()
+
+
+## Barco à vela do Nilo (felucca) amarrado no cais, balançando na água: casco de
+## madeira com faixa azul, mastro e a vela triangular com a marca.
+func _build_felucca(parent: Node3D, at: Vector3) -> void:
+	var boat := Node3D.new() if Engine.is_editor_hint() else DriftingProp.new()
+	boat.name = "Felucca"
+	if boat is DriftingProp:
+		var dp := boat as DriftingProp
+		dp.orbit_radius = 0.0
+		dp.bob_height = 0.07
+		dp.bob_speed = 1.1
+		dp.spin_speed = 0.0
+	var wood := Color(0.52, 0.33, 0.18)
+	var hull := _parts([
+		[_box(Vector3(1.7, 0.6, 5.6)), Transform3D(Basis(), Vector3(0, 0.05, 0)), wood],
+		[_box(Vector3(1.2, 0.6, 1.4)), Transform3D(Basis(Vector3.RIGHT, 0.35), Vector3(0, 0.22, 3.1)), wood],
+		[_box(Vector3(1.2, 0.6, 1.2)), Transform3D(Basis(Vector3.RIGHT, -0.3), Vector3(0, 0.2, -3.0)), wood],
+		[_box(Vector3(1.74, 0.14, 5.64)), Transform3D(Basis(), Vector3(0, 0.3, 0)), TrackScenery.BRAND_BLUE],
+		[_box(Vector3(1.5, 0.06, 5.2)), Transform3D(Basis(), Vector3(0, 0.36, 0)), Color(0.7, 0.55, 0.35)],
+		[_cyl(0.07, 0.09, 7.0, 6), Transform3D(Basis(), Vector3(0, 3.8, 1.2)), Color(0.4, 0.26, 0.14)],
+		[_cyl(0.05, 0.05, 8.6, 6), Transform3D(Basis(Vector3.RIGHT, 1.05), Vector3(0, 5.2, 0.4)), Color(0.4, 0.26, 0.14)],
+	], _tint)
+	var mi := MeshInstance3D.new()
+	mi.mesh = hull
+	boat.add_child(mi)
+	# Vela triangular presa na verga inclinada.
+	var top := Vector3(0, 5.2, 0.4) + Basis(Vector3.RIGHT, 1.05) * Vector3(0, 4.2, 0)
+	var low := Vector3(0, 5.2, 0.4) + Basis(Vector3.RIGHT, 1.05) * Vector3(0, -4.2, 0)
+	var foot := Vector3(0, 1.1, -2.3)
+	var sail := Track.MeshData.new()
+	var n := Vector3.RIGHT
+	sail.add_vertex(top, n, Vector2(0.5, 0.0))
+	sail.add_vertex(low, n, Vector2(1.0, 1.0))
+	sail.add_vertex(foot, n, Vector2(0.0, 1.0))
+	sail.add_tri(0, 1, 2, n)
+	var sail_mat := TrackScenery.brand_material(LOGO_ICON, Color(0.97, 0.95, 0.9), 1.0, {"logo_fill": 0.42, "recolor": true,
+			"recolor_main": TrackScenery.BRAND_BLUE, "recolor_accent": TrackScenery.YELLOW})
+	var sail_mi := MeshInstance3D.new()
+	sail_mi.mesh = sail.to_mesh(sail_mat)
+	boat.add_child(sail_mi)
+	boat.position = at + Vector3.UP * 0.05
+	boat.rotation.y = 0.25
+	parent.add_child(boat)
 
 
 func _shaft_mesh(material: Material) -> ArrayMesh:
@@ -509,7 +735,11 @@ func _build_lily_pads(ids: PackedInt32Array, node: Node3D, s: TrackSection) -> v
 			pc.append(Color.from_hsv(rng.randf_range(0.24, 0.32), 0.75, rng.randf_range(0.45, 0.7)))
 			if rng.randf() < 0.18:
 				fx.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU), cluster + o + Vector3.UP * 0.03))
-				fc.append(Color(1.0, 0.55, 0.75) if rng.randf() < 0.7 else Color(1, 1, 1))
+				if track.scenery == TrackTheme.Scenery.DESERTO:
+					# Lótus azul do Nilo.
+					fc.append(Color(0.45, 0.6, 1.0) if rng.randf() < 0.7 else Color(1, 1, 1))
+				else:
+					fc.append(Color(1.0, 0.55, 0.75) if rng.randf() < 0.7 else Color(1, 1, 1))
 	_multimesh(pad, px, pc, "Nenufares", node)
 	_multimesh(flower, fx, fc, "FloresDeLotus", node)
 
@@ -1326,7 +1556,7 @@ func _build_valley_trees(node: Node3D, line: PackedVector3Array, half_top: float
 		TrackTheme.Scenery.PRAIA:
 			mesh = TrackProps._palm_mesh()
 		TrackTheme.Scenery.DESERTO:
-			mesh = TrackProps._cactus_mesh()
+			mesh = TrackProps._palm_mesh()
 		TrackTheme.Scenery.NEVE:
 			mesh = TrackScenery._pine_mesh(1.0)
 		_:
