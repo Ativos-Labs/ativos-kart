@@ -3,6 +3,9 @@ render_mode diffuse_burley, specular_schlick_ggx;
 // Asfalto: granulado com relevo, trilho mais gasto no meio, faixas brancas,
 // linha de chegada quadriculada, grid de largada e o logo "at" pintado no chão.
 // UV.x = 0..1 de uma borda à outra; UV.y = metros ao longo da pista.
+// Trechos especiais (COLOR por vértice, veja Track._road_colors): r = areia batida das
+// dunas (marcas de vento, trilhas de pneu e areia fofa nas bordas), g = debaixo d'água
+// (algas, areia e cáusticas), b = gelo (liso, com rachaduras e geada).
 
 #include "res://shaders/noise.gdshaderinc"
 
@@ -22,6 +25,18 @@ uniform float logo_start = 16.0;
 uniform float logo_length = 12.0;
 uniform float logo_width = 10.0;
 
+// Areia batida das dunas e a faixa de areia fofa junto das bordas (m).
+uniform vec3 sand_light : source_color = vec3(0.93, 0.76, 0.5);
+uniform vec3 sand_dark : source_color = vec3(0.78, 0.56, 0.33);
+uniform float soft_edge = 2.2;
+uniform vec3 ice_light : source_color = vec3(0.66, 0.84, 0.97);
+uniform vec3 ice_dark : source_color = vec3(0.24, 0.5, 0.78);
+
+varying vec3 special;
+
+void vertex() {
+	special = COLOR.rgb;
+}
 float box(vec2 p, vec2 center, vec2 half_size, float aa) {
 	vec2 d = abs(p - center) - half_size;
 	float dist = max(d.x, d.y);
@@ -112,8 +127,51 @@ void fragment() {
 		paint = max(paint, m);
 	}
 
+	float sand_f = special.r;
+	float under_f = special.g;
+	float ice_f = special.b;
+	// Nas dunas e no gelo a tinta das faixas some (o logo da largada nunca fica lá).
+	paint *= 1.0 - max(sand_f, ice_f) * 0.92;
 	col = mix(col, paint_col * (0.92 + n_paint * 0.08), paint);
 	rough = mix(rough, 0.5, paint);
+	float spec = 0.45;
+
+	if (sand_f > 0.001) {
+		// Marcas do vento (ondinhas) e trilhas de pneu mais escuras no meio.
+		float warp = vnoise(p * vec2(0.09, 0.05)) * 6.0;
+		float ripple = sin((p.x * 0.6 + p.y * 1.0) * 2.3 + warp) * 0.5 + 0.5;
+		float tracks = exp(-pow((abs(lateral) - 1.7) / 0.9, 2.0)) * (0.6 + 0.4 * n_big);
+		vec3 sand_col = mix(sand_dark, sand_light, 0.35 + 0.4 * n_mid + 0.15 * ripple * (1.0 - lod));
+		sand_col *= 1.0 - tracks * 0.16;
+		// Areia fofa nas bordas: mais clara, ondulada e fofa.
+		float soft = smoothstep(soft_edge, soft_edge * 0.45, edge);
+		sand_col = mix(sand_col, sand_light * (0.96 + 0.08 * ripple), soft * 0.75);
+		col = mix(col, sand_col, sand_f);
+		rough = mix(rough, 0.95, sand_f);
+		spec = mix(spec, 0.2, sand_f);
+	}
+	if (ice_f > 0.001) {
+		float frost = fbm(p * 0.07, 3);
+		float c1 = abs(vnoise(p * 0.21) - 0.5);
+		float c2 = abs(vnoise(p * 0.53 + 7.3) - 0.5);
+		float crack = (1.0 - smoothstep(0.0, 0.015, c1)) * 0.7 + (1.0 - smoothstep(0.0, 0.01, c2)) * 0.4;
+		vec3 ice_col = mix(ice_dark, ice_light, smoothstep(0.35, 0.9, frost) * 0.8);
+		ice_col = mix(ice_col, ice_dark * 0.55, crack * (1.0 - smoothstep(0.55, 0.8, frost)));
+		// Geada nas bordas e marcas brancas dos pneus no meio.
+		ice_col = mix(ice_col, vec3(0.93, 0.96, 1.0), smoothstep(1.6, 0.4, edge) * 0.7 + wear * 0.12);
+		col = mix(col, ice_col, ice_f);
+		rough = mix(rough, mix(0.06, 0.35, smoothstep(0.45, 0.8, frost)), ice_f);
+		spec = mix(spec, 0.75, ice_f);
+	}
+	if (under_f > 0.001) {
+		// Fundo do lago/mar: asfalto escurecido com algas e areia por cima.
+		float algae = smoothstep(0.5, 0.75, fbm(p * 0.11 + 3.0, 2));
+		float drift = smoothstep(0.55, 0.8, vnoise(p * vec2(0.18, 0.06) + 9.0));
+		vec3 bed = mix(col * vec3(0.8, 0.9, 0.88), vec3(0.18, 0.36, 0.2), algae * 0.55);
+		bed = mix(bed, sand_light * 0.85, drift * 0.5);
+		col = mix(col, bed, under_f);
+		rough = mix(rough, 0.85, under_f);
+	}
 
 	// Linha de chegada quadriculada com bordas brancas.
 	if (abs(s) < 1.25 && edge > curb_min) {
@@ -135,5 +193,10 @@ void fragment() {
 
 	ALBEDO = col;
 	ROUGHNESS = rough;
-	SPECULAR = 0.45;
+	SPECULAR = spec;
+	if (under_f > 0.001) {
+		// Luz do sol dançando no fundo.
+		vec3 wp = (INV_VIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;
+		EMISSION = vec3(0.55, 0.85, 0.8) * caustics(wp.xz, TIME) * under_f * 0.5;
+	}
 }

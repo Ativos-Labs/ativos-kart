@@ -56,6 +56,11 @@ const ENGINE_VOICE_KEEP := 4.0
 ## Camada de desenho (1..20) da etiqueta "J1" em cima do kart do J1; a do J2 é a
 ## seguinte, e assim por diante. A câmera de cada jogador não vê a etiqueta dele.
 const TAG_LAYER := 11
+## Quem cai no vale (no vão sem pista) volta para a pista do outro lado quando fica
+## esta altura (m) abaixo da linha entre as duas bordas.
+const GAP_FALL := 6.0
+## Quantos metros depois da beira do pouso a asa-delta começa a descer para pousar.
+const LAND_AFTER_EDGE := 3.0
 
 
 ## Um kart na corrida (um jogador ou um adversário).
@@ -149,6 +154,10 @@ var _count_step := 0
 var _finish_timer := -1.0
 var _record_class := ""
 var _engine_voice_timer := 0.0
+## Ambiente da câmera debaixo d'água (névoa azul), se a pista tiver mergulho.
+var _underwater_env: Environment
+## Altura (global) da água da pista.
+var _water_y := -INF
 
 
 func _ready() -> void:
@@ -187,6 +196,7 @@ func _setup() -> void:
 	if GameState.is_multiplayer():
 		_setup_split_screen()
 	await _yield_if_busy()
+	_setup_underwater_view()
 	await _build_grid()
 	await _yield_if_busy()
 	_setup_views()
@@ -344,6 +354,8 @@ func _add_racer(character: CharacterData, kart_data: KartData, slot_index: int, 
 	karts_root.add_child(k)
 	k.set_skid_marks(skid_marks)
 	k.set_ground_theme(track.scenery)
+	if track.has_water_sections():
+		k.set_water_level(track.global_position.y + track.water_level)
 	k.obstacle_hit.connect(_on_obstacle_hit.bind(k))
 	var row := slot_index >> 1
 	var column := slot_index % 2
@@ -394,6 +406,7 @@ func _connect_human(r: Racer) -> void:
 	k.coin_collected.connect(_on_coin_collected.bind(r))
 	k.coins_changed.connect(_on_coins_changed.bind(r))
 	k.obstacle_hit.connect(_on_human_hit.bind(r))
+	k.splashed.connect(_on_kart_splashed.bind(r))
 
 
 ## Câmera e HUD de cada jogador. Sozinho: a câmera e o HUD da cena, como sempre. Na
@@ -586,6 +599,16 @@ func warm_up() -> void:
 			for i in 2:
 				await RenderingServer.frame_post_draw
 		track.obstacles.prewarm(false)
+	# Trechos especiais (fundo do mar, dunas, gelo, vale com a cachoeira), cada um
+	# com o ambiente que a câmera vai usar ali.
+	for view in track.section_views():
+		var xf: Transform3D = track.global_transform * view.xform
+		cam.global_transform = xf
+		cam.environment = _underwater_env if view.under and _underwater_env else null
+		cam.reset_physics_interpolation()
+		for i in 2:
+			await RenderingServer.frame_post_draw
+	cam.environment = null
 	# Volta inteira olhando para a frente, na altura da câmera.
 	for i in WARM_UP_VIEWS:
 		var along := track.length * (float(i) + 0.5) / WARM_UP_VIEWS
@@ -630,6 +653,9 @@ func _physics_process(delta: float) -> void:
 			race_time += delta
 	if ghost_kart and state != State.COUNTDOWN:
 		ghost_kart.show_at(race_time, delta)
+	if _underwater_env:
+		for r in humans:
+			_update_underwater_view(r)
 	var lead := _lead_human_progress()
 	for r in racers:
 		_update_racer(r, delta, lead)
@@ -769,11 +795,27 @@ func _update_racer(r: Racer, delta: float, lead: float) -> void:
 		step += track.length
 	elif step > track.length * 0.5:
 		step -= track.length
+	if step > 0.0 and not track.dune_crests.is_empty():
+		for crest in track.dune_crests:
+			if fposmod(crest - r.along, track.length) < step:
+				k.crest_hop()
 	r.progress += step
 	r.along = along
 	r.index = index
 	var lateral := track.get_lateral(local, index)
 	k.is_offroad = absf(lateral) > track.road_width * 0.5 + 0.4
+	k.surface = track.surface_at(index, lateral)
+	# Asa-delta: passou da beira do outro lado do vale, desce para pousar logo ali.
+	if k.gliding and not k.is_glide_landing() and not track.gap_spans.is_empty():
+		var past := track.past_gap(index)
+		if past >= LAND_AFTER_EDGE and past < 200.0:
+			k.glide_land()
+	if k.surface == Kart.Surface.AREIA_MOVEDICA:
+		var pit := track.pit_center(index, lateral)
+		var c := track.global_transform * Vector3(pit.x, pit.y, pit.z)
+		k.pit_center = Vector4(c.x, c.y, c.z, pit.w)
+	else:
+		k.pit_center = Vector4.INF
 
 	if state == State.COUNTDOWN:
 		return
@@ -782,13 +824,28 @@ func _update_racer(r: Racer, delta: float, lead: float) -> void:
 		if done > r.laps_done:
 			r.laps_done = done
 			_on_lap_completed(r)
-	if k.global_position.y < -20.0:
+	if k.global_position.y < -20.0 or _fell_into_valley(r):
 		_respawn(r)
 	elif r.ai:
 		r.ai.gap_to_player = r.progress - lead
 		# Parado de propósito (rivais parados do modo dev) não precisa de resgate.
 		if k.controls_enabled:
 			_check_rescue(r, lateral, delta)
+
+
+## Caiu no vale (abaixo da linha entre as bordas do vão, sem a asa-delta)?
+func _fell_into_valley(r: Racer) -> bool:
+	var n := track.samples.size()
+	var near := track.is_gap(r.index)
+	# Logo depois do vão também: quem chega abaixo da beira do pouso passa por baixo dela.
+	for k in range(1, 9):
+		if near:
+			break
+		near = track.is_gap((r.index - k + n) % n)
+	if not near:
+		return false
+	var line_y := (track.global_transform * track.samples[r.index]).y
+	return r.kart.global_position.y < line_y - GAP_FALL and not r.kart.gliding
 
 
 ## Adversário encalhado, fora da pista ou caído de uma ponte: volta para a pista.
@@ -1130,6 +1187,9 @@ func _cooldown_autopilot(k: Kart, r: Racer) -> Dictionary:
 func _respawn(r: Racer) -> void:
 	var local := track.to_local(r.kart.global_position)
 	var index := track.get_closest_index(local, r.index)
+	# Caiu no vale: volta do outro lado, um pouco depois da borda.
+	if track.is_gap(index) or track.is_gap((index + 1) % track.samples.size()):
+		index = (track.gap_exit(index) + 4) % track.samples.size()
 	var dist := track.distances[index]
 	var xf := track.get_transform_at(dist, _free_lateral(dist, r.kart))
 	xf.origin += Vector3.UP * 0.6
@@ -1232,6 +1292,52 @@ func _on_glider_opened(r: Racer) -> void:
 
 func _on_glider_closed() -> void:
 	Sfx.play(self, &"glider_close", -9.0)
+
+
+## O kart de um jogador entrou ou saiu da água.
+func _on_kart_splashed(entering: bool, r: Racer) -> void:
+	Sfx.play(self, &"splash", -9.0 if entering else -11.0, 1.15 if entering else 0.9)
+	r.camera.shake(0.1)
+
+
+# --- Debaixo d'água -----------------------------------------------------------------
+
+## Pista com mergulho: um ambiente igual ao da pista, só com a névoa azul-esverdeada
+## da água, que a câmera de cada jogador usa quando passa abaixo da superfície. Só
+## mudam valores (a névoa já está ligada): trocar não recompila shaders.
+func _setup_underwater_view() -> void:
+	if not track.has_underwater():
+		return
+	_water_y = track.global_position.y + track.water_level
+	var base := get_world_3d().environment
+	var we := track.find_child("WorldEnvironment", false, false) as WorldEnvironment
+	if we and we.environment:
+		base = we.environment
+	if base == null:
+		return
+	var env := base.duplicate() as Environment
+	var tint := TrackTheme.underwater_fog(track.scenery)
+	env.fog_enabled = true
+	env.fog_light_color = tint
+	env.fog_light_energy = 1.0
+	env.fog_sun_scatter = 0.0
+	env.fog_density = 0.03
+	env.fog_aerial_perspective = 0.0
+	env.fog_sky_affect = 1.0
+	env.adjustment_enabled = true
+	env.adjustment_saturation = base.adjustment_saturation * 1.05
+	env.adjustment_brightness = 0.92
+	_underwater_env = env
+
+
+func _update_underwater_view(r: Racer) -> void:
+	var cam := r.camera
+	if cam == null:
+		return
+	var below := cam.global_position.y < _water_y - 0.05
+	var env: Environment = _underwater_env if below else null
+	if cam.environment != env:
+		cam.environment = env
 
 
 ## Moeda pega por um jogador.

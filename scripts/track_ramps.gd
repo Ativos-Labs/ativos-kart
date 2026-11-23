@@ -48,6 +48,9 @@ func _build_ramp(ramp: TrackRamp) -> void:
 	var inner_half := track.road_width * 0.5 - track.curb_min_width - 0.1
 	var half := inner_half * ramp.width
 	var center := ramp.offset * (inner_half - half)
+	if ramp.full_width:
+		half = track.road_width * 0.5 + track.shoulder_width - 0.05
+		center = 0.0
 	var run := 1.0 / tan(SKIRT_ANGLE)
 	var steps := maxi(4, ceili(ramp.length / STEP))
 
@@ -83,17 +86,19 @@ func _build_ramp(ramp: TrackRamp) -> void:
 		md.add_tri(a, a + 1, a + 2, md.normals[a])
 		md.add_tri(a + 1, a + 3, a + 2, md.normals[a])
 
-	# Saias laterais inclinadas (do topo até o asfalto).
+	# Saias laterais inclinadas (do topo até o asfalto). Na rampa de mureta a mureta
+	# as laterais são retas (encostadas nas muretas).
+	var skirt_run := 0.0 if ramp.full_width else run
 	for side: float in [-1.0, 1.0]:
 		base = md.verts.size()
 		for i in steps + 1:
 			var out := rights[i] * side
-			var n := (Vector3.UP * cos(SKIRT_ANGLE) + out * sin(SKIRT_ANGLE)).normalized()
+			var n := out if ramp.full_width else (Vector3.UP * cos(SKIRT_ANGLE) + out * sin(SKIRT_ANGLE)).normalized()
 			var top := mid[i] + out * half
 			var h := heights[i]
 			var v := ramp.length * float(i) / steps
 			md.add_vertex(top, n, Vector2(0.0, v))
-			md.add_vertex(top + out * (h * run) + Vector3.DOWN * (h + 0.03), n, Vector2(h / sin(SKIRT_ANGLE) + 0.03, v))
+			md.add_vertex(top + out * (h * skirt_run) + Vector3.DOWN * (h + 0.03), n, Vector2(h / sin(SKIRT_ANGLE) + 0.03, v))
 			md.colors.append_array([skirt_color, skirt_color])
 		for i in steps:
 			var a := base + i * 2
@@ -109,8 +114,8 @@ func _build_ramp(ramp: TrackRamp) -> void:
 	var top_l := mid[steps] - lip_right * half
 	var top_r := mid[steps] + lip_right * half
 	var drop := Vector3.DOWN * (lip_h + 0.03)
-	var foot_l := top_l - lip_right * (lip_h * run) + drop
-	var foot_r := top_r + lip_right * (lip_h * run) + drop
+	var foot_l := top_l - lip_right * (lip_h * skirt_run) + drop
+	var foot_r := top_r + lip_right * (lip_h * skirt_run) + drop
 	base = md.verts.size()
 	for p: Vector3 in [foot_l, top_l, top_r, foot_r]:
 		md.add_vertex(p, lip_dir, Vector2((p - foot_l).dot(lip_right), p.y - foot_l.y))

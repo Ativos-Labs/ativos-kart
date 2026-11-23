@@ -855,7 +855,13 @@ func _move_trap(s: Shot, delta: float) -> void:
 		s.pos += s.vel * delta
 		_bounce(s)
 		var gy := _ground_under(s)
-		if s.pos.y <= gy and s.vel.y < 0.0:
+		var track: Track = race.track
+		if track.is_gap(s.index):
+			# Em cima do vão de um vale não há chão: a armadilha cai no vale e some.
+			if s.pos.y < gy - 6.0:
+				_vanish(s)
+				return
+		elif s.pos.y <= gy and s.vel.y < 0.0:
 			s.pos.y = gy
 			s.vel = Vector3.ZERO
 			s.phase = Phase.GROUND

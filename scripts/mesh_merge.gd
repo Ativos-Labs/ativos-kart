@@ -22,10 +22,14 @@ var _normals := PackedVector3Array()
 var _tangents := PackedFloat32Array()
 var _uvs := PackedVector2Array()
 var _indices := PackedInt32Array()
+var _colors := PackedColorArray()
+var _has_colors := false
 var _material: Material
 
 
-func append_from(mesh: PrimitiveMesh, _surface: int, xform: Transform3D) -> void:
+## `color` (opcional) vira a cor de vértice da peça (COLOR no shader): peças de cores
+## diferentes na mesma superfície.
+func append_from(mesh: PrimitiveMesh, _surface: int, xform: Transform3D, color := Color.WHITE) -> void:
 	var scale := _unit_scale(mesh)
 	var scalable := scale != Vector3.ZERO
 	var key := _unit_key(mesh, scale) if scalable else _full_key(mesh)
@@ -61,6 +65,13 @@ func append_from(mesh: PrimitiveMesh, _surface: int, xform: Transform3D) -> void
 		var t := (pos_basis * Vector3(src_t[i * 4], src_t[i * 4 + 1], src_t[i * 4 + 2])).normalized()
 		_tangents.append_array([t.x, t.y, t.z, src_t[i * 4 + 3] * flip])
 	_uvs.append_array(src_uv)
+	if color != Color.WHITE or _has_colors:
+		if not _has_colors:
+			_has_colors = true
+			_colors.resize(base)
+			_colors.fill(Color.WHITE)
+		for i in src_v.size():
+			_colors.append(color)
 	for index in src_i:
 		_indices.append(base + index)
 
@@ -84,6 +95,8 @@ func commit(existing: ArrayMesh = null, with_lods := false) -> ArrayMesh:
 	arrays[Mesh.ARRAY_TANGENT] = _tangents
 	arrays[Mesh.ARRAY_TEX_UV] = _uvs
 	arrays[Mesh.ARRAY_INDEX] = _indices
+	if _has_colors:
+		arrays[Mesh.ARRAY_COLOR] = _colors
 	var lods := {}
 	if with_lods:
 		var importer := ImporterMesh.new()

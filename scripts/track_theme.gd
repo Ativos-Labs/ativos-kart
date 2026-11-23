@@ -31,7 +31,8 @@ static func terrain_params(scenery: int) -> Dictionary:
 				"mowed_light": Color(0.88, 0.92, 0.98), "mowed_dark": Color(0.72, 0.79, 0.92),
 				"sand": Color(0.78, 0.85, 0.95), "rock": Color(0.52, 0.53, 0.58), "rock_dark": Color(0.3, 0.31, 0.36),
 				"snow": Color(0.95, 0.97, 1.0), "snow_height": 30.0, "sand_band": 1.2, "stripe_strength": 0.45,
-				"rock_slope": 0.42,
+				"rock_slope": 0.34,
+				"caustic_strength": 0.0,
 			}
 	return {}
 
@@ -46,6 +47,16 @@ static func water_params(scenery: int) -> Dictionary:
 		Scenery.NEVE:
 			return {"ice": 1.0, "shallow_color": Color(0.86, 0.95, 1.0), "deep_color": Color(0.5, 0.74, 0.93), "depth_range": 5.0}
 	return {}
+
+
+## Cor da névoa debaixo d'água: turquesa no mar, verde-azulado nos lagos.
+static func underwater_fog(scenery: int) -> Color:
+	match scenery:
+		Scenery.PRAIA:
+			return Color(0.06, 0.52, 0.66)
+		Scenery.NEVE:
+			return Color(0.32, 0.5, 0.66)
+	return Color(0.1, 0.42, 0.42)
 
 
 ## Cor da base e da ponta dos tufos de grama.

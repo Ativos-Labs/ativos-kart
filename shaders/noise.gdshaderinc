@@ -79,3 +79,24 @@ vec3 fbm_d(vec2 p, int octaves) {
 vec3 srgb_to_linear(vec3 c) {
 	return mix(c * (1.0 / 12.92), pow((c + 0.055) * (1.0 / 1.055), vec3(2.4)), step(0.04045, c));
 }
+
+// Cor de vértice/instância (sRGB, escolhida "no olho") para ALBEDO. No Forward+ o
+// ALBEDO é linear; no Compatibility (web) a cor sRGB crua é a que bate com os
+// StandardMaterial3D (medido no navegador).
+vec3 color_to_albedo(vec3 c) {
+#if CURRENT_RENDERER == RENDERER_COMPATIBILITY
+	return c;
+#else
+	return srgb_to_linear(c);
+#endif
+}
+
+// Cáusticas: a rede de linhas claras que a luz faz no fundo debaixo d'água (duas
+// camadas de ruído deslizando; claro onde as duas quase se igualam). 0 a 1.
+float caustics(vec2 p, float t) {
+	vec2 q = p * 0.42;
+	float a = vnoise(q + vec2(t * 0.31, t * 0.17));
+	float b = vnoise(q * 1.63 - vec2(t * 0.23, -t * 0.29) + vec2(3.1, 7.7));
+	float c = clamp(1.0 - abs(a - b) * 5.0, 0.0, 1.0);
+	return c * c * c * c;
+}

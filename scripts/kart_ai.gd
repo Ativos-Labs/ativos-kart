@@ -16,6 +16,7 @@ enum Drift { NONE, HOP, ON }
 const CHOICE_PAD := 0
 const CHOICE_RAMP := 100
 const CHOICE_OBSTACLES := 200
+const CHOICE_PIT := 300
 ## Faixas testadas para desviar (m em relação à trajetória).
 const AVOID_OFFSETS: Array[float] = [0.0, -2.6, 2.6, -5.2, 5.2]
 ## Amostras para cada lado em que o kart é procurado a partir do índice anterior. Um
@@ -77,6 +78,8 @@ var _stuck := 0.0
 
 var _ramps: Array[Dictionary] = []
 var _pads := PackedFloat32Array()
+## Redemoinhos de areia movediça: (distância na volta, lateral, raio).
+var _pits: Array[Vector3] = []
 ## Escolhas sorteadas uma vez por volta (pegar a rampa estreita, a placa de turbo).
 var _choices := {}
 ## Controle devolvido a cada passo (o mesmo dicionário, reaproveitado).
@@ -111,6 +114,10 @@ func setup(p_kart: Kart, p_track: Track, p_line: RacingLine, p_karts: Array[Kart
 		})
 	for f in track.boost_pads:
 		_pads.append(wrapf(f, 0.0, 1.0) * track.length)
+	for sec in track.sections:
+		if sec and sec.kind == TrackSection.Kind.AREIA:
+			for pit in sec.pits:
+				_pits.append(Vector3(wrapf(pit.x, 0.0, 1.0) * track.length, pit.y, pit.z))
 
 
 ## Esquece o estado da pilotagem (depois de reposicionar o kart).
@@ -262,6 +269,7 @@ func _target_lateral(k: Kart, along: float, target_d: float, lat_now: float, del
 	_avoid = move_toward(_avoid, _avoid_offset(k, lat, lat_now), 7.0 * delta)
 	lat += _avoid
 	lat = _ramp_lane(target_d, lat)
+	lat = _pit_lane(target_d, lat)
 	var edge := track.road_width * 0.5 - 1.5
 	return clampf(lat, -edge, edge)
 
@@ -334,6 +342,29 @@ func _ramp_lane(target_d: float, lat: float) -> float:
 			return lerpf(lat, r.center, w)
 		var keep: float = r.half + 2.2
 		return minf(lat, r.center - keep) if r.center > 0.0 else maxf(lat, r.center + keep)
+	return lat
+
+
+## Redemoinho de areia movediça à frente: passa pelo lado mais perto (iniciantes às
+## vezes não percebem e caem nele).
+func _pit_lane(target_d: float, lat: float) -> float:
+	var edge := track.road_width * 0.5 - 1.5
+	for i in _pits.size():
+		var pit := _pits[i]
+		var to_pit := _to_ahead(pit.x, target_d)
+		if to_pit < -pit.z - 14.0 or to_pit > 34.0:
+			continue
+		var keep := pit.z + 1.7
+		if absf(lat - pit.y) >= keep:
+			continue
+		if not _decided(CHOICE_PIT + i, lerpf(0.6, 0.97, skill)):
+			continue
+		var left := pit.y - keep
+		var right := pit.y + keep
+		var go := left if absf(lat - left) < absf(lat - right) else right
+		if absf(go) > edge:
+			go = right if go == left else left
+		return clampf(go, -edge, edge)
 	return lat
 
 

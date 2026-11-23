@@ -46,6 +46,19 @@ var half_extent := Vector2.ZERO
 ## Áreas planas extras: Vector3(x, z, raio).
 var flat_spots: Array[Vector3] = []
 
+## Trechos especiais da pista (veja Track._setup_terrain_sections), uma entrada por
+## amostra: fundo do lago/recife em volta (INF = nenhum), raio e força dele; força
+## das dunas; 1 perto das bordas do vão de um vale.
+var basin_floor := PackedFloat32Array()
+var basin_radius := PackedFloat32Array()
+var basin_strength := PackedFloat32Array()
+var sand_strength := PackedFloat32Array()
+var gap_edge := PackedByteArray()
+## Vales: {"line": PackedVector2Array (x, z), "half_top", "half_bed", "floor"}.
+var valleys: Array[Dictionary] = []
+## Expoente do perfil da encosta do vale (maior = paredão mais reto no alto).
+var valley_steepness := 3.0
+
 var _pts := PackedVector2Array()
 var _ys := PackedFloat32Array()
 var _mean_y := 0.0
@@ -56,6 +69,16 @@ var _bridge := Field.new()
 ## Para cada ponto do mapa das pontes: 2 = água embaixo, 1 = ponte comum.
 var _bridge_kind := PackedByteArray()
 var _river := Field.new()
+var _basin := Field.new()
+## Amostras no ar sobre os vales: só contam para a distância até a pista (enfeites longe
+## do corredor do voo); o chão embaixo é o do vale.
+var _gap := Field.new()
+var _sand := Field.new()
+var _valley := Field.new()
+## Vale de cada ponto de `_valley`.
+var _valley_of := PackedInt32Array()
+## Paredão do vale no último ponto calculado (0..1): vai para a cor do terreno (pedra).
+var _cliff := 0.0
 var _hills := FastNoiseLite.new()
 var _ridges := FastNoiseLite.new()
 var _coast := FastNoiseLite.new()
@@ -211,6 +234,8 @@ func setup(samples: PackedVector3Array, seed_value: int, bridge_mask := PackedBy
 	var solid_ids := PackedInt32Array()
 	var bridge_pts := PackedVector2Array()
 	var bridge_ids := PackedInt32Array()
+	var gap_pts := PackedVector2Array()
+	var gap_ids := PackedInt32Array()
 	for i in count:
 		var s := samples[i]
 		_pts[i] = Vector2(s.x, s.z)
@@ -218,7 +243,10 @@ func setup(samples: PackedVector3Array, seed_value: int, bridge_mask := PackedBy
 		min_p = min_p.min(_pts[i])
 		max_p = max_p.max(_pts[i])
 		var on_bridge := i < bridge_mask.size() and bridge_mask[i] != 0
-		if on_bridge:
+		if on_bridge and bridge_mask[i] == 3:
+			gap_pts.append(_pts[i])
+			gap_ids.append(i)
+		elif on_bridge:
 			bridge_pts.append(_pts[i])
 			bridge_ids.append(i)
 			_bridge_kind.append(bridge_mask[i])
@@ -238,6 +266,13 @@ func setup(samples: PackedVector3Array, seed_value: int, bridge_mask := PackedBy
 	_solid.build(solid_pts, solid_ids, lo, hi, CELL)
 	if not bridge_pts.is_empty():
 		_bridge.build(bridge_pts, bridge_ids, lo, hi, CELL)
+	if not gap_pts.is_empty():
+		var g_min := Vector2(INF, INF)
+		var g_max := Vector2(-INF, -INF)
+		for p in gap_pts:
+			g_min = g_min.min(p)
+			g_max = g_max.max(p)
+		_gap.build(gap_pts, gap_ids, g_min - Vector2.ONE * 90.0, g_max + Vector2.ONE * 90.0, RIVER_CELL)
 
 	# Rios: pontos a cada ~3 m ao longo das linhas.
 	var river_pts := PackedVector2Array()
@@ -254,6 +289,55 @@ func setup(samples: PackedVector3Array, seed_value: int, bridge_mask := PackedBy
 		var r_ids := PackedInt32Array()
 		r_ids.resize(river_pts.size())
 		_river.build(river_pts, r_ids, min_p - Vector2.ONE * RIVER_MARGIN, max_p + Vector2.ONE * RIVER_MARGIN, RIVER_CELL)
+
+	# Trechos especiais: amostras com lago/recife em volta e com dunas.
+	var basin_pts := PackedVector2Array()
+	var basin_ids := PackedInt32Array()
+	var sand_pts := PackedVector2Array()
+	var sand_ids := PackedInt32Array()
+	for i in count:
+		if i < basin_strength.size() and basin_strength[i] > 0.0:
+			basin_pts.append(_pts[i])
+			basin_ids.append(i)
+		if i < sand_strength.size() and sand_strength[i] > 0.0:
+			sand_pts.append(_pts[i])
+			sand_ids.append(i)
+	if not basin_pts.is_empty():
+		var b_min := Vector2(INF, INF)
+		var b_max := Vector2(-INF, -INF)
+		for p in basin_pts:
+			b_min = b_min.min(p)
+			b_max = b_max.max(p)
+		var reach := 0.0
+		for i in basin_ids:
+			reach = maxf(reach, basin_radius[i])
+		_basin.build(basin_pts, basin_ids, b_min - Vector2.ONE * (reach + 30.0), b_max + Vector2.ONE * (reach + 30.0), RIVER_CELL)
+	if not sand_pts.is_empty():
+		_sand.build(sand_pts, sand_ids, lo - Vector2.ONE * 120.0, hi + Vector2.ONE * 120.0, RIVER_CELL)
+	# Vales: pontos a cada ~3 m ao longo das linhas do meio.
+	var valley_pts := PackedVector2Array()
+	_valley_of = PackedInt32Array()
+	var v_min := Vector2(INF, INF)
+	var v_max := Vector2(-INF, -INF)
+	for vi in valleys.size():
+		var line: PackedVector2Array = valleys[vi].line
+		for k in line.size() - 1:
+			var a := line[k]
+			var b := line[k + 1]
+			var steps := maxi(1, int(a.distance_to(b) / 3.0))
+			for s in steps:
+				var p := a.lerp(b, float(s) / steps)
+				valley_pts.append(p)
+				_valley_of.append(vi)
+				v_min = v_min.min(p)
+				v_max = v_max.max(p)
+		var half: float = valleys[vi].half_top + valleys[vi].get("plateau", 0.0)
+		v_min -= Vector2.ONE * (half + 80.0)
+		v_max += Vector2.ONE * (half + 80.0)
+	if not valley_pts.is_empty():
+		var v_ids := PackedInt32Array()
+		v_ids.resize(valley_pts.size())
+		_valley.build(valley_pts, v_ids, v_min, v_max, RIVER_CELL)
 
 
 ## Distância (no plano) até o centro da pista e altura do chão da pista ali perto
@@ -282,6 +366,10 @@ func distance_to_track(x: float, z: float) -> float:
 		var k := _bridge.find(x, z)
 		if k >= 0:
 			d = minf(d, Vector2(x, z).distance_to(_bridge.pts[k]))
+	if not _gap.is_empty():
+		var k := _gap.find(x, z)
+		if k >= 0:
+			d = minf(d, Vector2(x, z).distance_to(_gap.pts[k]))
 	return d
 
 
@@ -289,22 +377,44 @@ func height_at(x: float, z: float) -> float:
 	return _sample(x, z).x
 
 
+## 0..1: quanto o chão ali é de dunas de areia (perto do trecho de areia).
+func sand_at(x: float, z: float) -> float:
+	return _sample(x, z).z
+
+
 ## 1 perto da pista (grama aparada em listras), 0 longe.
 func mow_factor(distance: float) -> float:
 	return 1.0 - smoothstep(flat_distance - 2.0, flat_distance + 16.0, distance)
 
 
-## (altura do chão, fator de grama aparada) num ponto.
-func _sample(x: float, z: float) -> Vector2:
-	var info := nearest_info(x, z)
-	var d := info.x
+## (altura do chão, fator de grama aparada, dunas, paredão do vale) num ponto.
+func _sample(x: float, z: float) -> Vector4:
+	_cliff = 0.0
+	var k := _solid.find(x, z)
+	var d: float
+	var road_y: float
+	var sid := -1
+	if k < 0:
+		var far := maxf(absf(x - center.x) - half_extent.x, absf(z - center.y) - half_extent.y)
+		d = maxf(far, 120.0)
+		road_y = _mean_y
+	else:
+		var p := Vector2(x, z)
+		sid = _solid.ids[k]
+		d = p.distance_to(_solid.pts[k])
+		road_y = _ys[0] if _flat else _interp_y(sid, p)
 	# Longe da pista a altura de base vai para a média (pistas com subidas não
 	# deixam degraus na borda do mapa).
-	var base := info.y if _flat else lerpf(info.y, _mean_y, smoothstep(40.0, 88.0, d))
+	var base := road_y if _flat else lerpf(road_y, _mean_y, smoothstep(40.0, 88.0, d))
 	var m := smoothstep(flat_distance, flat_distance + rise_distance, d)
 	for spot in flat_spots:
 		m *= smoothstep(spot.z, spot.z + 40.0, Vector2(x - spot.x, z - spot.y).length())
 	var h := base - 0.03
+	var sand := 0.0
+	if not _sand.is_empty():
+		var ks := _sand.find(x, z)
+		if ks >= 0:
+			sand = sand_strength[_sand.ids[ks]] * (1.0 - smoothstep(70.0, 190.0, Vector2(x, z).distance_to(_sand.pts[ks])))
 	if m > 0.0:
 		var relief := _hills.get_noise_2d(x, z) * hill_height + hill_bias
 		var ring := smoothstep(mountain_start, mountain_end, Vector2(x, z).distance_to(center))
@@ -312,15 +422,92 @@ func _sample(x: float, z: float) -> Vector2:
 			relief += ring * mountain_height * (0.3 + 0.7 * clampf(_ridges.get_noise_2d(x, z) * 0.6 + 0.5, 0.0, 1.2))
 		if terrace_step > 0.0:
 			relief = _terrace(relief)
+		if sand > 0.0:
+			# Perto das dunas da pista o relevo vira um mar de dunas (sem mesas).
+			relief = lerpf(relief, _dune_relief(x, z) + ring * relief, sand)
 		h += m * relief
 	if sea_distance > 0.0:
 		var coast := _coast.get_noise_2d(x, z) * 14.0
 		h -= sea_depth * smoothstep(sea_distance, sea_distance + 42.0, d + coast)
+	if not _basin.is_empty():
+		h = _carve_basin(x, z, h, d, sid)
 	if not _river.is_empty():
 		h = _carve_river(x, z, h, d)
+	if not _valley.is_empty():
+		h = _carve_valley(x, z, h, d, sid)
 	if not _bridge.is_empty():
 		h = _under_bridge(x, z, h, d)
-	return Vector2(h, mow_factor(d))
+	return Vector4(h, mow_factor(d), sand, _cliff)
+
+
+## Dunas: cristas compridas atravessadas ao vento, com a face de trás suave e a da
+## frente mais íngreme, e a altura variando aos poucos.
+func _dune_relief(x: float, z: float) -> float:
+	var warp := _hills.get_noise_2d(x * 0.7 + 300.0, z * 0.7) * 34.0
+	var u := (x * 0.8 + z * 0.6 + warp) / 42.0
+	var ph := u - floorf(u)
+	var ridge := smoothstep(0.0, 0.72, ph) if ph < 0.72 else 1.0 - smoothstep(0.72, 1.0, ph)
+	var amp := 6.0 + _coast.get_noise_2d(x * 0.25, z * 0.25) * 4.0
+	return ridge * amp + 1.2
+
+
+## Lago (ou recife) em volta do mergulho e do lago congelado: o chão desce até o fundo
+## num raio em volta do trecho (outros trechos da pista ali perto continuam firmes).
+func _carve_basin(x: float, z: float, h: float, d_track: float, sid: int) -> float:
+	var kb := _basin.find(x, z)
+	if kb < 0:
+		return h
+	var id := _basin.ids[kb]
+	var r := basin_radius[id]
+	var db := Vector2(x, z).distance_to(_basin.pts[kb])
+	if db >= r:
+		return h
+	var carved := lerpf(basin_floor[id], h, smoothstep(r * 0.55, r, db + _coast.get_noise_2d(x, z) * 10.0))
+	var protect := 1.0
+	if sid >= 0 and (sid >= basin_strength.size() or basin_strength[sid] <= 0.0):
+		protect = smoothstep(flat_distance - 2.0, flat_distance + 12.0, d_track)
+	return lerpf(h, minf(h, carved), basin_strength[id] * protect)
+
+
+## Vale cavado ao longo da linha "Vale": um planalto em volta (na altura `rim`, a da
+## beira mais alta da pista) cortado por uma ravina — fundo estreito (o leito, com água
+## se ficar abaixo do nível dela), encosta baixa e paredão até o alto. Na pista ao lado
+## o chão fica firme, menos na beira do vão (o penhasco começa onde o asfalto acaba).
+func _carve_valley(x: float, z: float, h: float, d_track: float, sid: int) -> float:
+	var kv := _valley.find(x, z)
+	if kv < 0:
+		return h
+	var v: Dictionary = valleys[_valley_of[kv]]
+	var half_top: float = v.half_top
+	var shelf: float = v.plateau
+	var raw := Vector2(x, z).distance_to(_valley.pts[kv])
+	if raw >= half_top + shelf + 7.0:
+		return h
+	var vd := raw + _coast.get_noise_2d(x * 0.6, z * 0.6) * 7.0
+	if vd >= half_top + shelf:
+		return h
+	var fade := smoothstep(0.0, 60.0, _valley.inside_margin(x, z))
+	# Planalto em volta da ravina (longe da pista: perto dela vale o aterro da pista).
+	var rim: float = v.rim + _hills.get_noise_2d(x * 1.7, z * 1.7) * 2.5
+	var lift := smoothstep(half_top + shelf, half_top + 12.0, vd) * smoothstep(flat_distance + 2.0, flat_distance + 22.0, d_track) * fade
+	var hp := lerpf(h, maxf(h, rim), lift)
+	if vd >= half_top:
+		return hp
+	var half_bed: float = v.half_bed
+	var t := clampf((vd - half_bed) / maxf(half_top - half_bed, 1.0), 0.0, 1.0)
+	# Leito quase plano, encosta baixa e o paredão no alto.
+	var prof := 0.14 * smoothstep(0.0, 0.5, t) + 0.86 * smoothstep(0.5, 0.88, t)
+	if terrace_step > 0.0:
+		# Paredões em degraus (cânion).
+		var steps := 4.0
+		var st := floorf(prof * steps)
+		prof = lerpf(prof, (st + smoothstep(0.55, 0.9, prof * steps - st)) / steps, 0.7)
+	var floor_y: float = v.floor
+	var carved := lerpf(floor_y, maxf(hp, floor_y), prof)
+	var reach := 1.0 if sid >= 0 and sid < gap_edge.size() and gap_edge[sid] != 0 else flat_distance - 2.0
+	var protect := smoothstep(reach, reach + 8.0, d_track)
+	_cliff = smoothstep(0.42, 0.62, t) * (1.0 - smoothstep(0.9, 1.0, t)) * protect * fade
+	return lerpf(hp, minf(hp, carved), protect * fade)
 
 
 ## Degraus: patamares planos e paredões entre eles (mesas e cânions).
@@ -356,6 +543,9 @@ func _carve_river(x: float, z: float, h: float, d_track: float) -> float:
 func _under_bridge(x: float, z: float, h: float, d_track: float) -> float:
 	var k := _bridge.find(x, z)
 	if k < 0:
+		return h
+	# Vão de vale: sem tabuleiro, o vale já cavou o chão.
+	if _bridge_kind[k] == 3:
 		return h
 	var p := Vector2(x, z)
 	var bd := p.distance_to(_bridge.pts[k])
@@ -411,7 +601,7 @@ func build_mesh(resolution: Vector2i, inner_half: Vector2, outer_half: float, ma
 			var z := center.y + zs[j]
 			var s := _sample(x, z)
 			verts[j * row + i] = Vector3(x, s.x, z)
-			colors[j * row + i] = Color(s.y, 0.0, 0.0)
+			colors[j * row + i] = Color(s.y, s.z, s.w)
 	var normals := PackedVector3Array()
 	normals.resize(row * rows)
 	for j in rows:

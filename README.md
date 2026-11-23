@@ -55,12 +55,29 @@ rodapé mostra as teclas ou os botões do controle, conforme o último que foi u
   **drift logo na saída da rampa** para fazer uma manobra no ar: o kart dá um giro e
   ganha um turbo ao aterrissar. No ar dá para corrigir a direção só um pouco.
 - **Rampas de asa-delta** (painel azul aceso com setas brancas e moldura amarela): o kart
-  sobe alto, a **asa-delta abre** em cima dele (presa na carroceria por quatro cordas) e ele **plana** de 3 a 7 s, descendo
+  sobe alto, a **asa-delta abre** em cima dele (presa na carroceria por quatro cordas) e ele **plana** de 3,5 a 6 s, descendo
   devagar. No ar o direcional vira (o kart inclina como um avião) e **segurar o freio
   levanta o bico** — desce mais devagar, mas perde velocidade. Paredes invisíveis altas
   seguram o voo dentro da pista; ao tocar o chão a asa fecha. Também dá para fazer a
-  manobra na decolagem (o turbo vem na aterrissagem). Há uma em cada pista, três delas
-  saindo do alto de uma ponte, e moedas no ar pelo caminho (uma fileira de cada lado).
+  manobra na decolagem (o turbo vem na aterrissagem). Há uma em cada pista, sempre na
+  **beira de um vale**: a pista acaba no penhasco e só continua do outro lado, uns 100 m
+  depois e mais baixo — o voo passa por cima de uma ravina com rio, cachoeira e o cenário
+  de cada lugar (veja **As pistas**). Passada a beira do outro lado, a asa **desce para
+  o pouso** (bico para baixo) e o kart toca o chão logo depois dela. A rampa ocupa a pista toda, e quem chega devagar
+  decola com pelo menos 88% da velocidade máxima: o vão sempre dá para atravessar. Quem
+  leva um golpe de item no meio do voo perde a asa e cai no vale — e volta para a pista
+  do outro lado. Moedas no ar pelo caminho (uma fileira de cada lado).
+- **Trechos especiais** (cada pista tem o seu):
+  - **Debaixo d'água** (Circuito e Ilha): a pista mergulha no lago ou no mar. Lá embaixo a
+    câmera fica azul-esverdeada, a superfície brilha lá em cima, raios de sol, algas, peixes,
+    bolhas saindo do kart e respingo ao entrar e sair. O kart fica **mais leve** (pulos
+    longos e lentos, gravidade pela metade) e um pouco mais lento.
+  - **Dunas** (Cânion): o asfalto vira areia batida que sobe e desce; rápido, o kart dá
+    um **pulinho na crista** de cada duna. A **areia fofa** junto das muretas segura o
+    kart, e os **redemoinhos de areia movediça** puxam para o meio e giram o kart (com
+    turbo dá para escapar).
+  - **Lago congelado** (Pico): a pista passa por cima do gelo — **escorrega**: o kart
+    demora para seguir o bico e desliza de lado nas curvas. Marcas brancas no gelo.
 - **Caixas de item** (com o logo "at"): passe por elas para pegar um item. Elas estouram e
   voltam depois de alguns segundos. O item aparece no **slot do canto superior esquerdo**
   (como no Mario Kart) depois de uma **roleta vertical** (os ícones descem e freiam até
@@ -76,7 +93,8 @@ rodapé mostra as teclas ou os botões do controle, conforme o último que foi u
   bronze), e cada kart é um ponto colorido no mini-mapa. Encostar em outro kart empurra os
   dois para o lado — o mais pesado empurra mais.
 - Na grama o kart fica mais lento. A corrida tem 3 voltas e os recordes ficam salvos
-  (separados por cilindrada).
+  (separados por cilindrada). Os recordes e fantasmas são do traçado atual
+  (`GameState.TRACK_LAYOUT`): quando as pistas mudam de traçado eles recomeçam.
 
 ## Itens
 
@@ -304,10 +322,10 @@ traçado, extensão, voltas, curvas, dificuldade e recordes. Vagas sem pista apa
 
 | Pista            | Cenário | Destaques                                                                 |
 |------------------|---------|---------------------------------------------------------------------------|
-| Circuito Ativos  | Campo   | Lagos, montanhas nevadas, "S" apertado no meio, rampa de asa-delta na reta antes da curva longa |
-| Ilha Ativos      | Praia   | Ilha com lagoa no meio, ponte estaiada com o logo na torre, ponte sobre o mar, coqueiros, guarda-sóis, veleiros com o logo na vela, farol, ondas do mar invadindo a pista e rampa de asa-delta no alto da ponte estaiada (voa por baixo da torre, sobre o mar) |
-| Cânion Ativos    | Deserto | Traçado em "8" com viaduto passando por cima da própria pista, ponte em arco azul e viaduto de pedra sobre o rio do cânion, arco de pedra sobre a pista, caixa-d'água, letreiro gigante da Ativos, fardos de feno rolando e rampa de asa-delta no alto do viaduto (8,5 m): o voo mais longo, ~6,5 s descendo pela diagonal do "8" |
-| Pico Nevado      | Neve    | Subida até um platô, viaduto de pedra sobre o rio congelado, ponte estaiada, pinheiros nevados, chalés, bonecos de neve de cachecol azul, neve caindo, bolas de neve descendo o morro e rampa de asa-delta na ponte estaiada (no 150cc dá para cruzar a chegada voando) |
+| Circuito Ativos  | Campo   | 1,5 km. Lagos, montanhas nevadas, "S" apertado no meio. Nova volta pelo leste: sobe uma colina, salta de asa-delta sobre o **Vale da Cachoeira** (cânion de pedra com rio, pedras, ponte pênsil de madeira, cachoeira com arco-íris e pássaros) e depois **mergulha no lago** (algas, nenúfares, cardumes, barco a remo afundado, píer com a bandeira da Ativos) |
+| Ilha Ativos      | Praia   | 1,3 km. Ilha com lagoa no meio, ponte estaiada com o logo na torre (com rampa de turbo), coqueiros, guarda-sóis, veleiros, farol e ondas do mar invadindo a pista. A asa-delta sai de um penhasco sobre a **Enseada dos Penhascos** (rochas no mar, golfinhos pulando, barco encalhado, cachoeira caindo no mar com arco-íris) e a pista **mergulha no recife** (corais, estrelas-do-mar, cardumes coloridos, navio pirata naufragado com o baú do tesouro da Ativos e o submarino amarelo da Ativos) |
+| Cânion Ativos    | Deserto | 1,7 km. Traçado em "8" com o viaduto passando por cima da própria pista, ponte em arco azul sobre o rio, caixa-d'água, letreiro gigante e fardos de feno. A asa-delta cruza a **Garganta do Cânion** (paredões em degraus, rio turquesa, cachoeira no paredão, torres de pedra, arco de pedra natural, urubus) e o laço da largada virou o **mar de dunas** (sobe e desce com pulinhos, areia fofa, três redemoinhos de areia movediça, bandeirinhas de rali, esqueletos de fóssil, areia voando, arco de pedra) |
+| Pico Nevado      | Neve    | 1,6 km. Subida até o platô, viaduto de pedra sobre o rio congelado, pinheiros, chalés, bonecos de neve e bolas de neve rolando. Do alto do platô a asa-delta atravessa o **Vale Glacial** (paredões de pedra nevada, cascata congelada, rio congelado, teleférico com cabines azul e amarela indo e vindo, águias) e a volta termina no **lago congelado** (gelo que escorrega, blocos de gelo, cabanas de pesca, pinguins patinando em roda) |
 
 Todas usam as logos da Ativos no pórtico, nas muretas, outdoors, bandeiras, balões, dirigível,
 no asfalto e nas pontes.
@@ -378,6 +396,11 @@ scripts/
   track_ramp.gd         Recurso com os dados de uma rampa de pulo ou de asa-delta (posição,
                         altura, ângulo, alcance do voo)
   track_ramps.gd        Monta as rampas de pulo (malha, colisão, turbo, paredes invisíveis)
+  track_section.gd      Recurso de um trecho especial (submerso, dunas, gelo, vale)
+  track_sections.gd     Monta o visual dos trechos especiais (fundo do mar/lago, dunas,
+                        lago congelado, vale com cachoeira e os destaques de cada cenário)
+  kart_water_fx.gd      Bolhas e respingo do kart na água
+  cable_car.gd          Cabine do teleférico do Pico Nevado
   jump_ramp.gd          Colisão da rampa com a borda de onde o kart decola
   item_box.gd           Caixa de item (gira e flutua no shader, estoura e volta)
   track_coins.gd        Moedas Ativos da pista (MultiMesh, giro no shader, coleta por
@@ -497,6 +520,9 @@ tools/music/build_music.mjs          Compõe e sintetiza as músicas (Node + ffm
 tools/perf/                          Medição de desempenho da versão web (probe +
                                      Chrome headless, veja tools/perf/README.md)
 tools/track_shots/                   Gera as imagens de assets/pistas/ (gerar.sh, veja o
+                                     README.md de lá)
+tools/pistas/                        Traçado (curva + conversão de frações), análise do
+                                     traçado, sonda dos trechos especiais e fotos (veja o
                                      README.md de lá)
 web/                                 Export para o navegador (veja web/README.md)
 linux/                               Export do executável Linux (veja linux/README.md)
@@ -820,18 +846,61 @@ sair da pista pelo ar; e se ele chegar torto, a rampa o endireita um pouco na de
 ### Rampas de asa-delta
 
 Uma rampa com **Glider** ligado (grupo "Asa-delta" do `TrackRamp`) vira rampa de asa-delta:
-o kart decola sempre com a mesma subida (15 m/s, não importa a velocidade), a asa abre 0,4 s
-depois e ele desce a 2 m/s (0,8 m/s segurando o freio), na velocidade máxima dele; depois de
-4,5 s planando a asa "cansa" e desce cada vez mais rápido, então o voo sempre acaba. Em chão
-plano são ~3,5 s e 80–140 m; saindo de uma ponte, mais (o chão fica mais longe). As paredes
-invisíveis do voo têm 32 m de altura e vão até **Glide Distance** m depois da borda. As
-rampas atuais usam 14 m de subida, 2,2 m de altura e 26°.
+o kart decola sempre com a mesma subida (15 m/s, não importa a velocidade) e com pelo
+menos 88% da velocidade máxima (`Kart.GLIDE_MIN_LAUNCH`), a asa abre 0,4 s depois e ele
+desce a 2 m/s (0,8 m/s segurando o freio), na velocidade máxima dele; depois de 4,5 s
+planando a asa "cansa" e desce cada vez mais rápido, então o voo sempre acaba. Em chão
+plano são ~3,5 s e 80–140 m. Sobre um vale, passada a beira do outro lado, ela desce para
+pousar (veja **Vale da asa-delta**). As
+paredes invisíveis do voo têm 32 m de altura e vão até **Glide Distance** m depois da
+borda. As rampas atuais usam 14 m de subida, 2,2 m de altura, 26° e **Full Width** (de
+mureta a mureta).
 
-Ponha a rampa onde caibam uns 150 m (até ~220 m saindo de uma ponte alta) de pista sem
-outro trecho passando por cima, sem rampa de pulo, obstáculos ou caixas embaixo do voo —
-caixas e turbos ficam logo depois da aterrissagem. O alto de uma ponte é o melhor lugar: o
-voo passa por cima do rio, do mar ou do vale. Para conferir, rode a sonda de voos de
-`tools/asas/` (tempo no ar, distância, onde aterrissa, batidas na parede, quedas).
+Hoje todas ficam na beira de um vale (veja **Vale da asa-delta**). Sem vale, ponha a rampa
+onde caibam uns 150 m de pista sem outro trecho passando por cima, sem rampa de pulo,
+obstáculos ou caixas embaixo do voo — caixas e turbos ficam logo depois da aterrissagem.
+Para conferir, rode a sonda de voos de `tools/asas/` ou a de trechos de `tools/pistas/`.
+
+### Trechos especiais
+
+No nó raiz, em **Trechos especiais**, acrescente itens (`TrackSection`). Cada um tem
+**Start / End** (frações da volta) e **Ramp** (transição antes e depois) e um **Kind**:
+
+- **SUBMERSO:** a pista desce até **Depth** m abaixo da água entre `start` e `end` (as
+  rampas de `ramp` m ficam por fora) e o chão num raio de **Basin** m em volta vira o
+  fundo do lago/mar. Ali o kart fica submerso (`Kart.water_level`, gravidade ×0,5,
+  velocidade ×0,94), a câmera troca para um ambiente com névoa da cor da água
+  (`TrackTheme.underwater_fog`) e o asfalto ganha algas e cáusticas. Ponha onde a pista
+  já está perto da água e uns 70 m livres de outro trecho.
+- **AREIA:** dunas — o asfalto vira areia batida que sobe **Dune Height** m a cada
+  **Dune Length** m, sem zebras; o terreno em volta vira um mar de dunas. A faixa de
+  `Track.SOFT_SAND_EDGE` m junto de cada borda é areia fofa (×0,78) e **Pits** são os
+  redemoinhos de areia movediça (x = fração, y = lateral, z = raio; ×0,55 e puxam para o
+  meio). Deixe ~6 m livres ao lado de cada redemoinho: o computador desvia por ali.
+- **GELO:** lago congelado — a pista fica rente ao gelo (use **Depth** −0,06) e o chão em
+  **Basin** m vira lago. No gelo a aderência cai para 24% (o kart desliza).
+- **VALE:** veja abaixo.
+
+### Vale da asa-delta
+
+Um trecho **VALE** tira a pista entre `start` e `end`: as duas pontas viram a beira de um
+penhasco (paredão de pedra com colisão) e no meio não há asfalto nem colisão. Ponha uma
+rampa de asa-delta com **At** = `start` e **Full Width** ligado (a rampa ocupa até as
+muretas). A linha do vale é um filho **Path3D** chamado "Vale" (o primeiro ponto é a
+cabeceira, com a cachoeira; desenhe-a atravessando a pista no meio do vão). O terreno vira
+um planalto em volta (**Valley Plateau** m de largura, na altura da beira mais alta) e uma
+ravina de **Valley Width** m no alto, com o fundo plano de **Valley Bed** m em
+**Valley Floor** (abaixo da água vira rio, mar ou gelo); os paredões são sempre de pedra.
+
+Regras que funcionaram (sonda `tools/pistas/sonda_trechos.gd`): vão de ~95–100 m e a beira
+do pouso 7–10 m mais baixa que a da decolagem; mesmo no 50cc o kart passa a beira do pouso
+com folga. Passados `Race.LAND_AFTER_EDGE` m da beira do pouso, a corrida chama
+`Kart.glide_land`: a asa desce até `GLIDE_LAND_SINK` (12 m/s) e o kart pousa ~5–20 m
+depois da beira no 50cc e ~15–55 m no 150cc (o voo inteiro dura 3,5–6 s). Deixe uns 80 m
+de pista quase reta depois da beira; `glide_distance` (~200–210 m) cobre o pouso. Quem cai no vale
+(o kart fica 6 m abaixo da linha entre as bordas) volta para a pista 4 amostras depois do
+vão. Os destaques de cada cenário (ponte pênsil, rochas no mar e golfinhos, arco de pedra e
+torres, teleférico) e a cachoeira são montados sozinhos a partir da linha do vale.
 
 ### Caixas de item
 

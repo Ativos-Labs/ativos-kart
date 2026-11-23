@@ -62,6 +62,12 @@ extends Resource
 	set(value):
 		glide_distance = value
 		emit_changed()
+## A rampa ocupa tudo de mureta a mureta (o acostamento também): na beira de um vale
+## (TrackSection VALE) ninguém chega na borda sem decolar.
+@export var full_width := false:
+	set(value):
+		full_width = value
+		emit_changed()
 
 
 ## Formato da subida: altura (0..1) na fração `t` do comprimento. Cúbica que sai

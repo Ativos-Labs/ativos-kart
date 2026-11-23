@@ -7,10 +7,8 @@ extends Node
 ##   ?s=explore vista aérea de cada pista nos 4 lados, para escolher o melhor (VIEWS)
 ##   ?s=select  mede a tela de pistas: entrada, parada e trocando de pista
 ##
-## A foto é tirada na build web (renderizador Compatibility). Nela o water.gdshader
-## lê a profundidade como no Forward+ e a água inteira vira espuma branca; aqui o
-## shader ganha, só na memória, a conversão do Compatibility (profundidade * 2 - 1),
-## para a foto mostrar a água como ela é no desktop.
+## A foto é tirada na build web (renderizador Compatibility); o water.gdshader já
+## converte a profundidade do Compatibility, então a água sai como no desktop.
 
 const TRACK_SELECT := "res://scenes/track_select.tscn"
 ## Lado de onde a câmera aérea olha cada pista (graus em volta do eixo Y; 0 = olhando
@@ -98,7 +96,6 @@ func _shots(explore: bool) -> void:
 		root.add_child(track)
 		await get_tree().process_frame
 		_full_detail(track)
-		_fix_water(track)
 		var cam := Camera3D.new()
 		root.add_child(cam)
 		cam.current = true
@@ -145,29 +142,6 @@ func _settle() -> void:
 		last = now
 
 
-func _fix_water(node: Node) -> void:
-	if RenderingServer.get_current_rendering_method() != "gl_compatibility":
-		return
-	var fixed := Shader.new()
-	fixed.code = Track.WATER_SHADER.code.replace("vec4(SCREEN_UV * 2.0 - 1.0, scene_depth_raw, 1.0)",
-			"vec4(SCREEN_UV * 2.0 - 1.0, scene_depth_raw * 2.0 - 1.0, 1.0)")
-	if fixed.code == Track.WATER_SHADER.code:
-		_out("INFO|water shader mudou: conferir _fix_water")
-		return
-	_swap_water(node, fixed)
-
-
-func _swap_water(node: Node, fixed: Shader) -> void:
-	for child in node.get_children(true):
-		_swap_water(child, fixed)
-	if node is MeshInstance3D:
-		var mats: Array = [node.material_override]
-		if node.mesh:
-			for i in node.mesh.get_surface_count():
-				mats.append(node.mesh.surface_get_material(i))
-		for m in mats:
-			if m is ShaderMaterial and m.shader == Track.WATER_SHADER:
-				m.shader = fixed
 
 
 ## Vista de longe: sem cortes por distância, sombra até onde a câmera vê, sem neve

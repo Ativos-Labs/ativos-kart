@@ -34,9 +34,8 @@ Rode de novo depois de mudar o traçado, o cenário ou as decorações de uma pi
 - Os prints saem do renderizador da web (Compatibility). De longe a neblina da corrida
   deixaria tudo branco, então o probe usa 12% dela; também tira os cortes por distância,
   estica a sombra e esconde a neve.
-- No Compatibility o `shaders/water.gdshader` reconstrói a profundidade como no Forward+
-  e a água vira espuma branca. O probe corrige isso **só na memória** (profundidade
-  `* 2 - 1`) para a foto mostrar a água como no desktop.
+- O `shaders/water.gdshader` converte a profundidade do Compatibility (`* 2 - 1`); sem
+  isso a água inteira virava espuma branca na web (e nas fotos).
 - A vista aérea usa `near = 40 m`: com o near padrão o buffer de profundidade perde a
   precisão a 400 m e a espuma da água cobre tudo.
 - O probe espera cada print ficar pronto (`window.__shot_saved`) antes de mexer na

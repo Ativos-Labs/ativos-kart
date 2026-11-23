@@ -50,6 +50,13 @@ signal squashed
 signal parcel_paid(paid: int, total: int)
 ## Com o Trânsito em julgado, passou por cima de outro kart e o derrubou.
 signal knocked(other: Kart)
+## Entrou (true) ou saiu (false) da água.
+signal splashed(entering: bool)
+
+## Chão embaixo do kart (a corrida define com Track.surface_at): areia batida nas dunas
+## (igual ao asfalto), areia fofa nas bordas das dunas, redemoinho de areia movediça e
+## gelo (escorrega).
+enum Surface { ASFALTO, AREIA, AREIA_FOFA, AREIA_MOVEDICA, GELO }
 
 const GRAVITY := 32.0
 const HOP_VELOCITY := 4.6
@@ -128,8 +135,41 @@ const GLIDE_SLOW_SPEED := 0.72
 ## Inclinação para dentro da curva (rad, direcional todo) e bico para baixo planando.
 const GLIDE_BANK := 0.32
 const GLIDE_NOSE := -0.06
+## Velocidade mínima (fração da máxima) na decolagem de uma rampa de asa-delta.
+const GLIDE_MIN_LAUNCH := 0.88
+## Pouso: passada a beira do outro lado do vale (glide_land), a asa desce até esta
+## velocidade (m/s), ganhando GLIDE_LAND_ACCEL m/s por segundo — o kart toca o chão
+## logo depois da beira, em qualquer cilindrada.
+const GLIDE_LAND_SINK := 12.0
+const GLIDE_LAND_ACCEL := 26.0
+## Bico para baixo na descida do pouso (rad).
+const GLIDE_LAND_NOSE := -0.16
 ## Asa usada quando o kart não recebeu uma (`glider` vazio).
 const DEFAULT_GLIDER := "res://data/asas/asa_rubra.tres"
+
+## Debaixo d'água: fração da gravidade (pulos longos e lentos), da velocidade máxima e
+## da aceleração.
+const UNDERWATER_GRAVITY := 0.5
+const UNDERWATER_SPEED := 0.94
+const UNDERWATER_ACCEL := 0.85
+## Quanto do meio do kart precisa estar abaixo da superfície para contar como submerso.
+const UNDERWATER_DEPTH := 0.5
+## Gelo: fração da aderência (o kart desliza de lado), no drift e do giro.
+const ICE_GRIP := 0.24
+const ICE_DRIFT_GRIP := 0.45
+const ICE_TURN := 0.9
+## Areia fofa (bordas das dunas) e areia movediça: fração da velocidade máxima.
+const SOFT_SAND_SPEED := 0.78
+const QUICKSAND_SPEED := 0.55
+## Puxão do redemoinho de areia movediça para o meio dele (m/s²) e o giro que ele dá.
+const QUICKSAND_PULL := 34.0
+const QUICKSAND_SPIN := 0.7
+const ICE_MARK := Color(0.82, 0.9, 1.0, 0.45)
+## Pulinho na crista de uma duna: velocidade (m/s) a partir da qual o kart sai do chão
+## e quanto ele sobe por m/s acima dela (m/s), até o máximo.
+const DUNE_HOP_FROM := 19.0
+const DUNE_HOP_GAIN := 0.27
+const DUNE_HOP_MAX := 3.6
 ## --- Moedas ---
 ## Máximo de moedas e quanto cada uma soma na velocidade máxima (fração).
 const MAX_COINS := 10
@@ -264,6 +304,17 @@ var steer_input := 0.0
 var throttle_input := 0.0
 ## Definido pela corrida: true quando o kart está fora do asfalto.
 var is_offroad := false
+## Chão embaixo (Surface), definido pela corrida a cada quadro.
+var surface := Surface.ASFALTO
+## Centro (global) e raio do redemoinho de areia movediça em que o kart está.
+var pit_center := Vector4.INF
+## Altura (global) da água da pista: abaixo dela o kart fica submerso (-INF = sem água).
+var water_level := -INF
+var underwater := false
+## Pulinho de duna pedido pela corrida (aplicado no próximo passo de física).
+var _dune_hop := 0.0
+## Bolhas e respingos (criados na primeira vez que a pista tem água).
+var water_fx: KartWaterFx
 var drifting := false
 var drift_dir := 0
 var drift_level := 0
@@ -325,6 +376,8 @@ var _glide_pending := false
 ## Tempo planando (s) e o freio segurado no ar (0..1, suavizado): bico para cima.
 var _glide_time := 0.0
 var _glide_pull := 0.0
+## Descendo para o pouso (veja glide_land).
+var _glide_landing := false
 ## A asa em cima do kart (null sem asa) e onde ela fica no modelo (GliderVisual.fit_to).
 var glider_visual: GliderVisual
 var _glider_mount := Vector3.ZERO
@@ -662,6 +715,37 @@ func set_skid_marks(marks: SkidMarks) -> void:
 
 
 ## Poeira e marcas com a cara do cenário da pista (TrackTheme.Scenery).
+## Passou rápido pela crista de uma duna: sai do chão um pouquinho.
+func crest_hop() -> void:
+	if not is_on_floor() or drifting or gliding:
+		return
+	_dune_hop = clampf((absf(speed) - DUNE_HOP_FROM) * DUNE_HOP_GAIN, 0.0, DUNE_HOP_MAX)
+
+
+## A pista tem água em `level` (altura global): o kart passa a ficar submerso abaixo
+## dela (bolhas, gravidade menor) e respinga ao entrar e sair.
+func set_water_level(level: float) -> void:
+	water_level = level
+	if water_fx == null:
+		water_fx = KartWaterFx.new()
+		add_child(water_fx)
+		water_fx.position = Vector3(0.0, 0.25, 0.45) * KartScale.ITEMS
+
+
+## Entrou ou saiu da água neste passo?
+func _update_water() -> void:
+	if water_level == -INF:
+		return
+	var now := global_position.y + UNDERWATER_DEPTH * KartScale.ITEMS < water_level
+	if now == underwater:
+		return
+	underwater = now
+	if water_fx:
+		water_fx.set_underwater(now)
+		water_fx.burst(Vector3(global_position.x, water_level, global_position.z))
+	splashed.emit(now)
+
+
 func set_ground_theme(scenery: int) -> void:
 	_offroad_mark = TrackTheme.offroad_mark_color(scenery)
 	var mat := TrackTheme.dust_material(scenery)
@@ -731,6 +815,8 @@ func teleport(xform: Transform3D) -> void:
 	_corner_loss = 0.0
 	_glide_pending = false
 	_glide_pull = 0.0
+	surface = Surface.ASFALTO
+	pit_center = Vector4.INF
 	if gliding:
 		gliding = false
 		glider_closed.emit()
@@ -770,6 +856,7 @@ func _physics_process(delta: float) -> void:
 	var steer := _smooth_steer(raw_steer, delta)
 	steer_input = steer
 	throttle_input = throttle
+	_update_water()
 	var on_floor := is_on_floor()
 	var ramp := _current_ramp() if on_floor else null
 	_trick_buffer = maxf(_trick_buffer - delta, 0.0)
@@ -815,6 +902,17 @@ func _physics_process(delta: float) -> void:
 	var judged := judged_time > 0.0
 	var offroad := is_offroad and on_floor and not judged
 	var top := max_speed * speed_multiplier * coin_bonus * (offroad_factor if offroad else 1.0)
+	# Areia fofa e movediça seguram o kart (a grama de fora já segura mais).
+	var ground_factor := 1.0
+	if on_floor and not judged and not offroad:
+		if surface == Surface.AREIA_FOFA:
+			ground_factor = SOFT_SAND_SPEED
+		elif surface == Surface.AREIA_MOVEDICA:
+			ground_factor = QUICKSAND_SPEED
+	if underwater:
+		ground_factor *= UNDERWATER_SPEED
+	top *= ground_factor
+	var sinking := ground_factor < 0.95 and on_floor
 	if judged:
 		top *= JUDGED_SPEED
 	top *= 1.0 - _corner_loss
@@ -839,10 +937,13 @@ func _physics_process(delta: float) -> void:
 		if speed < target:
 			var ratio := clampf(speed / max_speed, 0.0, 1.0)
 			var accel := acceleration * lerpf(1.5, 0.45, ratio) * (JUDGED_ACCEL if judged else 1.0)
+			if underwater:
+				accel *= UNDERWATER_ACCEL
 			speed = move_toward(speed, target, accel * delta)
 		else:
-			# Acima do alvo: na grama freia forte; na curva o atrito segura aos poucos.
-			var drag := 16.0 if offroad else coast_drag + (CORNER_SCRUB if _corner_loss > 0.005 else 0.0)
+			# Acima do alvo: na grama (e na areia fofa) freia forte; na curva o atrito
+			# segura aos poucos.
+			var drag := 16.0 if offroad or sinking else coast_drag + (CORNER_SCRUB if _corner_loss > 0.005 else 0.0)
 			speed = move_toward(speed, target, drag * delta)
 	elif brake > 0.05:
 		if speed > 0.5:
@@ -875,6 +976,8 @@ func _physics_process(delta: float) -> void:
 		yaw = steer * turn_rate * turn_factor * high_speed * (1.0 if speed >= 0.0 else -1.0)
 	if not on_floor:
 		yaw *= GLIDE_TURN if gliding else 0.35
+	elif surface == Surface.GELO:
+		yaw *= ICE_TURN
 	# Suaviza a velocidade de giro: o kart não dá trancos ao entrar/sair do drift.
 	_yaw_rate = lerpf(_yaw_rate, yaw, 1.0 - exp(-yaw_smoothing * delta))
 	rotate_y(_yaw_rate * delta)
@@ -885,7 +988,17 @@ func _physics_process(delta: float) -> void:
 	var traction := drift_grip if drifting else grip
 	if not on_floor:
 		traction *= GLIDE_TRACTION if gliding else 0.4
+	elif surface == Surface.GELO and not judged:
+		# No gelo a velocidade demora para seguir o bico: o kart escorrega de lado.
+		traction *= ICE_DRIFT_GRIP if drifting else ICE_GRIP
 	horizontal = horizontal.lerp(fwd * speed, 1.0 - exp(-traction * delta))
+	if surface == Surface.AREIA_MOVEDICA and on_floor and pit_center != Vector4.INF and not judged:
+		# Redemoinho: puxa para o meio e gira o kart devagar.
+		var to_center := Vector3(pit_center.x - global_position.x, 0.0, pit_center.z - global_position.z)
+		var reach := clampf(to_center.length() / maxf(pit_center.w, 0.1), 0.0, 1.0)
+		if to_center.length_squared() > 0.04:
+			horizontal += to_center.normalized() * QUICKSAND_PULL * (0.4 + 0.6 * reach) * delta
+		rotate_y(QUICKSAND_SPIN * (1.0 - reach) * delta)
 	# Decolagem: quando a frente do kart passa da borda da rampa ele sai do chão
 	# com a inclinação da borda (só a gravidade age a partir daí).
 	if ramp and _vertical <= 0.0:
@@ -893,12 +1006,18 @@ func _physics_process(delta: float) -> void:
 		if along > 2.0 and ramp.to_lip_space(global_position).z + along * delta >= -LIP_REACH:
 			horizontal = _launch(ramp, horizontal)
 			on_floor = false
+	if _dune_hop > 0.0 and on_floor and _vertical <= 0.0:
+		_vertical = _dune_hop
+		on_floor = false
+		if driver:
+			driver.bounce(-0.6)
+	_dune_hop = 0.0
 	if on_floor and _vertical <= 0.0:
 		_vertical = -2.0
 	elif gliding:
-		_vertical = move_toward(_vertical, -_glide_sink(), GLIDE_GRAVITY * delta)
+		_vertical = move_toward(_vertical, -_glide_sink(), (GLIDE_LAND_ACCEL if _glide_landing else GLIDE_GRAVITY) * delta)
 	else:
-		_vertical -= GRAVITY * delta
+		_vertical -= GRAVITY * (UNDERWATER_GRAVITY if underwater else 1.0) * delta
 	velocity = horizontal + Vector3.UP * _vertical
 	move_and_slide()
 	var now_on_floor := is_on_floor()
@@ -1432,7 +1551,11 @@ func _update_skid_marks(on_floor: bool) -> void:
 		return
 	_marking = true
 	var n := get_floor_normal()
-	var color := _offroad_mark if is_offroad else ROAD_MARK
+	var color := _offroad_mark if is_offroad or surface == Surface.AREIA_FOFA or surface == Surface.AREIA_MOVEDICA else ROAD_MARK
+	if surface == Surface.GELO:
+		color = ICE_MARK
+	elif surface == Surface.AREIA:
+		color = _offroad_mark
 	# Mais forte com o drift carregado.
 	color.a *= 0.75 + 0.1 * drift_level
 	var origin := global_position
@@ -1498,10 +1621,16 @@ func _launch(ramp: JumpRamp, horizontal: Vector3) -> Vector3:
 	_air_expected = (_vertical + sqrt(_vertical * _vertical + 2.0 * GRAVITY * h)) / GRAVITY
 	if ramp.glider:
 		# Rampa de asa-delta: sobe sempre igual e a asa abre logo depois (a manobra tem
-		# tempo de sobra: o voo é longo).
+		# tempo de sobra: o voo é longo). Quem chega devagar (batido, saindo de uma
+		# rodada) decola com pelo menos GLIDE_MIN_LAUNCH da velocidade máxima: o vão de
+		# um vale sempre dá para atravessar.
 		_vertical = GLIDE_LAUNCH_VY
 		_glide_pending = true
 		_air_expected = GLIDE_OPEN_DELAY + 1.0
+		var least := max_speed * speed_multiplier * GLIDE_MIN_LAUNCH
+		if absf(speed) < least:
+			speed = least
+			horizontal = horizontal.normalized() * least if horizontal.length_squared() > 0.01 else dir * least
 	_trick_window = TRICK_WINDOW
 	jumped.emit()
 	if _trick_buffer > 0.0:
@@ -1602,6 +1731,7 @@ func _open_glider() -> void:
 	_glide_pending = false
 	gliding = true
 	_glide_time = 0.0
+	_glide_landing = false
 	# Sem manobra nova debaixo da asa; um drift carregado vira o turbo dele.
 	_trick_window = 0.0
 	_trick_buffer = 0.0
@@ -1615,8 +1745,21 @@ func _open_glider() -> void:
 	glider_opened.emit()
 
 
+## Passou da beira do outro lado do vale: a asa desce para o pouso (a corrida chama).
+## O freio não segura mais o voo.
+func glide_land() -> void:
+	if gliding:
+		_glide_landing = true
+
+
+## Está descendo para o pouso?
+func is_glide_landing() -> bool:
+	return gliding and _glide_landing
+
+
 ## A asa-delta fecha (tocou o chão, ou o kart foi reposicionado).
 func _close_glider() -> void:
+	_glide_landing = false
 	_glide_pending = false
 	if not gliding:
 		return
@@ -1629,6 +1772,8 @@ func _close_glider() -> void:
 
 ## Velocidade de descida planando agora (m/s).
 func _glide_sink() -> float:
+	if _glide_landing:
+		return GLIDE_LAND_SINK
 	var sink := lerpf(GLIDE_SINK, GLIDE_SINK_SLOW, _glide_pull)
 	if _glide_time > GLIDE_TIRED_TIME:
 		sink += (_glide_time - GLIDE_TIRED_TIME) * GLIDE_TIRED_SINK
@@ -1717,6 +1862,8 @@ func prewarm_effects(on: bool) -> void:
 	var emitters: Array[GPUParticles3D] = [sparks_left, sparks_right]
 	emitters.append_array(_dust_emitters)
 	emitters.append_array(_rev_smoke)
+	if water_fx:
+		water_fx.prewarm(on)
 	for p in emitters:
 		if on:
 			p.emitting = true
@@ -1768,7 +1915,7 @@ func _update_visuals(delta: float, steer: float) -> void:
 		ground_roll = -asin(clampf(n.dot(global_basis.x), -1.0, 1.0))
 	elif gliding:
 		# Planando: bico um pouco para baixo; freando, o bico sobe.
-		ground_pitch = GLIDE_NOSE + 0.22 * _glide_pull
+		ground_pitch = GLIDE_LAND_NOSE if _glide_landing else GLIDE_NOSE + 0.22 * _glide_pull
 		ground_rate = 3.0
 	elif ramp_jump or _air_time > LONG_AIR_TIME:
 		# No pulo o bico acompanha o arco: sobe na decolagem e desce na queda.
@@ -1852,8 +1999,11 @@ func _update_visuals(delta: float, steer: float) -> void:
 		boost_fx.update(delta, boost_time > 0.0)
 	_land_dust = maxf(_land_dust - delta, 0.0)
 	# Poeira (ou neve) das rodas de trás: fora do asfalto, no drift e na aterrissagem.
-	var grounded := is_on_floor()
-	var offroad_dust := is_offroad and absf(speed) > 4.0 and grounded
+	var grounded := is_on_floor() and not underwater
+	# Nas dunas (e no redemoinho) a areia voa sempre que o kart anda.
+	var sandy := surface == Surface.AREIA_FOFA or surface == Surface.AREIA_MOVEDICA \
+			or (surface == Surface.AREIA and absf(speed) > 14.0)
+	var offroad_dust := (is_offroad or sandy) and absf(speed) > 4.0 and grounded
 	var drift_dust := drifting and absf(speed) > 6.0 and grounded
 	var dusty := offroad_dust or drift_dust or _land_dust > 0.0
 	var ratio := 1.0 if offroad_dust or _land_dust > 0.0 else 0.45 + 0.18 * drift_level

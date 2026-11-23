@@ -5,6 +5,8 @@ extends Node
 ## recordes.
 
 const RECORDS_PATH := "user://recordes.cfg"
+## Versão do traçado das pistas (veja record_section).
+const TRACK_LAYOUT := 2
 
 const SCENE_MAIN_MENU := "res://scenes/main_menu.tscn"
 const SCENE_MODE_SELECT := "res://scenes/mode_select.tscn"
@@ -726,14 +728,21 @@ func record_key(base: String) -> String:
 
 
 func get_record(track_id: String, key: String) -> float:
-	return float(_records.get_value(track_id, key, -1.0))
+	return float(_records.get_value(record_section(track_id), key, -1.0))
+
+
+## Seção dos recordes de uma pista. As pistas ganharam trechos novos (mergulho, dunas,
+## gelo e o vale da asa-delta) e ficaram mais compridas em 2026-11: os tempos de antes
+## não dá para comparar, então os recordes (e fantasmas) recomeçam no traçado novo.
+static func record_section(track_id: String) -> String:
+	return "%s@%d" % [track_id, TRACK_LAYOUT]
 
 
 ## Salva o tempo se for recorde. Retorna true quando é um recorde novo.
 func submit_record(track_id: String, key: String, time: float) -> bool:
 	var old := get_record(track_id, key)
 	if old < 0.0 or time < old:
-		_records.set_value(track_id, key, time)
+		_records.set_value(record_section(track_id), key, time)
 		_records.save(RECORDS_PATH)
 		return true
 	return false

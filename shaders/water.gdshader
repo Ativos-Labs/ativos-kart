@@ -31,6 +31,11 @@ vec2 wave_slope(vec2 p) {
 
 void fragment() {
 	float scene_depth_raw = texture(depth_texture, SCREEN_UV).r;
+#if CURRENT_RENDERER == RENDERER_COMPATIBILITY
+	// No Compatibility (web) a profundidade vai de 0 a 1 e o NDC de -1 a 1 (no
+	// Forward+ o Z já é o do NDC): sem isso a água inteira virava espuma branca.
+	scene_depth_raw = scene_depth_raw * 2.0 - 1.0;
+#endif
 	vec4 view = INV_PROJECTION_MATRIX * vec4(SCREEN_UV * 2.0 - 1.0, scene_depth_raw, 1.0);
 	view.xyz /= view.w;
 	float water_depth = max(-view.z - (-VERTEX.z), 0.0);

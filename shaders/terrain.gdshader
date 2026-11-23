@@ -2,7 +2,9 @@ shader_type spatial;
 render_mode diffuse_burley, specular_schlick_ggx;
 // Terreno: grama cortada em listras perto da pista, campos com manchas, areia na
 // beira dos lagos, pedra nas encostas e neve no alto das montanhas.
-// COLOR.r = 1 perto da pista (grama aparada), 0 longe.
+// COLOR.r = 1 perto da pista (grama aparada), 0 longe. COLOR.g = dunas (mar de areia
+// em volta do trecho de areia da pista). COLOR.b = paredão de vale (pedra).
+// Debaixo d'água, cáusticas no fundo.
 
 #include "res://shaders/noise.gdshaderinc"
 
@@ -29,15 +31,23 @@ uniform float strata = 0.1;
 uniform float strata_freq = 0.9;
 uniform vec3 rock_band : source_color = vec3(0.6, 0.55, 0.5);
 uniform float band_mix = 0.0;
+// Força das cáusticas (luz dançando no fundo debaixo d'água; 0 = sem, como no gelo).
+uniform float caustic_strength = 0.6;
+uniform vec3 dune_light : source_color = vec3(0.96, 0.8, 0.55);
+uniform vec3 dune_dark : source_color = vec3(0.84, 0.6, 0.36);
 
 varying vec3 world_pos;
 varying vec3 world_normal;
 varying float near_track;
+varying float dune;
+varying float cliff;
 
 void vertex() {
 	world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	world_normal = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
 	near_track = COLOR.r;
+	dune = COLOR.g;
+	cliff = COLOR.b;
 }
 
 void fragment() {
@@ -63,6 +73,8 @@ void fragment() {
 	vec3 wn = normalize(world_normal);
 	float slope = 1.0 - wn.y;
 	float rock_mask = smoothstep(rock_slope, rock_slope + 0.16, slope + (n_mid - 0.5) * 0.18);
+	// Paredões dos vales da asa-delta são sempre de pedra (COLOR.b).
+	rock_mask = max(rock_mask, smoothstep(0.15, 0.6, cliff + (n_mid - 0.5) * 0.3));
 	if (rock_mask > 0.0) {
 		// Ruído projetado no plano da encosta (e não no chão XZ), senão ele estica
 		// e vira listras verticais nas paredes das montanhas.
@@ -86,7 +98,21 @@ void fragment() {
 	float shore = 1.0 - smoothstep(water_level + 0.45, water_level + sand_band, world_pos.y + (n_fine - 0.5) * 0.35);
 	col = mix(col, sand * (0.92 + n_fine * 0.1), shore * (1.0 - near_track));
 
+	// Mar de dunas: areia lisa com marcas do vento, mais escura na face à sombra.
+	if (dune > 0.001) {
+		float warp = vnoise(p * 0.03) * 8.0;
+		float ripple = sin((p.x * 0.8 + p.y * 0.6) * 1.9 + warp) * 0.5 + 0.5;
+		vec3 dcol = mix(dune_dark, dune_light, smoothstep(0.25, 0.85, n_big + (1.0 - slope) * 0.3));
+		dcol *= 0.95 + 0.07 * ripple * (1.0 - lod);
+		col = mix(col, dcol, dune * (1.0 - rock_mask * 0.6));
+	}
+
 	ALBEDO = col;
 	ROUGHNESS = mix(0.92, 0.55, snow_mask);
 	SPECULAR = 0.3;
+	if (caustic_strength > 0.0 && world_pos.y < water_level - 0.15) {
+		float depth = water_level - world_pos.y;
+		float fade = smoothstep(0.15, 1.2, depth) * (1.0 - smoothstep(9.0, 22.0, depth));
+		EMISSION = vec3(0.5, 0.8, 0.75) * caustics(p, TIME) * fade * caustic_strength;
+	}
 }

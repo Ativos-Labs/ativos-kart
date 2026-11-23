@@ -32,7 +32,8 @@ var stride := STRIDE
 
 
 static func path_for(p_track_id: String, p_class: String) -> String:
-	return "%s/%s_%s.fantasma" % [DIR, p_track_id, p_class]
+	# Um fantasma por versão do traçado (o do traçado antigo não serve no novo).
+	return "%s/%s_%s.fantasma" % [DIR, GameState.record_section(p_track_id), p_class]
 
 
 ## Começa uma gravação para o kart `kart` (de um jogador).

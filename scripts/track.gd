@@ -20,6 +20,10 @@ const WORDMARK_DARK := preload("res://assets/logos/ativos_marca_branca.png")
 ## (ItemBox.TOUCH_SIZE), a fileira não deixa vão por onde um kart de 0,7 m passe sem pegar
 ## nenhuma.
 const ITEM_BOX_SPACING := 1.7
+## Nas dunas, a faixa de areia fofa junto de cada borda do asfalto (m).
+const SOFT_SAND_EDGE := 2.2
+## Quanto o asfalto do trecho de gelo fica acima da água congelada (m).
+const ICE_ROAD_LIFT := 0.06
 
 @export var track_id := "circuito_ativos"
 @export var track_name := "Circuito Ativos"
@@ -49,6 +53,15 @@ const ITEM_BOX_SPACING := 1.7
 @export var ramps: Array[TrackRamp] = []:
 	set(value):
 		ramps = value
+		_watch_bridges()
+		_queue_rebuild()
+
+@export_group("Trechos especiais")
+## Trechos com cara e física próprias (veja track_section.gd): mergulho por baixo
+## d'água, dunas de areia, lago congelado e vale para atravessar de asa-delta.
+@export var sections: Array[TrackSection] = []:
+	set(value):
+		sections = value
 		_watch_bridges()
 		_queue_rebuild()
 
@@ -248,6 +261,16 @@ var terrain: TrackTerrain
 var bridge_mask := PackedByteArray()
 ## Trechos de ponte: {"bridge": TrackBridge, "from": índice, "to": índice}.
 var bridge_spans: Array[Dictionary] = []
+## Trecho especial de cada amostra (índice em `sections`, -1 = nenhum) e quanto ele
+## vale ali (1 dentro, 0..1 nas rampas de transição).
+var section_of := PackedInt32Array()
+var section_blend := PackedFloat32Array()
+## Amostras no ar, sobre o vale (sem asfalto): 1. Nelas `bridge_mask` = 3.
+var gap_mask := PackedByteArray()
+## Trechos sobre vales: {"section": TrackSection, "from": 1ª amostra no ar, "to": última}.
+var gap_spans: Array[Dictionary] = []
+## Cristas das dunas (m da largada): passando rápido por uma, o kart dá um pulinho.
+var dune_crests := PackedFloat32Array()
 ## Moedas da pista (null se não tiver).
 var coins: TrackCoins
 ## Obstáculos que se mexem (null se a pista não tiver).
@@ -284,10 +307,142 @@ func _watch_bridges() -> void:
 	for r in ramps:
 		if r and not r.changed.is_connected(_queue_rebuild):
 			r.changed.connect(_queue_rebuild)
+	for s in sections:
+		if s and not s.changed.is_connected(_queue_rebuild):
+			s.changed.connect(_queue_rebuild)
 
 
+## Ponte ou trecho no ar sobre um vale (o chão embaixo não segue a pista).
 func is_bridge(index: int) -> bool:
 	return index >= 0 and index < bridge_mask.size() and bridge_mask[index] != 0
+
+
+## Amostra no ar, em cima de um vale (sem asfalto embaixo).
+func is_gap(index: int) -> bool:
+	return index >= 0 and index < gap_mask.size() and gap_mask[index] != 0
+
+
+## Trecho especial na amostra (null = pista comum).
+func section_at(index: int) -> TrackSection:
+	if index < 0 or index >= section_of.size() or section_of[index] < 0:
+		return null
+	return sections[section_of[index]]
+
+
+## Tipo do trecho especial na amostra (TrackSection.Kind) ou -1. Nas rampas de
+## transição só conta a partir da metade.
+func section_kind_at(index: int) -> int:
+	var s := section_at(index)
+	if s == null or section_blend[index] < 0.5:
+		return -1
+	return s.kind
+
+
+## Amostra comum: sem ponte, vale, água, gelo ou areia (para placas e enfeites).
+func is_plain(index: int) -> bool:
+	return not is_bridge(index) and (index >= section_of.size() or section_of[index] < 0)
+
+
+## A pista passa por baixo d'água em algum trecho?
+func has_underwater() -> bool:
+	for s in sections:
+		if s and s.kind == TrackSection.Kind.SUBMERSO:
+			return true
+	return false
+
+
+## Algum kart pode ficar submerso (mergulho, ou cair no rio de um vale)?
+func has_water_sections() -> bool:
+	if has_underwater():
+		return true
+	for s in sections:
+		if s and s.kind == TrackSection.Kind.VALE and s.valley_floor < water_level:
+			return true
+	return false
+
+
+## Vistas (espaço local) de cada trecho especial para Race.warm_up compilar os shaders
+## de lá: [{"xform": Transform3D, "under": debaixo d'água}].
+func section_views() -> Array[Dictionary]:
+	var views: Array[Dictionary] = []
+	for s in sections:
+		if s == null:
+			continue
+		var a := s.start * length
+		var e := s.end * length
+		var mid := (a + e) * 0.5
+		match s.kind:
+			TrackSection.Kind.VALE:
+				var xf := get_transform_at(a - 6.0)
+				views.append({"xform": Transform3D(xf.basis, xf.origin + Vector3.UP * 6.0), "under": false})
+				# Olhando para a cabeceira do vale (cachoeira) e para o outro lado.
+				for side: float in [-1.0, 1.0]:
+					var b := xf.basis.rotated(Vector3.UP, side * 1.2)
+					views.append({"xform": Transform3D(b, get_point_at(mid) + Vector3.UP * 4.0), "under": false})
+			_:
+				var xf := get_transform_at(mid)
+				var under := s.kind == TrackSection.Kind.SUBMERSO
+				views.append({"xform": Transform3D(xf.basis, xf.origin + Vector3.UP * 2.0), "under": under})
+				var back := get_transform_at(a + 10.0)
+				views.append({"xform": Transform3D(back.basis.rotated(Vector3.UP, 0.7), back.origin + Vector3.UP * 2.5), "under": under})
+	return views
+
+
+## Metros depois da beira do pouso de um vale (a primeira amostra com chão depois do
+## vão) até a amostra `index`, ou -1 se ela não fica logo depois de um vale (até 250 m).
+func past_gap(index: int) -> float:
+	var n := samples.size()
+	for span in gap_spans:
+		var e: int = (int(span.to) + 1) % n
+		var d := fposmod(distances[index] - distances[e], length)
+		if d < 250.0:
+			return d
+	return -1.0
+
+
+## Primeira amostra com chão depois do vale que contém `index` (ou `index`).
+func gap_exit(index: int) -> int:
+	for span in gap_spans:
+		var from: int = span.from
+		var to: int = span.to
+		if index >= from - 1 and index <= to + 1:
+			return (to + 1) % samples.size()
+	return index
+
+
+## O que o kart pisa (lateral em m, + = direita): Kart.Surface.
+func surface_at(index: int, lateral: float) -> int:
+	var kind := section_kind_at(index)
+	match kind:
+		TrackSection.Kind.GELO:
+			return Kart.Surface.GELO
+		TrackSection.Kind.AREIA:
+			var s := section_at(index)
+			var along := distances[index]
+			for pit in s.pits:
+				var d := absf(wrapf(pit.x * length - along, -length * 0.5, length * 0.5))
+				if d < pit.z and absf(lateral - pit.y) < pit.z:
+					if Vector2(d, lateral - pit.y).length() < pit.z:
+						return Kart.Surface.AREIA_MOVEDICA
+			# Areia fofa nas bordas (perto das muretas).
+			if absf(lateral) > road_width * 0.5 - SOFT_SAND_EDGE:
+				return Kart.Surface.AREIA_FOFA
+			return Kart.Surface.AREIA
+	return Kart.Surface.ASFALTO
+
+
+## Centro (espaço local) do redemoinho de areia movediça mais perto, ou Vector3.INF.
+func pit_center(index: int, lateral: float) -> Vector4:
+	var s := section_at(index)
+	if s == null or s.kind != TrackSection.Kind.AREIA:
+		return Vector4.INF
+	var along := distances[index]
+	for pit in s.pits:
+		var d := wrapf(pit.x * length - along, -length * 0.5, length * 0.5)
+		if absf(d) < pit.z + 1.0 and absf(lateral - pit.y) < pit.z + 1.0:
+			var c := get_transform_at(pit.x * length, pit.y).origin
+			return Vector4(c.x, c.y, c.z, pit.z)
+	return Vector4.INF
 
 
 func _river_paths() -> Array[Path3D]:
@@ -375,6 +530,7 @@ func build_geometry(defer_physics := false) -> void:
 		terrain.river_valley = river_valley
 		terrain.deck_half = road_width * 0.5 + shoulder_width + wall_thickness
 		terrain.flat_distance = road_width * 0.5 + shoulder_width + wall_thickness + 2.5
+		_setup_terrain_sections()
 		terrain.setup(samples, decoration_seed, bridge_mask, rivers)
 		# A largada (arquibancada) fica num terreno plano.
 		var start := get_point_at(0.0)
@@ -398,6 +554,8 @@ func build_geometry(defer_physics := false) -> void:
 	_build_obstacles()
 	if not bridge_spans.is_empty():
 		TrackBridgeBuilder.new(self, terrain, _generated).build(preview)
+	if not sections.is_empty():
+		TrackSectionBuilder.new(self, terrain, _generated).build(preview)
 	TrackScenery.new(self, terrain, _generated).build(preview)
 
 
@@ -417,6 +575,75 @@ func physics_job(job: Callable) -> void:
 		_physics_jobs.append(job)
 	else:
 		job.call()
+
+
+## Passa ao terreno o que os trechos especiais mudam no chão: o fundo do lago/recife
+## em volta do mergulho e do lago congelado, as dunas em volta da areia e as linhas
+## dos vales (filhos Path3D "Vale").
+func _setup_terrain_sections() -> void:
+	var count := samples.size()
+	terrain.basin_floor = PackedFloat32Array()
+	terrain.basin_floor.resize(count)
+	terrain.basin_floor.fill(INF)
+	terrain.basin_radius = PackedFloat32Array()
+	terrain.basin_radius.resize(count)
+	terrain.basin_strength = PackedFloat32Array()
+	terrain.basin_strength.resize(count)
+	terrain.sand_strength = PackedFloat32Array()
+	terrain.sand_strength.resize(count)
+	terrain.gap_edge = PackedByteArray()
+	terrain.gap_edge.resize(count)
+	for i in count:
+		var sec := section_at(i)
+		if sec == null:
+			continue
+		var f := section_blend[i]
+		match sec.kind:
+			TrackSection.Kind.SUBMERSO:
+				terrain.basin_floor[i] = samples[i].y - 0.03
+				terrain.basin_radius[i] = sec.basin
+				terrain.basin_strength[i] = f
+			TrackSection.Kind.GELO:
+				terrain.basin_floor[i] = lerpf(samples[i].y - 0.03, water_level - 1.2, f * f)
+				terrain.basin_radius[i] = sec.basin
+				terrain.basin_strength[i] = f
+			TrackSection.Kind.AREIA:
+				terrain.sand_strength[i] = f
+	# Perto das bordas do vão o chão fica firme só embaixo da pista: o penhasco começa
+	# logo onde o asfalto acaba.
+	var step := length / maxf(count, 1)
+	var edge := int(ceil(22.0 / step))
+	for span in gap_spans:
+		for side: int in [span.from - 1, span.to + 1]:
+			for k in range(-edge, edge + 1):
+				terrain.gap_edge[(side + k + count) % count] = 1
+	terrain.valleys.clear()
+	var vale_paths := _valley_paths()
+	for gi in gap_spans.size():
+		if gi >= vale_paths.size():
+			break
+		var sec: TrackSection = gap_spans[gi].section
+		var line := PackedVector2Array()
+		var path := vale_paths[gi]
+		var total := path.curve.get_baked_length()
+		var steps := maxi(2, int(total / 3.0))
+		for k in steps + 1:
+			var p := path.transform * path.curve.sample_baked(total * k / steps)
+			line.append(Vector2(p.x, p.z))
+		var count_s := samples.size()
+		var rim := maxf(samples[(int(gap_spans[gi].from) - 1 + count_s) % count_s].y,
+				samples[(int(gap_spans[gi].to) + 1) % count_s].y) + 1.5
+		terrain.valleys.append({"line": line, "half_top": sec.valley_width * 0.5,
+				"half_bed": sec.valley_bed * 0.5, "floor": sec.valley_floor, "rim": rim, "plateau": sec.valley_plateau})
+
+
+## Linhas do meio dos vales: filhos Path3D com nome começando por "Vale", na ordem.
+func _valley_paths() -> Array[Path3D]:
+	var paths: Array[Path3D] = []
+	for child in get_children():
+		if child is Path3D and String(child.name).begins_with("Vale") and child.curve and child.curve.point_count >= 2:
+			paths.append(child)
+	return paths
 
 
 # --- Consultas usadas pela corrida ------------------------------------------------
@@ -504,6 +731,11 @@ func _sample_curve() -> void:
 	length = 0.0
 	bridge_mask = PackedByteArray()
 	bridge_spans.clear()
+	section_of = PackedInt32Array()
+	section_blend = PackedFloat32Array()
+	gap_mask = PackedByteArray()
+	gap_spans.clear()
+	dune_crests = PackedFloat32Array()
 	var path := _get_path()
 	if path == null or path.curve == null or path.curve.point_count < 3:
 		push_warning("Track: adicione um Path3D chamado 'Tracado' com pelo menos 3 pontos.")
@@ -519,6 +751,7 @@ func _sample_curve() -> void:
 		distances.append(i * step)
 	length = baked_length
 	_apply_bridges()
+	_apply_sections()
 	for i in count:
 		var t := (samples[(i + 1) % count] - samples[(i - 1 + count) % count]).normalized()
 		tangents.append(t)
@@ -564,6 +797,81 @@ func _apply_bridges() -> void:
 			bridge_spans.append({"bridge": b, "from": first, "to": last})
 	for i in count:
 		samples[i].y += lift[i]
+
+
+## Trechos especiais: o mergulho (a pista desce até `depth` m abaixo da água), o lago
+## congelado (rente ao gelo), as dunas (sobe e desce) e o vale (amostras no ar, em
+## linha reta da borda de um lado até a do outro).
+func _apply_sections() -> void:
+	var count := samples.size()
+	section_of.resize(count)
+	section_of.fill(-1)
+	section_blend.resize(count)
+	section_blend.fill(0.0)
+	gap_mask.resize(count)
+	gap_mask.fill(0)
+	for si in sections.size():
+		var sec := sections[si]
+		if sec == null or sec.end <= sec.start:
+			continue
+		var a := sec.start * length
+		var e := sec.end * length
+		var target := water_level - sec.depth
+		if sec.kind == TrackSection.Kind.GELO:
+			target = water_level + ICE_ROAD_LIFT
+		# No vale: a altura das bordas (para ligar as duas em linha reta).
+		var ya := _height_at_distance(a)
+		var ye := _height_at_distance(e)
+		var dunes := maxi(1, roundi((e - a) / sec.dune_length))
+		if sec.kind == TrackSection.Kind.AREIA and sec.dune_height > 0.0:
+			for k in dunes:
+				dune_crests.append(a + (e - a) * (k + 0.5) / dunes)
+		var first := -1
+		var last := -1
+		for i in count:
+			var s := distances[i]
+			var f := 0.0
+			if s >= a and s <= e:
+				f = 1.0
+			else:
+				var before := fposmod(a - s, length)
+				var after := fposmod(s - e, length)
+				var reach := sec.ramp if sec.is_basin() else minf(sec.ramp, 25.0)
+				if sec.kind != TrackSection.Kind.VALE:
+					if before < reach:
+						f = smoothstep(0.0, 1.0, 1.0 - before / reach)
+					elif after < reach:
+						f = smoothstep(0.0, 1.0, 1.0 - after / reach)
+			if f <= 0.0:
+				continue
+			if f > section_blend[i] or section_of[i] < 0:
+				section_of[i] = si
+				section_blend[i] = f
+			match sec.kind:
+				TrackSection.Kind.SUBMERSO, TrackSection.Kind.GELO:
+					samples[i].y = lerpf(samples[i].y, target, f)
+				TrackSection.Kind.AREIA:
+					if f >= 1.0:
+						var u := (s - a) / (e - a) * dunes
+						samples[i].y += sec.dune_height * 0.5 * (1.0 - cos(TAU * u))
+				TrackSection.Kind.VALE:
+					if s > a and s < e:
+						samples[i].y = lerpf(ya, ye, (s - a) / (e - a))
+						gap_mask[i] = 1
+						bridge_mask[i] = 3
+						if first < 0:
+							first = i
+						last = i
+		if sec.kind == TrackSection.Kind.VALE and first >= 0:
+			gap_spans.append({"section": sec, "from": first, "to": last})
+
+
+## Altura da pista (com pontes) a `dist` m da largada, interpolando as amostras.
+func _height_at_distance(dist: float) -> float:
+	var count := samples.size()
+	var f := fposmod(dist, length) / (length / count)
+	var i := int(f) % count
+	return lerpf(samples[i].y, samples[(i + 1) % count].y, f - floorf(f))
 
 
 func _compute_curvature() -> void:
@@ -633,10 +941,15 @@ class MeshData:
 
 ## Faixa contínua ao longo da pista entre dois trilhos de pontos.
 ## Com `tangent_rail`, grava tangentes (direção de U) para o relevo do shader.
+## `colors` (uma por amostra) vai para COLOR. Não desenha os pedaços em que uma das
+## pontas está em `skip` (padrão: o vão dos vales).
 func _add_strip(md: MeshData, rail_a: PackedVector3Array, rail_b: PackedVector3Array,
-		face_normals: PackedVector3Array, u_a: float, u_b: float, with_tangents := false) -> void:
+		face_normals: PackedVector3Array, u_a: float, u_b: float, with_tangents := false,
+		colors := PackedColorArray(), skip := PackedByteArray()) -> void:
 	var count := samples.size()
 	var base := md.verts.size()
+	if skip.is_empty():
+		skip = gap_mask
 	for i in count + 1:
 		var j := i % count
 		var v := distances[j] if i < count else length
@@ -645,7 +958,12 @@ func _add_strip(md: MeshData, rail_a: PackedVector3Array, rail_b: PackedVector3A
 		if with_tangents:
 			var t := (rail_b[j] - rail_a[j]).normalized()
 			md.tangents.append_array([t.x, t.y, t.z, 1.0, t.x, t.y, t.z, 1.0])
+		if not colors.is_empty():
+			md.colors.append_array([colors[j], colors[j]])
+	var skipping := skip.size() == count
 	for i in count:
+		if skipping and (skip[i] != 0 or skip[(i + 1) % count] != 0):
+			continue
 		var a := base + i * 2
 		md.add_tri(a, a + 1, a + 2, face_normals[i])
 		md.add_tri(a + 1, a + 3, a + 2, face_normals[i])
@@ -736,7 +1054,15 @@ func _terrain_key(rivers: Array[PackedVector2Array]) -> String:
 	var bridged := 0
 	for b in bridge_mask:
 		bridged += b
-	return var_to_str([track_id, scenery, samples.size(), length, sum, bridged, river_points, river_sum,
+	var special := []
+	for s in sections:
+		if s:
+			special.append([s.kind, s.start, s.end, s.ramp, s.depth, s.basin, s.dune_height, s.dune_length,
+					s.valley_width, s.valley_floor, s.valley_bed, s.valley_plateau])
+	for path in _valley_paths():
+		special.append(path.curve.get_baked_length())
+		special.append(path.curve.sample_baked(0.0))
+	return var_to_str([track_id, scenery, samples.size(), length, sum, bridged, river_points, river_sum, special,
 			decoration_seed, water_level, hill_height, hill_bias, mountain_height, terrace_step,
 			sea_distance, river_width, river_depth, river_bank, river_valley, road_width,
 			shoulder_width, wall_thickness])
@@ -753,7 +1079,7 @@ func _build_ground(preview: bool, mesh: Mesh = null) -> Mesh:
 			mat.set_shader_parameter(key, params[key])
 		# Grade com células de ~2,8 m perto da pista (pistas compridas ganham mais linhas).
 		var inner_half := terrain.half_extent + Vector2(120.0, 120.0)
-		var cell := 5.6 if preview else 2.8
+		var cell := 5.6 if preview else 3.0
 		var res := Vector2i(int(inner_half.x / (0.36 * cell)), int(inner_half.y / (0.36 * cell)))
 		mesh = terrain.build_mesh(res, inner_half, 1250.0, mat)
 	var ground := _add_mesh(mesh)
@@ -761,8 +1087,11 @@ func _build_ground(preview: bool, mesh: Mesh = null) -> Mesh:
 	# O chão não projeta sombra: a malha inteira entraria em todas as cascatas de
 	# sombra do sol (centenas de milhares de triângulos) quase sem efeito visível.
 	ground.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	if with_collision:
+	if with_collision and _is_flat():
 		# O kart nunca sai das muretas: o chão de colisão é só um plano (grama = "offroad").
+		# Pista com subidas, mergulho ou vale usa a faixa de colisão da pista (veja
+		# _build_road): o plano atrapalharia (a pista passa abaixo dele) ou seguraria
+		# quem cai no vale.
 		var center := terrain.center
 		physics_job(func() -> void:
 			var shape := BoxShape3D.new()
@@ -785,19 +1114,42 @@ func _build_water() -> void:
 	water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
+## Cor de cada amostra para o asfalto (COLOR): r = areia batida, g = debaixo d'água
+## (algas e cáusticas), b = gelo.
+func _road_colors() -> PackedColorArray:
+	var colors := PackedColorArray()
+	colors.resize(samples.size())
+	for i in samples.size():
+		var c := Color(0.0, 0.0, 0.0, 1.0)
+		var sec := section_at(i)
+		if sec:
+			var f := section_blend[i]
+			match sec.kind:
+				TrackSection.Kind.AREIA:
+					c.r = f
+				TrackSection.Kind.SUBMERSO:
+					c.g = smoothstep(water_level + 0.4, water_level - 1.6, samples[i].y)
+				TrackSection.Kind.GELO:
+					c.b = f
+		colors[i] = c
+	return colors
+
+
 func _build_road() -> void:
 	var half := road_width * 0.5
 	var md := MeshData.new()
-	_add_strip(md, _offset_rail(-half, 0.0), _offset_rail(half, 0.0), _repeat(Vector3.UP), 0.0, 1.0, true)
+	var colors := _road_colors()
+	_add_strip(md, _offset_rail(-half, 0.0), _offset_rail(half, 0.0), _repeat(Vector3.UP), 0.0, 1.0, true, colors)
 	# Laterais do asfalto (dão volume quando a pista tem subidas).
-	_add_strip(md, _offset_rail(-half, 0.0), _offset_rail(-half, -0.6), _scaled_rights(-1.0), 0.0, 0.0, true)
-	_add_strip(md, _offset_rail(half, 0.0), _offset_rail(half, -0.6), _scaled_rights(1.0), 1.0, 1.0, true)
+	_add_strip(md, _offset_rail(-half, 0.0), _offset_rail(-half, -0.6), _scaled_rights(-1.0), 0.0, 0.0, true, colors)
+	_add_strip(md, _offset_rail(half, 0.0), _offset_rail(half, -0.6), _scaled_rights(1.0), 1.0, 1.0, true, colors)
 	var mat := ShaderMaterial.new()
 	mat.shader = ROAD_SHADER
 	mat.set_shader_parameter("road_width", road_width)
 	mat.set_shader_parameter("track_length", length)
 	mat.set_shader_parameter("curb_min", curb_min_width)
 	mat.set_shader_parameter("logo_texture", LOGO_ICON)
+	mat.set_shader_parameter("soft_edge", SOFT_SAND_EDGE)
 	var road := _add_mesh(md.to_mesh(mat))
 	road.name = "Asfalto"
 	road.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -821,6 +1173,12 @@ func _build_curbs() -> void:
 	var mat := ShaderMaterial.new()
 	mat.shader = CURB_SHADER
 	var md := MeshData.new()
+	# Sem zebras nas dunas (nem no vão do vale).
+	var skip := gap_mask.duplicate()
+	for i in samples.size():
+		var sec := section_at(i)
+		if sec and sec.kind == TrackSection.Kind.AREIA and section_blend[i] > 0.15:
+			skip[i] = 1
 	for side: float in [-1.0, 1.0]:
 		var inner := PackedFloat32Array()
 		var ramp := PackedFloat32Array()
@@ -840,10 +1198,10 @@ func _build_curbs() -> void:
 		var r2 := _offset_rail(side * (half - 0.07), top)
 		var r3 := _offset_rail(side * half, 0.03)
 		var r4 := _offset_rail(side * half, -0.15)
-		_add_strip(md, r0, r1, _slope_normals(side, 0.22, top), 0.0, 0.15)
-		_add_strip(md, r1, r2, _repeat(Vector3.UP), 0.15, 0.95)
-		_add_strip(md, r2, r3, _slope_normals(side, 0.07, -0.045), 0.95, 1.0)
-		_add_strip(md, r3, r4, _scaled_rights(side), 1.0, 1.0)
+		_add_strip(md, r0, r1, _slope_normals(side, 0.22, top), 0.0, 0.15, false, PackedColorArray(), skip)
+		_add_strip(md, r1, r2, _repeat(Vector3.UP), 0.15, 0.95, false, PackedColorArray(), skip)
+		_add_strip(md, r2, r3, _slope_normals(side, 0.07, -0.045), 0.95, 1.0, false, PackedColorArray(), skip)
+		_add_strip(md, r3, r4, _scaled_rights(side), 1.0, 1.0, false, PackedColorArray(), skip)
 	var curbs := _add_mesh(md.to_mesh(mat))
 	curbs.name = "Zebras"
 	curbs.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF

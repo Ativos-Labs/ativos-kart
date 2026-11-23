@@ -4,50 +4,75 @@
 [ext_resource type="Shader" uid="uid://w3dvvi0opuc0" path="res://shaders/sky.gdshader" id="2_sky"]
 [ext_resource type="Script" uid="uid://djlvhqy6ktt7f" path="res://scripts/track_bridge.gd" id="3_bridge"]
 [ext_resource type="Script" uid="uid://cmctvjjxwx0sn" path="res://scripts/track_ramp.gd" id="4_ramp"]
+[ext_resource type="Script" uid="uid://dga1qtl8l2npd" path="res://scripts/track_section.gd" id="5_section"]
 
 [sub_resource type="Resource" id="Resource_ponte0"]
 script = ExtResource("3_bridge")
-start = 0.225
-end = 0.365
+start = 0.186
+end = 0.302
 height = 5.5
 ramp = 38.0
 over_water = true
 style = 1
 
-[sub_resource type="Resource" id="Resource_ponte1"]
-script = ExtResource("3_bridge")
-start = 0.73
-end = 0.815
-height = 4.0
-ramp = 30.0
-over_water = true
-
 [sub_resource type="Resource" id="Resource_rampa0"]
 script = ExtResource("4_ramp")
-at = 0.489
-
-[sub_resource type="Resource" id="Resource_rampa1"]
-script = ExtResource("4_ramp")
-at = 0.931
-height = 1.3
-angle = 21.0
-
-[sub_resource type="Resource" id="Resource_rampa_asa"]
-script = ExtResource("4_ramp")
-at = 0.27
+at = 0.488
+glide_distance = 210.0
 length = 14.0
 height = 2.2
 angle = 26.0
 glider = true
+full_width = true
+
+[sub_resource type="Resource" id="Resource_rampa1"]
+script = ExtResource("4_ramp")
+at = 0.944
+height = 1.3
+angle = 21.0
+
+[sub_resource type="Resource" id="Resource_rampa2"]
+script = ExtResource("4_ramp")
+at = 0.248
+length = 11.0
+height = 1.5
+turbo = true
+
+[sub_resource type="Resource" id="Resource_trecho0"]
+script = ExtResource("5_section")
+kind = 3
+start = 0.488
+end = 0.562
+valley_width = 116.0
+valley_floor = -10.0
+valley_bed = 50.0
+valley_plateau = 60.0
+
+[sub_resource type="Resource" id="Resource_trecho1"]
+script = ExtResource("5_section")
+kind = 0
+start = 0.74
+end = 0.85
+ramp = 42.0
+depth = 7.6
+basin = 80.0
+
+[sub_resource type="Curve3D" id="Curve3D_vale"]
+bake_interval = 2.0
+_data = {
+"points": PackedVector3Array(0, 0, 0, -14.471, 0, 0.116, 350, 0, 46, -14.412, 0, 1.31, 13.309, 0, -1.21, 390, 0, 42, -13.36, 0, 0.297, 19.079, 0, -0.424, 427, 0, 39, -19.04, 0, -1.288, 28.878, 0, 1.954, 480, 0, 40, -28.944, 0, 0, 28.944, 0, 0, 560, 0, 48, 28.942, 0, 0.276, 0, 0, 0, 640, 0, 40),
+"tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0)
+}
+point_count = 6
 
 [sub_resource type="Curve3D" id="Curve3D_tracado"]
 closed = true
 bake_interval = 0.5
 _data = {
-"points": PackedVector3Array(1.217, 0, 12.475, -1.845, 0, -18.91, 0, 0, 0, 2.985, 0, 18.764, -2.418, 0, -15.198, 0, 0, -50, 1.244, 0, 15.338, -1.133, 0, -13.968, -14, 0, -88, -7.037, 0, 12.119, 7.291, 0, -12.557, -6, 0, -124, -12.987, 0, 6.493, 16.816, 0, -8.408, 22, 0, -150, -18.546, 0, 3.091, 22.602, 0, -3.767, 70, 0, -162, -22.911, 0, -0.382, 22.999, 0, 0.383, 130, 0, -168, -22.7, 0, -3.715, 19.122, 0, 3.129, 190, 0, -160, -18.845, 0, -4.506, 16.143, 0, 3.86, 240, 0, -150, -14.412, 0, -8.235, 13.065, 0, 7.466, 282, 0, -138, -6.227, 0, -13.698, 5.984, 0, 13.164, 310, 0, -110, 4.439, 0, -13.762, -3.798, 0, 11.774, 312, 0, -72, 9.473, 0, -7.958, -9.685, 0, 8.136, 290, 0, -48, 7.452, 0, -10.22, -6.897, 0, 9.459, 262, 0, -30, -2.058, 0, -11.524, 2.075, 0, 11.621, 255, 0, 0, -8.347, 0, -8.347, 9.092, 0, 9.092, 272, 0, 26, -6.673, 0, -10.991, 7.392, 0, 12.175, 300, 0, 45, 3.913, 0, -13.696, -3.694, 0, 12.928, 306, 0, 82, 12.241, 0, -5.564, -14.595, 0, 6.634, 282, 0, 108, 15.972, 0, 1.389, -19.466, 0, -1.693, 240, 0, 112, 19.477, 0, 1.558, -19, 0, -1.52, 190, 0, 100, 18.844, 0, -2.868, -16.219, 0, 2.468, 140, 0, 104, 16.352, 0, 1.326, -13.551, 0, -1.099, 98, 0, 114, 8.953, 0, 10.232, -8.389, 0, -9.588, 66, 0, 98, 6.972, 0, 10.663, -6.497, 0, -9.936, 56, 0, 66, 9.687, 0, 6.862, -8.616, 0, -6.103, 32, 0, 46, 6.029, 0, 8.667, -7.158, 0, -10.289, 8, 0, 32),
-"tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+"points": PackedVector3Array(1.112, 0, 11.122, -1.791, 0, -17.911, 0, 0, 0, 2.828, 0, 17.776, -2.291, 0, -14.398, 0, 0, -50, 1.178, 0, 14.531, -1.073, 0, -13.233, -14, 0, -88, -6.666, 0, 11.481, 6.907, 0, -11.896, -6, 0, -124, -12.303, 0, 6.152, 15.931, 0, -7.966, 22, 0, -150, -17.569, 0, 2.928, 21.412, 0, -3.569, 70, 0, -162, -21.705, 0, -0.362, 21.788, 0, 0.363, 130, 0, -168, -21.505, 0, -3.519, 18.116, 0, 2.964, 190, 0, -160, -17.938, 0, -3.899, 15.188, 0, 3.302, 240, 0, -150, -15.276, -0.355, -2.842, 15.729, 0.366, 2.926, 282, 0, -140, -15.419, -1.199, -4.112, 17.221, 1.339, 4.592, 326, 2, -134, -15.34, -1.871, -8.98, 14.561, 1.776, 8.524, 372, 7, -116, -10.064, -1.742, -13.547, 9.239, 1.599, 12.437, 408, 12, -86, -3.964, 0, -15.063, 3.319, 0, 12.61, 424, 16, -46, -0.189, 0, -13.038, 0.534, 0, 36.836, 428, 16, -10, 2.517, 0, -36.754, -1.101, 0, 16.078, 426, 8, 92, 6.569, 0.966, -14.684, -6.067, -0.892, 13.561, 418, 6, 136, 12.466, 0.842, -8.086, -15.269, -1.032, 9.904, 392, 3, 168, 18.052, 0.531, -2.478, -19.268, -0.567, 2.645, 344, 1, 184, 19.406, 0.173, 1.386, -20.937, -0.187, -1.496, 290, 0, 182, 20.916, 0, 1.773, -21.571, 0, -1.828, 232, 0, 176, 21.438, 0, 3.009, -19.721, 0, -2.768, 172, 0, 172, 18.324, 0, 7.798, -16.174, 0, -6.883, 118, 0, 160, 11.804, 0, 13.025, -9.73, 0, -10.737, 78, 0, 132, 5.175, 0, 13.534, -4.241, 0, -11.091, 60, 0, 96, 5.934, 0, 10.286, -5.349, 0, -9.271, 52, 0, 64, 8.47, 0, 6.545, -7.428, 0, -5.74, 30, 0, 44, 5.288, 0, 7.756, -6.297, 0, -9.235, 8, 0, 30),
+"tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 }
-point_count = 27
+point_count = 28
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_ceu"]
 shader = ExtResource("2_sky")
@@ -102,12 +127,13 @@ script = ExtResource("1_track")
 track_id = "ilha_ativos"
 track_name = "Ilha Ativos"
 scenery = 1
-bridges = Array[ExtResource("3_bridge")]([SubResource("Resource_ponte0"), SubResource("Resource_ponte1")])
-ramps = Array[ExtResource("4_ramp")]([SubResource("Resource_rampa0"), SubResource("Resource_rampa1"), SubResource("Resource_rampa_asa")])
-item_rows = PackedFloat32Array(0.14, 0.455, 0.655, 0.8)
-coin_lines = PackedVector3Array(0.049, -5, 4, 0.1, 5.3, 5, 0.177, 0, 5, 0.44, 1, 4, 0.548, -5, 4, 0.62, 1, 4, 0.688, -3, 5, 0.77, 2, 5, 0.87, 1, 5)
-obstacle_zones = PackedFloat32Array(0.177, 0.688)
-boost_pads = PackedFloat32Array(0.04, 0.215, 0.6, 0.77)
+bridges = Array[ExtResource("3_bridge")]([SubResource("Resource_ponte0")])
+ramps = Array[ExtResource("4_ramp")]([SubResource("Resource_rampa0"), SubResource("Resource_rampa1"), SubResource("Resource_rampa2")])
+sections = Array[ExtResource("5_section")]([SubResource("Resource_trecho0"), SubResource("Resource_trecho1")])
+item_rows = PackedFloat32Array(0.116, 0.335, 0.63, 0.795)
+coin_lines = PackedVector3Array(0.041, -5.0, 4.0, 0.083, 5.3, 5.0, 0.147, 0.0, 5.0, 0.2, 1.0, 4.0, 0.32, -4.0, 4.0, 0.37, 3.0, 5.0, 0.45, -3.0, 4.0, 0.6, 2.0, 5.0, 0.69, -4.0, 4.0, 0.77, 3.0, 5.0, 0.82, -3.0, 5.0, 0.87, 1.0, 5.0, 0.925, -4.0, 4.0)
+obstacle_zones = PackedFloat32Array(0.147, 0.665)
+boost_pads = PackedFloat32Array(0.033, 0.16, 0.415, 0.705, 0.9)
 tree_count = 420
 grass_count = 7000
 flower_count = 120
@@ -120,6 +146,9 @@ sea_distance = 30.0
 
 [node name="Tracado" type="Path3D" parent="." unique_id=1525258661]
 curve = SubResource("Curve3D_tracado")
+
+[node name="Vale" type="Path3D" parent="." unique_id=1137213620]
+curve = SubResource("Curve3D_vale")
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1956897786]
 environment = SubResource("Environment_pista")
