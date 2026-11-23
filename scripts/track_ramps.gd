@@ -133,36 +133,43 @@ func _build_ramp(ramp: TrackRamp) -> void:
 
 	if not track.with_collision:
 		return
-	var body := JumpRamp.new()
-	body.name = "RampaColisao"
-	var shape := ConcavePolygonShape3D.new()
-	shape.backface_collision = true
-	shape.set_faces(_solid_faces(md.collision_faces()))
-	var col := CollisionShape3D.new()
-	col.shape = shape
-	body.add_child(col)
+	# Formas e corpos de física só na thread principal (Track.physics_job); as faces
+	# são calculadas aqui.
+	var faces := _solid_faces(md.collision_faces())
 	var lip_point := track.get_point_at(lip_dist) + lip_right * center
-	body.lip = Transform3D(Basis.looking_at(lip_dir, Vector3.UP), lip_point)
-	body.ramp_length = ramp.length
-	body.half_width = half
-	body.height = ramp.height
-	body.launch_angle = ramp.lip_angle()
-	body.glider = ramp.glider
-	root.add_child(body)
+	# Locais: o job roda depois que este construtor (RefCounted) já foi solto.
+	var root_node := root
+	var on_boost := track._on_boost_pad_body_entered
+	track.physics_job(func() -> void:
+		var body := JumpRamp.new()
+		body.name = "RampaColisao"
+		var shape := ConcavePolygonShape3D.new()
+		shape.backface_collision = true
+		shape.set_faces(faces)
+		var col := CollisionShape3D.new()
+		col.shape = shape
+		body.add_child(col)
+		body.lip = Transform3D(Basis.looking_at(lip_dir, Vector3.UP), lip_point)
+		body.ramp_length = ramp.length
+		body.half_width = half
+		body.height = ramp.height
+		body.launch_angle = ramp.lip_angle()
+		body.glider = ramp.glider
+		root_node.add_child(body)
 
-	if ramp.turbo:
-		# Igual às placas de turbo: o kart ganha o turbo ao entrar na rampa.
-		var area := Area3D.new()
-		area.name = "TurboRampa"
-		var box := BoxShape3D.new()
-		box.size = Vector3(half * 2.0, ramp.height + 2.0, ramp.length)
-		var area_col := CollisionShape3D.new()
-		area_col.shape = box
-		area.add_child(area_col)
-		area.transform = Transform3D(Basis.looking_at(lip_dir, Vector3.UP),
-				lip_point - lip_dir * ramp.length * 0.5 + Vector3.UP * (ramp.height * 0.5 + 0.6))
-		area.body_entered.connect(track._on_boost_pad_body_entered)
-		root.add_child(area)
+		if ramp.turbo:
+			# Igual às placas de turbo: o kart ganha o turbo ao entrar na rampa.
+			var area := Area3D.new()
+			area.name = "TurboRampa"
+			var box := BoxShape3D.new()
+			box.size = Vector3(half * 2.0, ramp.height + 2.0, ramp.length)
+			var area_col := CollisionShape3D.new()
+			area_col.shape = box
+			area.add_child(area_col)
+			area.transform = Transform3D(Basis.looking_at(lip_dir, Vector3.UP),
+					lip_point - lip_dir * ramp.length * 0.5 + Vector3.UP * (ramp.height * 0.5 + 0.6))
+			area.body_entered.connect(on_boost)
+			root_node.add_child(area))
 
 	if ramp.glider:
 		_build_guard_walls(start - GUARD_BEFORE, lip_dist + ramp.glide_distance, GLIDE_GUARD_HEIGHT)
@@ -187,16 +194,18 @@ func _build_guard_walls(from: float, to: float, height: float) -> void:
 			if i > 0:
 				faces.append_array([prev + low, prev + high, p + low, prev + high, p + high, p + low])
 			prev = p
-	var shape := ConcavePolygonShape3D.new()
-	shape.backface_collision = true
-	shape.set_faces(faces)
-	var body := StaticBody3D.new()
-	body.name = "ParedeInvisivelPulo"
-	body.add_to_group("wall")
-	var col := CollisionShape3D.new()
-	col.shape = shape
-	body.add_child(col)
-	root.add_child(body)
+	var root_node := root
+	track.physics_job(func() -> void:
+		var shape := ConcavePolygonShape3D.new()
+		shape.backface_collision = true
+		shape.set_faces(faces)
+		var body := StaticBody3D.new()
+		body.name = "ParedeInvisivelPulo"
+		body.add_to_group("wall")
+		var col := CollisionShape3D.new()
+		col.shape = shape
+		body.add_child(col)
+		root_node.add_child(body))
 
 
 ## Tira os triângulos sem área (o começo das saias, onde a altura é zero).

@@ -150,15 +150,33 @@ var _records := ConfigFile.new()
 ## Personagens recoloridos para quem escolheu um piloto que outro jogador já pegou.
 var _tinted := {}
 var _fade_rect: ColorRect
-## "Carregando…" sobre o fade (só na web).
-var _loading_label: Label
+## Ícone de carregamento sobre o fade (entra depois do escuro, sai antes de clarear).
+var _loading_icon: LoadingIcon
 var _changing_scene := false
+## Pista da corrida gerada atrás do fade (veja `_prepare_scene`), à espera da cena da
+## corrida (`take_prebuilt_track`).
+var _prebuilt_track: Track
+var _prebuilt_data: TrackData
+## Tarefas em andamento no WorkerThreadPool (o jogo só fecha depois delas).
+var _tasks: Array[int] = []
+## Recursos carregados aos poucos antes da troca de tela (`_preload_scene`), seguros
+## aqui até a tela nova existir (sem referência o Godot os solta do cache).
+var _held: Array[Resource] = []
+## Script de cada classe global (class_name → caminho), para achar as dependências de
+## um script (veja `_dependencies`).
+var _global_classes := {}
+## Todos os scripts das telas, compilados ao abrir o jogo (`_compile_scripts`) e seguros
+## aqui para nunca serem soltos e compilados de novo.
+var _scripts: Array[Resource] = []
+## Quanto tempo de carga cabe num quadro (ms) antes de devolver a vez ao ícone.
+const LOAD_BUDGET_MS := 12
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	dev_mode = _wants_dev_mode()
 	_records.load(RECORDS_PATH)
+	_compile_scripts()
 	menu_input = MenuInput.new()
 	menu_input.name = "MenuInput"
 	add_child(menu_input)
@@ -184,22 +202,13 @@ func _ready() -> void:
 	_fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(_fade_rect)
 
-	# Na web gerar a pista da próxima tela leva alguns segundos (no desktop, menos de
-	# meio): avisa durante o fade em vez de deixar a tela escura parada.
-	if OS.has_feature("web"):
-		_loading_label = Label.new()
-		_loading_label.text = "Carregando…"
-		_loading_label.add_theme_font_override("font", preload("res://assets/fonts/LilitaOne-Regular.woff2"))
-		_loading_label.add_theme_font_size_override("font_size", 34)
-		_loading_label.add_theme_color_override("font_color", Color.WHITE)
-		_loading_label.add_theme_color_override("font_outline_color", Color(0.04, 0.05, 0.12))
-		_loading_label.add_theme_constant_override("outline_size", 10)
-		_loading_label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT, Control.PRESET_MODE_MINSIZE, 40)
-		_loading_label.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-		_loading_label.grow_vertical = Control.GROW_DIRECTION_BEGIN
-		_loading_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_loading_label.hide()
-		layer.add_child(_loading_label)
+	# Ícone de carregamento (Celerino no kart soltando fumaça) no canto, sobre o fade:
+	# na web gerar a pista da próxima tela leva alguns segundos (no desktop, menos de
+	# meio) e a tela escura não fica parada.
+	_loading_icon = LoadingIcon.new()
+	_loading_icon.modulate.a = 0.0
+	_loading_icon.hide()
+	layer.add_child(_loading_icon)
 
 
 func _notification(what: int) -> void:
@@ -217,6 +226,7 @@ func _wants_dev_mode() -> bool:
 
 
 func _exit_tree() -> void:
+	_free_prebuilt_track()
 	CharacterMesh.clear_cache()
 	GliderVisual.clear_cache()
 	TrackCoins.clear_cache()
@@ -228,6 +238,10 @@ func quit() -> void:
 	# A música para antes e o servidor de áudio ganha um instante para soltá-la
 	# (senão a faixa que tocava aparece como vazamento na saída).
 	music.release()
+	# O que estiver sendo gerado nas threads termina antes (o Godot fecharia esperando a
+	# thread, e ela às vezes espera a thread principal).
+	while _tasks.any(func(t: int) -> bool: return not WorkerThreadPool.is_task_completed(t)):
+		await get_tree().process_frame
 	await get_tree().create_timer(0.1, true, false, true).timeout
 	get_tree().quit()
 
@@ -459,14 +473,31 @@ func goto_scene(path: String) -> void:
 	var fade_out := create_tween()
 	fade_out.tween_property(_fade_rect, "color:a", 1.0, 0.22)
 	await fade_out.finished
-	if _loading_label:
-		# Garante um quadro desenhado com o aviso antes da troca (que trava a tela).
-		_loading_label.show()
-		await RenderingServer.frame_post_draw
+	# O ícone aparece já no escuro. Daqui até ele sair, nada pode travar a tela por muito
+	# tempo (o ícone para de animar): a carga é em pedaços (`_preload_scene`), o pesado
+	# vai para threads (`_prepare_scene`), a corrida se monta aos poucos (`loaded`) e os
+	# scripts já foram compilados ao abrir o jogo (`_compile_scripts`).
+	await _fade_loading_icon(true)
+	await _preload_scene(path)
+	# A tela nova é montada aqui, fora da árvore (instanciar é rápido), para as pistas
+	# dela serem geradas numa thread antes de ela entrar.
+	var packed := load(path) as PackedScene
+	_held.clear()
+	var scene: Node = packed.instantiate() if packed else null
+	await _prepare_scene(path, scene)
+	# A tela nova entra com a árvore pausada: a corrida se monta aos poucos (`loaded`)
+	# e nada dela roda pela metade. GameState e o ícone rodam sempre.
+	get_tree().paused = true
+	if scene:
+		get_tree().change_scene_to_node(scene)
+	else:
+		get_tree().change_scene_to_file(path)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var entered := get_tree().current_scene
+	if entered and entered.get(&"loading"):
+		await entered.loaded
 	get_tree().paused = false
-	get_tree().change_scene_to_file(path)
-	await get_tree().process_frame
-	await get_tree().process_frame
 	# Resolução do 3D desta tela escolhida ainda no escuro: trocar a escala realoca os
 	# buffers do 3D (pico de 30-150 ms), e o warm_up abaixo já compila nela.
 	if render_scale:
@@ -478,11 +509,10 @@ func goto_scene(path: String) -> void:
 	# A tela nova pode compilar os shaders dela ainda atrás do fade (sem isso cada coisa
 	# que aparece pela primeira vez trava o jogo por um instante: web e Forward+). Em
 	# --headless não há quadros desenhados (frame_post_draw nunca dispara): pula.
-	var scene := get_tree().current_scene
-	if scene and scene.has_method(&"warm_up") and DisplayServer.get_name() != "headless":
-		await scene.warm_up()
-	if _loading_label:
-		_loading_label.hide()
+	var current := get_tree().current_scene
+	if current and current.has_method(&"warm_up") and DisplayServer.get_name() != "headless":
+		await current.warm_up()
+	await _fade_loading_icon(false)
 	var fade_in := create_tween()
 	fade_in.tween_property(_fade_rect, "color:a", 0.0, 0.3)
 	await fade_in.finished
@@ -490,6 +520,201 @@ func goto_scene(path: String) -> void:
 	_changing_scene = false
 	if render_scale:
 		render_scale.hold(false)
+
+
+## Compila, ao abrir o jogo (atrás da tela de abertura do Godot, antes do menu), os
+## scripts de todas as telas. Compilar um script é um pedaço só na thread principal (o
+## da corrida passa de 0,1 s, o dos itens de 0,25 s) e não dá para fazer numa thread
+## (veja `_preload_scene`): sem isso, a troca de tela travava o ícone de carregamento.
+func _compile_scripts() -> void:
+	for c in ProjectSettings.get_global_class_list():
+		_global_classes[String(c["class"])] = String(c["path"])
+	var seen := {}
+	var order: Array[String] = []
+	for path in [SCENE_MAIN_MENU, SCENE_MODE_SELECT, SCENE_CHARACTER_SELECT, SCENE_KART_SELECT,
+			SCENE_GLIDER_SELECT, SCENE_TRACK_SELECT, SCENE_RACE]:
+		_collect_dependencies(path, seen, order)
+	for class_path: String in _global_classes.values():
+		_collect_dependencies(class_path, seen, order)
+	for dep in order:
+		if dep.get_extension() == "gd" and ResourceLoader.exists(dep):
+			var script := load(dep)
+			if script:
+				_scripts.append(script)
+
+
+## Carrega aos poucos, na thread principal, tudo de que a tela `path` depende (cenas,
+## scripts, texturas, modelos...), das folhas para cima, devolvendo a vez a cada
+## LOAD_BUDGET_MS para o ícone de carregamento continuar animando. Depois disso o
+## `load` da tela só junta o que já está no cache.
+##
+## Não usa ResourceLoader.load_threaded_request: compilar os scripts da corrida numa
+## thread falha às vezes no Godot 4.7 ("Could not resolve external class member"), e o
+## script quebrado fica no cache.
+func _preload_scene(path: String) -> void:
+	var order: Array[String] = []
+	_collect_dependencies(path, {}, order)
+	var frame_start := Time.get_ticks_msec()
+	for dep in order:
+		if ResourceLoader.has_cached(dep) or not ResourceLoader.exists(dep):
+			continue
+		var res := load(dep)
+		if res:
+			_held.append(res)
+		if Time.get_ticks_msec() - frame_start >= LOAD_BUDGET_MS:
+			await get_tree().process_frame
+			frame_start = Time.get_ticks_msec()
+
+
+## Dependências de `path` em pós-ordem (cada uma depois das dela), sem repetir.
+func _collect_dependencies(path: String, seen: Dictionary, order: Array[String]) -> void:
+	if seen.has(path):
+		return
+	seen[path] = true
+	for dep in _dependencies(path):
+		_collect_dependencies(dep, seen, order)
+	order.append(path)
+
+
+## O ResourceLoader não lista as dependências de um script: elas saem do código (os
+## caminhos "res://..." e as classes globais citadas).
+func _dependencies(path: String) -> PackedStringArray:
+	var out := PackedStringArray()
+	if path.get_extension() == "gd":
+		var source := FileAccess.get_file_as_string(path)
+		var paths := RegEx.create_from_string("\"(res://[^\"]+)\"")
+		for m in paths.search_all(source):
+			out.append(m.get_string(1))
+		var words := RegEx.create_from_string("\\b[A-Z][A-Za-z0-9_]*\\b")
+		var found := {}
+		for m in words.search_all(source):
+			var word := m.get_string()
+			if _global_classes.has(word) and not found.has(word):
+				found[word] = true
+				var script_path: String = _global_classes[word]
+				if script_path != path:
+					out.append(script_path)
+	else:
+		for dep in ResourceLoader.get_dependencies(path):
+			out.append(dep.get_slice("::", 2) if dep.contains("::") else dep)
+	return out
+
+
+## Trabalho pesado da tela nova feito em threads antes da troca, com o ícone animando:
+## as malhas juntas dos personagens (CharacterMesh, 0,1 a 0,2 s cada na primeira vez;
+## o menu e as telas de seleção mostram personagens) e as pistas (gerar leva de 0,2 a
+## 1,6 s no desktop, alguns segundos na web): as que já estão na cena `scene` (o fundo
+## do menu) e, para a corrida, a da vez. A colisão das pistas é criada depois, aqui na
+## thread principal (`Track.finish_physics`).
+func _prepare_scene(path: String, scene: Node) -> void:
+	var jobs: Array[Callable] = []
+	var tracks: Array[Track] = []
+	if scene:
+		for node in scene.find_children("*", "", true, false):
+			if node is Track:
+				tracks.append(node)
+	var drivers := _race_drivers() if path == SCENE_RACE else _menu_characters()
+	if not drivers.is_empty():
+		jobs.append(func() -> void:
+			for c in drivers:
+				CharacterMesh.prebuild(c))
+	var track: Track = null
+	var data: TrackData = null
+	if path == SCENE_RACE:
+		_free_prebuilt_track()
+		data = get_race_track()
+		if data and data.scene:
+			track = data.scene.instantiate()
+			track.name = "Pista"
+			tracks.append(track)
+	for t in tracks:
+		t.prepare_layout()
+		jobs.append(t.build_geometry.bind(true))
+	await _run_threaded(jobs, "Preparar tela")
+	for t in tracks:
+		t.finish_physics()
+	if track:
+		_prebuilt_track = track
+		_prebuilt_data = data
+
+
+## Os personagens jogáveis (as telas fora da corrida podem mostrar qualquer um).
+func _menu_characters() -> Array[CharacterData]:
+	var out: Array[CharacterData] = []
+	for c in characters:
+		if c.model_scene:
+			out.append(c)
+	return out
+
+
+## Os personagens com modelo que podem estar no grid: os dos jogadores e, com
+## adversários do computador, os jogáveis não bloqueados (entram antes dos rivais; veja
+## `get_rival_lineup`).
+func _race_drivers() -> Array[CharacterData]:
+	var out: Array[CharacterData] = []
+	for i in players.size():
+		var c := characters[clampi(players[i].character_index, 0, characters.size() - 1)]
+		if not out.has(c):
+			out.append(c)
+	if get_rival_count() > 0:
+		for c in characters:
+			if not c.locked and c.model_scene and not out.has(c):
+				out.append(c)
+	return out
+
+
+## Roda `jobs` ao mesmo tempo no WorkerThreadPool e espera, quadro a quadro, todos
+## terminarem. As threads às vezes esperam a thread principal (o RenderingServer devolve
+## dados de malhas): por isso ela nunca fica parada esperando, só confere a cada quadro.
+## Na web sem threads roda tudo aqui mesmo (trava).
+func _run_threaded(jobs: Array[Callable], label: String) -> void:
+	if OS.has_feature("nothreads"):
+		for job in jobs:
+			job.call()
+		return
+	var mine: Array[int] = []
+	for job in jobs:
+		mine.append(WorkerThreadPool.add_task(job, false, label))
+	_tasks.append_array(mine)
+	while mine.any(func(t: int) -> bool: return not WorkerThreadPool.is_task_completed(t)):
+		await get_tree().process_frame
+	for t in mine:
+		WorkerThreadPool.wait_for_task_completion(t)
+		_tasks.erase(t)
+
+
+## A pista que `goto_scene` gerou para a corrida (null se não for a de `data`: aí a
+## corrida gera a dela). Quem pega fica responsável por ela.
+func take_prebuilt_track(data: TrackData) -> Track:
+	var track := _prebuilt_track if _prebuilt_data == data else null
+	if track:
+		_prebuilt_track = null
+		_prebuilt_data = null
+	else:
+		_free_prebuilt_track()
+	return track
+
+
+func _free_prebuilt_track() -> void:
+	if is_instance_valid(_prebuilt_track):
+		_prebuilt_track.free()
+	_prebuilt_track = null
+	_prebuilt_data = null
+
+
+func _fade_loading_icon(appear: bool) -> void:
+	if appear:
+		_loading_icon.show()
+	var tween := create_tween()
+	tween.tween_property(_loading_icon, "modulate:a", 1.0 if appear else 0.0, 0.2)
+	await tween.finished
+	if appear:
+		# Garante um quadro desenhado com o ícone inteiro antes da troca (em --headless
+		# frame_post_draw nunca dispara).
+		if DisplayServer.get_name() != "headless":
+			await RenderingServer.frame_post_draw
+	else:
+		_loading_icon.hide()
 
 
 # --- Recordes -----------------------------------------------------------

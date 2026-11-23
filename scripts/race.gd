@@ -134,6 +134,15 @@ var items: RaceItems
 var _karts: Array[Kart] = []
 ## Compilando os shaders atrás da tela de carregamento (a contagem ainda não começou).
 var _warming := false
+## A corrida está sendo montada aos poucos (`_setup`), atrás da tela de carregamento.
+var loading := true
+## Montagem terminada (GameState.goto_scene espera por ele antes do warm_up).
+signal loaded
+## Começo do pedaço de montagem deste quadro (veja `_yield_if_busy`).
+var _slice_start := 0
+## Quanto da montagem cabe num quadro (ms) antes de devolver a vez ao ícone de
+## carregamento.
+const SETUP_BUDGET_MS := 12
 var _clock := 0.0
 var _count_step := 0
 ## Multijogador: tempo até acabar a corrida para quem não chegou (-1 = sem prazo).
@@ -143,15 +152,30 @@ var _engine_voice_timer := 0.0
 
 
 func _ready() -> void:
+	# Nada de pausa até a corrida estar montada.
+	pause_menu.can_pause = false
+	_setup()
+
+
+## Monta a corrida aos poucos, devolvendo a vez a cada SETUP_BUDGET_MS para o ícone de
+## carregamento continuar animando (tudo de uma vez travava a tela por 0,3 a 0,7 s).
+## A árvore fica pausada enquanto isso (GameState.goto_scene): nada da corrida roda
+## pela metade.
+func _setup() -> void:
+	_slice_start = Time.get_ticks_msec()
 	mode = GameState.mode
 	_record_class = GameState.get_speed_class_name()
 	# A pista escolhida na tela de seleção (ou a da vez na copa) é carregada aqui.
 	var track_data := GameState.get_race_track()
-	track = track_data.scene.instantiate()
-	track.name = "Pista"
+	# Normalmente já vem gerada (numa thread, atrás do fade: GameState.goto_scene).
+	track = GameState.take_prebuilt_track(track_data)
+	if track == null:
+		track = track_data.scene.instantiate()
+		track.name = "Pista"
 	add_child(track)
 	move_child(track, 0)
 	laps = GameState.laps
+	await _yield_if_busy()
 	skid_marks = SkidMarks.new()
 	add_child(skid_marks)
 	if track.obstacles:
@@ -162,11 +186,15 @@ func _ready() -> void:
 	# em Opções → Gráficos): GraphicsQuality ajusta a luz quando a pista entra.
 	if GameState.is_multiplayer():
 		_setup_split_screen()
-	_build_grid()
+	await _yield_if_busy()
+	await _build_grid()
+	await _yield_if_busy()
 	_setup_views()
+	await _yield_if_busy()
 	items = RaceItems.new()
 	add_child(items)
 	items.setup(self)
+	await _yield_if_busy()
 	if GameState.dev_mode:
 		# F1: painel para testar os itens (DevPanel).
 		var dev := DevPanel.new()
@@ -190,6 +218,16 @@ func _ready() -> void:
 	pause_menu.resume_requested.connect(func(): pause_menu.set_info(_pause_info()))
 	pause_menu.set_info(_pause_info())
 	Input.joy_connection_changed.connect(_on_joy_connection_changed)
+	pause_menu.can_pause = true
+	loading = false
+	loaded.emit()
+
+
+## Passou do orçamento do quadro: espera o próximo.
+func _yield_if_busy() -> void:
+	if Time.get_ticks_msec() - _slice_start >= SETUP_BUDGET_MS:
+		await get_tree().process_frame
+		_slice_start = Time.get_ticks_msec()
 
 
 func _exit_tree() -> void:
@@ -225,6 +263,7 @@ func _build_grid() -> void:
 		var e: Dictionary = entries[i]
 		var slot: PlayerSlot = e.slot
 		var ai: KartAI = null if slot else KartAI.new()
+		await _yield_if_busy()
 		var r := _add_racer(e.character, e.kart, i, ai, slot, lone, e.get("glider"))
 		r.entrant = e.get("entrant")
 		if ai:
@@ -511,16 +550,25 @@ func warm_up() -> void:
 	var cam: Camera3D = humans[0].camera
 	for r in humans:
 		r.camera.set_physics_process(false)
+	# A câmera de sempre (atrás do J1): o grid inteiro. Os efeitos entram um grupo por
+	# quadro: tudo de uma vez compilava os shaders num quadro só (~0,4 s) e travava o
+	# ícone de carregamento.
+	cam.global_transform = _chase_view(humans[0])
+	cam.reset_physics_interpolation()
+	await RenderingServer.frame_post_draw
 	for k in _karts:
 		k.prewarm_effects(true)
+	await RenderingServer.frame_post_draw
 	# Moedas voando (pegas) na frente do J1.
 	if track.coins:
 		track.coins.prewarm(true, humans[0].kart.global_position + humans[0].kart.get_forward() * 6.0)
-	# A câmera de sempre (atrás do J1): o grid inteiro com os efeitos ligados.
-	cam.global_transform = _chase_view(humans[0])
-	cam.reset_physics_interpolation()
+		await RenderingServer.frame_post_draw
 	# Efeitos dos itens (raio, "deságio −%", "§", Celerino-fantasma e o contrato) à vista.
-	items.prewarm(true)
+	items.prewarm(true, 0)
+	await RenderingServer.frame_post_draw
+	for step in ItemAttacks.PREWARM_STEPS:
+		items.prewarm(true, 1, step)
+		await RenderingServer.frame_post_draw
 	for i in 3:
 		await RenderingServer.frame_post_draw
 	items.prewarm(false)
@@ -562,7 +610,7 @@ func _chase_view(r: Racer) -> Transform3D:
 # --- Quadro a quadro ------------------------------------------------------------------
 
 func _physics_process(delta: float) -> void:
-	if _warming:
+	if _warming or loading:
 		return
 	_update_engine_voices(delta)
 	if track.obstacles:

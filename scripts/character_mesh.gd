@@ -47,12 +47,64 @@ static var enabled := true
 static var _cache := {}
 ## "modelo|materiais|cor" → ShaderMaterial recolorido.
 static var _tinted := {}
+## Trava do `_cache` (`prebuild` roda numa thread). Nunca fica presa durante o `_build`:
+## ele espera a thread principal (o RenderingServer devolve os dados das malhas).
+static var _cache_lock := Mutex.new()
 
 
 ## Solta as malhas e materiais guardados (no fim do jogo; senão o Godot acusa vazamento).
 static func clear_cache() -> void:
+	_cache_lock.lock()
 	_cache.clear()
+	_cache_lock.unlock()
 	_tinted.clear()
+
+
+## Faz a malha junta de `data` antes de alguém precisar (pode rodar numa thread: a tela
+## de carregamento gera as dos pilotos da corrida enquanto o ícone anima). Na primeira
+## corrida cada personagem levava 0,1 a 0,2 s na thread principal.
+static func prebuild(data: CharacterData) -> void:
+	if not enabled or data == null or data.model_scene == null:
+		return
+	var key := _key(data)
+	if _cached(key) != null:
+		return
+	var model := data.model_scene.instantiate() as Node3D
+	if model == null:
+		return
+	var meshes := _meshes(model)
+	var entry := _build(meshes, data.tint_materials, data.tint_reference.a > 0.0) if not meshes.is_empty() else {}
+	model.free()
+	_store(key, entry)
+
+
+static func _key(data: CharacterData) -> String:
+	return "%s|%s" % [data.model_scene.resource_path, ",".join(data.tint_materials)]
+
+
+static func _meshes(model: Node3D) -> Array[MeshInstance3D]:
+	var meshes: Array[MeshInstance3D] = []
+	for node in model.find_children("*", "MeshInstance3D", true, false):
+		meshes.append(node as MeshInstance3D)
+	return meshes
+
+
+## A entrada guardada (null se ainda não foi feita).
+static func _cached(key: String) -> Variant:
+	_cache_lock.lock()
+	var entry: Variant = _cache.get(key)
+	_cache_lock.unlock()
+	return entry
+
+
+static func _store(key: String, entry: Dictionary) -> Dictionary:
+	_cache_lock.lock()
+	# Feita ao mesmo tempo em outro lugar: fica a primeira.
+	if not _cache.has(key):
+		_cache[key] = entry
+	entry = _cache[key]
+	_cache_lock.unlock()
+	return entry
 
 
 ## Troca as malhas de `model` (instância do `data.model_scene`) pela malha junta.
@@ -60,15 +112,13 @@ static func clear_cache() -> void:
 static func apply(model: Node3D, data: CharacterData) -> bool:
 	if not enabled or data == null or data.model_scene == null:
 		return false
-	var meshes: Array[MeshInstance3D] = []
-	for node in model.find_children("*", "MeshInstance3D", true, false):
-		meshes.append(node as MeshInstance3D)
+	var meshes := _meshes(model)
 	if meshes.is_empty():
 		return false
-	var key := "%s|%s" % [data.model_scene.resource_path, ",".join(data.tint_materials)]
-	if not _cache.has(key):
-		_cache[key] = _build(meshes, data.tint_materials, data.tint_reference.a > 0.0)
-	var entry: Dictionary = _cache[key]
+	var key := _key(data)
+	var cached: Variant = _cached(key)
+	var entry: Dictionary = cached if cached != null else \
+			_store(key, _build(meshes, data.tint_materials, data.tint_reference.a > 0.0))
 	if entry.is_empty():
 		return false
 

@@ -227,6 +227,11 @@ const ITEM_BOX_SPACING := 1.7
 ## árvore de cena (`build_geometry`): o servidor de física não pode ser usado fora da
 ## thread principal.
 var with_collision := true
+## Gerando numa thread (`build_geometry(true)`): o que usa o servidor de física (formas,
+## corpos e áreas) fica guardado aqui e só é criado depois, na thread principal, por
+## `finish_physics()`.
+var _defer_physics := false
+var _physics_jobs: Array[Callable] = []
 
 ## Pontos amostrados no centro da pista (espaço local).
 var samples := PackedVector3Array()
@@ -338,8 +343,11 @@ func prepare_layout() -> void:
 
 
 ## Gera as malhas da pista a partir do traçado (`prepare_layout` antes). É a parte
-## pesada; com a pista fora da árvore e sem colisão pode rodar numa thread.
-func build_geometry() -> void:
+## pesada; com a pista fora da árvore pode rodar numa thread, com `defer_physics` = true
+## (a colisão fica para `finish_physics()`, na thread principal).
+func build_geometry(defer_physics := false) -> void:
+	_defer_physics = defer_physics
+	_physics_jobs.clear()
 	if is_instance_valid(_generated):
 		_generated.free()
 	coins = null
@@ -391,6 +399,24 @@ func build_geometry() -> void:
 	if not bridge_spans.is_empty():
 		TrackBridgeBuilder.new(self, terrain, _generated).build(preview)
 	TrackScenery.new(self, terrain, _generated).build(preview)
+
+
+## Cria a colisão guardada por `build_geometry(true)`. Na thread principal, com a pista
+## ainda fora da árvore (os corpos entram no mundo da física junto com ela).
+func finish_physics() -> void:
+	for job in _physics_jobs:
+		job.call()
+	_physics_jobs.clear()
+	_defer_physics = false
+
+
+## Roda `job` (que cria formas, corpos ou áreas) agora ou, gerando numa thread, guarda
+## para `finish_physics()`. As contas pesadas (as faces da colisão) ficam fora do job.
+func physics_job(job: Callable) -> void:
+	if _defer_physics:
+		_physics_jobs.append(job)
+	else:
+		job.call()
 
 
 # --- Consultas usadas pela corrida ------------------------------------------------
@@ -738,9 +764,10 @@ func _build_ground(preview: bool, mesh: Mesh = null) -> Mesh:
 	if with_collision:
 		# O kart nunca sai das muretas: o chão de colisão é só um plano (grama = "offroad").
 		var center := terrain.center
-		var shape := BoxShape3D.new()
-		shape.size = Vector3(1800.0, 2.0, 1800.0)
-		_add_static_body(shape, Transform3D(Basis(), Vector3(center.x, -1.0, center.y)), "offroad")
+		physics_job(func() -> void:
+			var shape := BoxShape3D.new()
+			shape.size = Vector3(1800.0, 2.0, 1800.0)
+			_add_static_body(shape, Transform3D(Basis(), Vector3(center.x, -1.0, center.y)), "offroad"))
 	return mesh
 
 
@@ -780,10 +807,12 @@ func _build_road() -> void:
 		var reach := half + shoulder_width + 0.15
 		var col := MeshData.new()
 		_add_strip(col, _offset_rail(-reach, 0.0), _offset_rail(reach, 0.0), _repeat(Vector3.UP), 0.0, 1.0)
-		var shape := ConcavePolygonShape3D.new()
-		shape.backface_collision = true
-		shape.set_faces(col.collision_faces())
-		_add_static_body(shape, Transform3D.IDENTITY, "road")
+		var faces := col.collision_faces()
+		physics_job(func() -> void:
+			var shape := ConcavePolygonShape3D.new()
+			shape.backface_collision = true
+			shape.set_faces(faces)
+			_add_static_body(shape, Transform3D.IDENTITY, "road"))
 
 
 ## Zebras em relevo nas duas bordas, mais largas do lado de dentro das curvas.
@@ -857,10 +886,11 @@ func _build_walls() -> void:
 			continue
 		var faces := face.collision_faces()
 		faces.append_array(rest.collision_faces())
-		var shape := ConcavePolygonShape3D.new()
-		shape.backface_collision = true
-		shape.set_faces(faces)
-		_add_static_body(shape, Transform3D.IDENTITY, "wall")
+		physics_job(func() -> void:
+			var shape := ConcavePolygonShape3D.new()
+			shape.backface_collision = true
+			shape.set_faces(faces)
+			_add_static_body(shape, Transform3D.IDENTITY, "wall"))
 
 
 ## Pórtico de largada: colunas azuis, viga com a marca da Ativos dos dois lados
@@ -886,18 +916,18 @@ func _build_start_gate() -> void:
 	ring.height = 0.3
 	ring.radial_segments = 20
 	ring.material = white
-	var pillar_shape: CylinderShape3D = null
-	if with_collision:
-		pillar_shape = CylinderShape3D.new()
-		pillar_shape.radius = 0.7
-		pillar_shape.height = 7.4
 	for side: float in [-1.0, 1.0]:
 		var xf := Transform3D(Basis(), Vector3(side * half, 3.7, 0.0))
 		_add_mesh(pillar, xf, gate)
 		_add_mesh(ring, Transform3D(Basis(), Vector3(side * half, 0.15, 0.0)), gate)
 		_add_mesh(ring, Transform3D(Basis(), Vector3(side * half, 4.6, 0.0)), gate)
-		if pillar_shape:
-			_add_static_body(pillar_shape, xf, "wall", gate)
+	if with_collision:
+		physics_job(func() -> void:
+			var pillar_shape := CylinderShape3D.new()
+			pillar_shape.radius = 0.7
+			pillar_shape.height = 7.4
+			for side: float in [-1.0, 1.0]:
+				_add_static_body(pillar_shape, Transform3D(Basis(), Vector3(side * half, 3.7, 0.0)), "wall", gate))
 	var beam := BoxMesh.new()
 	beam.size = Vector3(span + 1.6, 2.3, 1.0)
 	beam.material = TrackScenery.color_material(TrackScenery.NAVY, 0.4)
@@ -945,23 +975,28 @@ func _build_boost_pads() -> void:
 	md.add_tri(a, b, c, Vector3.UP)
 	md.add_tri(b, d, c, Vector3.UP)
 	var pad_mesh := md.to_mesh(mat)
-	var shape: BoxShape3D = null
-	if with_collision:
-		shape = BoxShape3D.new()
-		shape.size = Vector3(w, 1.6, l)
+	var pads: Array[Node3D] = []
 	for frac in boost_pads:
-		var pad: Node3D = Area3D.new() if with_collision else Node3D.new()
+		var pad := Node3D.new()
 		pad.name = "Turbo"
 		pad.transform = get_transform_at(wrapf(frac, 0.0, 1.0) * length)
-		if pad is Area3D:
-			var col := CollisionShape3D.new()
-			col.shape = shape
-			col.position.y = 0.8
-			pad.add_child(col)
-			(pad as Area3D).body_entered.connect(_on_boost_pad_body_entered)
 		var mi := _add_mesh(pad_mesh, Transform3D.IDENTITY, pad)
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		_generated.add_child(pad)
+		pads.append(pad)
+	if with_collision and not pads.is_empty():
+		physics_job(func() -> void:
+			var shape := BoxShape3D.new()
+			shape.size = Vector3(w, 1.6, l)
+			for pad in pads:
+				var area := Area3D.new()
+				area.name = "Toque"
+				var col := CollisionShape3D.new()
+				col.shape = shape
+				col.position.y = 0.8
+				area.add_child(col)
+				area.body_entered.connect(_on_boost_pad_body_entered)
+				pad.add_child(area))
 
 
 ## Fileiras de caixas de item (veja item_box.gd), atravessando o asfalto.
@@ -989,8 +1024,10 @@ func _build_item_boxes() -> void:
 			var box := ItemBox.new()
 			box.name = "CaixaDeItem"
 			box.transform = Transform3D(basis, center + right * (i - (count - 1) * 0.5) * spacing)
-			box.setup(mesh, shadow, with_collision, tilt)
+			box.setup(mesh, shadow, tilt)
 			holder.add_child(box)
+			if with_collision:
+				physics_job(box.add_touch_area)
 
 
 ## Moedas Ativos (veja track_coins.gd): as fileiras de `coin_lines` e um arco de três

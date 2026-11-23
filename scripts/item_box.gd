@@ -45,9 +45,11 @@ var _burst := -1.0
 
 
 ## Monta a caixa com a malha e a sombra compartilhadas pela pista (`make_mesh`,
-## `make_shadow_mesh`). Sem colisão ela é só visual (prévia da tela de pistas).
+## `make_shadow_mesh`). Só o visual (pode rodar numa thread, fora da árvore): a área
+## de toque vem com `add_touch_area()`, na thread principal; sem ela a caixa não é
+## pega (prévia da tela de pistas, caixa falsa da Fila do tribunal).
 ## `ground_tilt` = inclinação da pista (rad, subida > 0) para a sombra deitar no chão.
-func setup(mesh: Mesh, shadow_mesh: Mesh, with_collision: bool, ground_tilt := 0.0) -> void:
+func setup(mesh: Mesh, shadow_mesh: Mesh, ground_tilt := 0.0) -> void:
 	_box = MeshInstance3D.new()
 	_box.name = "Caixa"
 	_box.mesh = mesh
@@ -60,22 +62,25 @@ func setup(mesh: Mesh, shadow_mesh: Mesh, with_collision: bool, ground_tilt := 0
 	_shadow.rotation.x = ground_tilt
 	_shadow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_shadow)
-	if with_collision:
-		_area = Area3D.new()
-		_area.name = "Toque"
-		# Área do chão até acima da caixa (o kart é baixo: uma esfera na altura da
-		# caixa quase não o alcançaria). Com as caixas a Track.ITEM_BOX_SPACING uma da
-		# outra, a fileira toda pega qualquer kart (0,7 m de largura ou mais) em qualquer
-		# ponto.
-		var shape := BoxShape3D.new()
-		var top := 1.2 * KartScale.ITEMS
-		shape.size = Vector3(TOUCH_SIZE, FLOAT_HEIGHT + top, TOUCH_SIZE)
-		var col := CollisionShape3D.new()
-		col.shape = shape
-		col.position.y = (top - FLOAT_HEIGHT) * 0.5
-		_area.add_child(col)
-		_area.body_entered.connect(_on_body_entered)
-		add_child(_area)
+
+
+## A área que pega o kart que passa (cria formas de física: thread principal).
+func add_touch_area() -> void:
+	_area = Area3D.new()
+	_area.name = "Toque"
+	# Área do chão até acima da caixa (o kart é baixo: uma esfera na altura da
+	# caixa quase não o alcançaria). Com as caixas a Track.ITEM_BOX_SPACING uma da
+	# outra, a fileira toda pega qualquer kart (0,7 m de largura ou mais) em qualquer
+	# ponto.
+	var shape := BoxShape3D.new()
+	var top := 1.2 * KartScale.ITEMS
+	shape.size = Vector3(TOUCH_SIZE, FLOAT_HEIGHT + top, TOUCH_SIZE)
+	var col := CollisionShape3D.new()
+	col.shape = shape
+	col.position.y = (top - FLOAT_HEIGHT) * 0.5
+	_area.add_child(col)
+	_area.body_entered.connect(_on_body_entered)
+	add_child(_area)
 
 
 func _ready() -> void:

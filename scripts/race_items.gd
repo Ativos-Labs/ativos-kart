@@ -176,7 +176,9 @@ func setup(p_race: Node3D) -> void:
 
 
 ## Liga/desliga os efeitos por uns quadros para compilar os shaders (Race.warm_up).
-func prewarm(on: bool) -> void:
+## `part`: -1 = tudo; 0 = só os efeitos; 1 = só os ataques, e deles só o passo `step`
+## (-1 = todos; veja ItemAttacks.prewarm). O warm_up da corrida liga um por quadro.
+func prewarm(on: bool, part := -1, step := -1) -> void:
 	if effects == null or race.humans.is_empty():
 		return
 	var k: Kart = race.humans[0].kart
@@ -184,8 +186,10 @@ func prewarm(on: bool) -> void:
 	var at := k.global_position + fwd * 6.0
 	# O fantasma na frente do kart, de frente para a câmera.
 	var xf := Transform3D(Basis.looking_at(-fwd, Vector3.UP), at)
-	effects.prewarm(on, k, xf)
-	attacks.prewarm(on, k, xf)
+	if part != 1:
+		effects.prewarm(on, k, xf)
+	if part != 0:
+		attacks.prewarm(on, k, xf, step)
 
 
 ## Os itens de cada kart (um por kart, na ordem de Race.racers).

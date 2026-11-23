@@ -1339,7 +1339,7 @@ func _get_node(kind: int) -> Node3D:
 			box.name = "CaixaFalsa"
 			box.respawns = false
 			add_child(box)
-			box.setup(_fake_mesh, _box_shadow, false)
+			box.setup(_fake_mesh, _box_shadow)
 			node = box
 	return node
 
@@ -1390,9 +1390,21 @@ func _park(node: Node3D, kind: int) -> void:
 
 ## Mostra um de cada (e as marcas no kart `near`) parados em `xf`, atrás da tela de
 ## carregamento (Race.warm_up), para os shaders compilarem antes da corrida.
-func prewarm(on: bool, near: Kart, xf: Transform3D) -> void:
-	for kind: int in [RaceItem.Kind.CARIMBO, RaceItem.Kind.INTIMACAO, RaceItem.Kind.PEC, RaceItem.Kind.IMPUGNACAO,
-			RaceItem.Kind.PENDENCIA, RaceItem.Kind.FILA]:
+## Os itens mostrados no prewarm, um passo cada (depois deles: a chuva de folhas, o
+## escudo e as marcas no kart).
+const PREWARM_KINDS: Array[int] = [RaceItem.Kind.CARIMBO, RaceItem.Kind.INTIMACAO, RaceItem.Kind.PEC,
+		RaceItem.Kind.IMPUGNACAO, RaceItem.Kind.PENDENCIA, RaceItem.Kind.FILA]
+## Quantos passos o prewarm tem (veja `prewarm`).
+const PREWARM_STEPS := 9
+
+
+## `step`: -1 = tudo; 0 a PREWARM_STEPS - 1 = só aquele passo (criar os nós de todos
+## de uma vez levava ~0,2 s num quadro só; o warm_up da corrida liga um por quadro).
+func prewarm(on: bool, near: Kart, xf: Transform3D, step := -1) -> void:
+	for i in PREWARM_KINDS.size():
+		if step >= 0 and step != i:
+			continue
+		var kind := PREWARM_KINDS[i]
 		var key := StringName("prewarm_%d" % kind)
 		var node: Node3D = get_meta(key) if has_meta(key) else null
 		if on:
@@ -1418,18 +1430,21 @@ func prewarm(on: bool, near: Kart, xf: Transform3D) -> void:
 				(node as ImpugnacaoCalculadora).prewarm(false)
 			_park(node, kind)
 	# Chuva de folhas e o escudo da Liminar na frente do kart.
-	if on and _folhas.is_empty():
-		var rain := ChuvaDeFolhas.new()
-		add_child(rain)
-		rain.build()
-		_folhas.append(rain)
-	if not _folhas.is_empty():
-		_folhas[0].prewarm(on, xf.translated_local(Vector3(0.0, 1.0, -3.0)).origin)
-	if on and _escudos.is_empty():
-		_get_escudo()
-	if not _escudos.is_empty():
-		_escudos[0].prewarm(on, xf.translated_local(Vector3(0.0, 0.0, -10.0)))
-	if near == null:
+	var kinds := PREWARM_KINDS.size()
+	if step < 0 or step == kinds:
+		if on and _folhas.is_empty():
+			var rain := ChuvaDeFolhas.new()
+			add_child(rain)
+			rain.build()
+			_folhas.append(rain)
+		if not _folhas.is_empty():
+			_folhas[0].prewarm(on, xf.translated_local(Vector3(0.0, 1.0, -3.0)).origin)
+	if step < 0 or step == kinds + 1:
+		if on and _escudos.is_empty():
+			_get_escudo()
+		if not _escudos.is_empty():
+			_escudos[0].prewarm(on, xf.translated_local(Vector3(0.0, 0.0, -10.0)))
+	if near == null or (step >= 0 and step != kinds + 2):
 		return
 	if on:
 		stamp_mark(near)
