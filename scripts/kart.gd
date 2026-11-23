@@ -54,9 +54,9 @@ signal knocked(other: Kart)
 signal splashed(entering: bool)
 
 ## Chão embaixo do kart (a corrida define com Track.surface_at): areia batida nas dunas
-## (igual ao asfalto), areia fofa nas bordas das dunas, redemoinho de areia movediça e
-## gelo (escorrega).
-enum Surface { ASFALTO, AREIA, AREIA_FOFA, AREIA_MOVEDICA, GELO }
+## (igual ao asfalto), areia fofa nas bordas das dunas, redemoinho de areia movediça,
+## gelo (escorrega) e neve batida (pista de neve: escorrega um pouco).
+enum Surface { ASFALTO, AREIA, AREIA_FOFA, AREIA_MOVEDICA, GELO, NEVE }
 
 const GRAVITY := 32.0
 const HOP_VELOCITY := 4.6
@@ -158,6 +158,14 @@ const UNDERWATER_DEPTH := 0.5
 const ICE_GRIP := 0.24
 const ICE_DRIFT_GRIP := 0.45
 const ICE_TURN := 0.9
+## Neve batida (pista de neve e gelo): fração da aderência, fora e dentro do drift — o
+## kart solta um pouco a traseira, mas bem menos que no gelo.
+const SNOW_GRIP := 0.72
+const SNOW_DRIFT_GRIP := 0.9
+## Na neve, acima dessa velocidade (m/s) as rodas levantam um véu de neve fina, com
+## essa fração das partículas da poeira.
+const SNOW_SPRAY_SPEED := 18.0
+const SNOW_SPRAY := 0.22
 ## Areia fofa (bordas das dunas) e areia movediça: fração da velocidade máxima.
 const SOFT_SAND_SPEED := 0.78
 const QUICKSAND_SPEED := 0.55
@@ -991,6 +999,8 @@ func _physics_process(delta: float) -> void:
 	elif surface == Surface.GELO and not judged:
 		# No gelo a velocidade demora para seguir o bico: o kart escorrega de lado.
 		traction *= ICE_DRIFT_GRIP if drifting else ICE_GRIP
+	elif surface == Surface.NEVE and not judged:
+		traction *= SNOW_DRIFT_GRIP if drifting else SNOW_GRIP
 	horizontal = horizontal.lerp(fwd * speed, 1.0 - exp(-traction * delta))
 	if surface == Surface.AREIA_MOVEDICA and on_floor and pit_center != Vector4.INF and not judged:
 		# Redemoinho: puxa para o meio e gira o kart devagar.
@@ -1554,7 +1564,7 @@ func _update_skid_marks(on_floor: bool) -> void:
 	var color := _offroad_mark if is_offroad or surface == Surface.AREIA_FOFA or surface == Surface.AREIA_MOVEDICA else ROAD_MARK
 	if surface == Surface.GELO:
 		color = ICE_MARK
-	elif surface == Surface.AREIA:
+	elif surface == Surface.AREIA or surface == Surface.NEVE:
 		color = _offroad_mark
 	# Mais forte com o drift carregado.
 	color.a *= 0.75 + 0.1 * drift_level
@@ -2005,8 +2015,10 @@ func _update_visuals(delta: float, steer: float) -> void:
 			or (surface == Surface.AREIA and absf(speed) > 14.0)
 	var offroad_dust := (is_offroad or sandy) and absf(speed) > 4.0 and grounded
 	var drift_dust := drifting and absf(speed) > 6.0 and grounded
-	var dusty := offroad_dust or drift_dust or _land_dust > 0.0
-	var ratio := 1.0 if offroad_dust or _land_dust > 0.0 else 0.45 + 0.18 * drift_level
+	# Na neve batida, rápido, um véu fino de neve sai das rodas.
+	var powder := surface == Surface.NEVE and absf(speed) > SNOW_SPRAY_SPEED and grounded
+	var dusty := offroad_dust or drift_dust or _land_dust > 0.0 or powder
+	var ratio := 1.0 if offroad_dust or _land_dust > 0.0 else (0.45 + 0.18 * drift_level if drift_dust else SNOW_SPRAY)
 	if dusty and not is_equal_approx(ratio, _dust_ratio):
 		_dust_ratio = ratio
 		for p in _dust_emitters:

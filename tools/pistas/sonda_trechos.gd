@@ -170,7 +170,7 @@ func _report() -> void:
 			mx_a = maxf(mx_a, f.after)
 	print("VOOS %d ar %.2f-%.2fs dist %.0f-%.0fm pouso %.0f-%.0fm depois da beira, folga minima na beira do pouso %.1fm QUEDAS NO VALE %d" % [
 			flights.size(), mn_air, mx_air, mn_d, mx_d, mn_a, mx_a, min_margin, falls])
-	var names := ["asfalto", "areia", "areia_fofa", "movedica", "gelo"]
+	var names := ["asfalto", "areia", "areia_fofa", "movedica", "gelo", "neve"]
 	var s := []
 	for key in surf:
 		s.append("%s %.1fs" % [names[key], surf[key]])

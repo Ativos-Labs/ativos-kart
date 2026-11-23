@@ -7,8 +7,10 @@ extends RefCounted
 ##   baú e o submarino amarelo da Ativos; no lago, um barco a remo e nenúfares).
 ## - Dunas: os redemoinhos de areia movediça, bandeirinhas de rali nas muretas,
 ##   esqueletos de fóssil meio enterrados e areia voando com o vento.
-## - Gelo: blocos de gelo, cabanas de pesca no gelo, montes de neve e pinguins
-##   patinando em roda.
+## - Gelo: blocos de gelo, cabanas de pesca no gelo (só no lago), montes de neve e
+##   pinguins patinando em roda. No riacho congelado (sem lago) tudo fica no chão de neve
+##   das margens. Na pista de neve e gelo: cristais de gelo gigantes nas margens e, sobre
+##   cada riacho, um arco de gelo glacial por onde a pista passa.
 ## - Vale: paredão de pedra onde a pista acaba, cachoeira na cabeceira (congelada na
 ##   neve) com névoa e arco-íris, pedras no rio, árvores, bichos voando (golfinhos no
 ##   mar) e um destaque de cada cenário: ponte pênsil (campo), rochas no mar e um barco
@@ -23,6 +25,7 @@ const QUICKSAND_SHADER := preload("res://shaders/quicksand.gdshader")
 const RAINBOW_SHADER := preload("res://shaders/rainbow.gdshader")
 const BUBBLE_SHADER := preload("res://shaders/bubble.gdshader")
 const STONE_SHADER := preload("res://shaders/stone.gdshader")
+const ICE_CRYSTAL_SHADER := preload("res://shaders/ice_crystal.gdshader")
 const LOGO_ICON := preload("res://assets/logos/ativos_icone.png")
 const WORDMARK_DARK := preload("res://assets/logos/ativos_marca_branca.png")
 const CABLE_CAR := preload("res://scripts/cable_car.gd")
@@ -819,7 +822,8 @@ func _build_ice(s: TrackSection) -> void:
 	var ids := _indices(s)
 	if ids.is_empty():
 		return
-	var node := _node("LagoCongelado")
+	var lake := s.is_basin()
+	var node := _node("LagoCongelado" if lake else "RiachoCongelado")
 	var wl := track.water_level
 	# Blocos de gelo empilhados.
 	var ice := StandardMaterial3D.new()
@@ -830,7 +834,8 @@ func _build_ice(s: TrackSection) -> void:
 	ice.rim_enabled = true
 	ice.rim = 0.5
 	var block := _box(Vector3(1.0, 1.0, 1.0))
-	block.material = ice
+	# Na pista de neve e gelo, o mesmo gelo maciço dos cristais (opaco, sem ordenar).
+	block.material = _ice_material(0.5) if track.snow_track else ice
 	var bx: Array[Transform3D] = []
 	for k in 70:
 		var p := _spot_beside(ids, _outside + 1.0, 55.0, 0.8)
@@ -838,7 +843,7 @@ func _build_ice(s: TrackSection) -> void:
 			continue
 		var sc := Vector3(rng.randf_range(0.8, 2.6), rng.randf_range(0.5, 1.6), rng.randf_range(0.8, 2.2))
 		var b := Basis(Vector3.UP, rng.randf() * TAU) * Basis(Vector3.RIGHT, rng.randf_range(-0.3, 0.3))
-		bx.append(Transform3D(b.scaled(sc), Vector3(p.x, wl + sc.y * 0.3, p.z)))
+		bx.append(Transform3D(b.scaled(sc), Vector3(p.x, (wl if lake else p.y) + sc.y * 0.3, p.z)))
 	_multimesh(block, bx, [], "BlocosDeGelo", node, true)
 	# Montes de neve na base das muretas (do lado de fora).
 	var snow := _parts([[_sphere(1.0, 10), Transform3D(Basis().scaled(Vector3(1.0, 0.45, 2.2)), Vector3.ZERO)]], _tint)
@@ -850,11 +855,12 @@ func _build_ice(s: TrackSection) -> void:
 			if rng.randf() < 0.35:
 				continue
 			var p := track.samples[i] + track.rights[i] * side * (_outside + rng.randf_range(0.6, 2.0))
-			sx.append(Transform3D(_facing(track.tangents[i]).scaled(Vector3.ONE * rng.randf_range(0.7, 1.4)), Vector3(p.x, wl, p.z)))
+			var y := wl if lake else terrain.height_at(p.x, p.z)
+			sx.append(Transform3D(_facing(track.tangents[i]).scaled(Vector3.ONE * rng.randf_range(0.7, 1.4)), Vector3(p.x, y, p.z)))
 			sc_.append(Color(0.95, 0.97, 1.0))
 	_multimesh(snow, sx, sc_, "MontesDeNeve", node)
 	# Cabanas de pesca no gelo, com o buraco e a vara.
-	for k in 4:
+	for k in (4 if lake else 0):
 		var p := _spot_beside(ids, _outside + 8.0, 40.0, 6.0)
 		if p == Vector3.INF:
 			continue
@@ -877,8 +883,142 @@ func _build_ice(s: TrackSection) -> void:
 		if p == Vector3.INF:
 			continue
 		var white: Array[Color] = [Color.WHITE]
-		_flock(px, pc, pcu, Vector3(p.x, wl, p.z), rng.randi_range(3, 6), Vector2(2.5, 5.0), 1.6, 0.8, 0.0, 0.06, white)
+		_flock(px, pc, pcu, Vector3(p.x, wl if lake else p.y, p.z), rng.randi_range(3, 6), Vector2(2.5, 5.0), 1.6, 0.8, 0.0, 0.06, white)
 	_multimesh(_creature_mesh(Creature.PINGUIM), px, pc, "Pinguins", node, true, pcu)
+	if track.snow_track:
+		_build_ice_crystals(ids, node, lake)
+		if not lake:
+			_build_ice_arch(ids, node)
+
+
+func _ice_material(top: float) -> ShaderMaterial:
+	var m := ShaderMaterial.new()
+	m.shader = ICE_CRYSTAL_SHADER
+	m.set_shader_parameter("top", top)
+	return m
+
+
+## Cristal de gelo facetado: prisma de seis lados (raio 1, um pouco mais fino no alto)
+## de y = -0,3 a 1 e ponta em pirâmide comprida até 2,1.
+static func _crystal_mesh(material: Material) -> ArrayMesh:
+	var md := Track.MeshData.new()
+	var low: Array[Vector3] = []
+	var high: Array[Vector3] = []
+	for k in 6:
+		var a := TAU * k / 6.0
+		low.append(Vector3(cos(a), -0.3, sin(a)))
+		high.append(Vector3(cos(a) * 0.8, 1.0, sin(a) * 0.8))
+	var tip := Vector3(0.1, 2.1, -0.06)
+	for k in 6:
+		var n := (k + 1) % 6
+		_flat_quad(md, low[k], low[n], high[n], high[k])
+		_flat_tri(md, high[k], high[n], tip)
+	return md.to_mesh(material)
+
+
+## Triângulo com normal própria (facetado), virado para fora do eixo Y.
+static func _flat_tri(md: Track.MeshData, a: Vector3, b: Vector3, c: Vector3) -> void:
+	var n := (b - a).cross(c - a).normalized()
+	var mid := (a + b + c) / 3.0
+	if n.dot(Vector3(mid.x, 0.0, mid.z)) < 0.0:
+		n = -n
+	var i := md.add_vertex(a, n, Vector2.ZERO)
+	md.add_vertex(b, n, Vector2.ZERO)
+	md.add_vertex(c, n, Vector2.ZERO)
+	md.add_tri(i, i + 1, i + 2, n)
+
+
+static func _flat_quad(md: Track.MeshData, a: Vector3, b: Vector3, c: Vector3, d: Vector3) -> void:
+	var n := (b - a).cross(d - a).normalized()
+	var mid := (a + b + c + d) * 0.25
+	if n.dot(Vector3(mid.x, 0.0, mid.z)) < 0.0:
+		n = -n
+	var i := md.add_vertex(a, n, Vector2.ZERO)
+	md.add_vertex(b, n, Vector2.ZERO)
+	md.add_vertex(c, n, Vector2.ZERO)
+	md.add_vertex(d, n, Vector2.ZERO)
+	md.add_tri(i, i + 1, i + 2, n)
+	md.add_tri(i, i + 2, i + 3, n)
+
+
+## Tufos de cristais de gelo gigantes (1,5 a 6 m) nas margens do rio congelado.
+func _build_ice_crystals(ids: PackedInt32Array, node: Node3D, lake: bool) -> void:
+	var mesh := _crystal_mesh(_ice_material(2.1))
+	var xs: Array[Transform3D] = []
+	var clusters := int(ids.size() * (0.22 if lake else 0.3))
+	for k in clusters:
+		var p := _spot_beside(ids, _outside + 2.5, 30.0 if lake else 24.0, 2.0)
+		if p == Vector3.INF:
+			continue
+		var y := track.water_level if lake and p.y < track.water_level else p.y
+		var lean := Vector3(rng.randf_range(-1.0, 1.0), 0.0, rng.randf_range(-1.0, 1.0)).normalized()
+		for c in rng.randi_range(3, 6):
+			var h := rng.randf_range(1.6, 5.2) * (1.0 if c == 0 else rng.randf_range(0.35, 0.75))
+			var r := h * rng.randf_range(0.07, 0.11)
+			# Em leque: os menores saem tortos do pé do maior.
+			var out := Vector3(rng.randf_range(-1.0, 1.0), 0.0, rng.randf_range(-1.0, 1.0)).normalized()
+			var axis := (lean if c == 0 else out).cross(Vector3.UP).normalized()
+			var tilt := Basis(axis, -rng.randf_range(0.05, 0.2) if c == 0 else -rng.randf_range(0.3, 0.75))
+			var b := tilt * Basis(Vector3.UP, rng.randf() * TAU)
+			var at := Vector3(p.x, y, p.z) + out * rng.randf_range(0.2, 0.9) * (0.0 if c == 0 else 1.0)
+			xs.append(Transform3D(b.scaled(Vector3(r, h, r)), at))
+	_multimesh(mesh, xs, [], "CristaisDeGelo", node, true)
+
+
+## Arco de gelo glacial sobre o meio do riacho: um tubo irregular de margem a margem,
+## alto o bastante para a câmera passar por baixo (sem colisão: os pés ficam fora dos
+## montes de neve).
+func _build_ice_arch(ids: PackedInt32Array, node: Node3D) -> void:
+	var i := ids[ids.size() / 2]
+	var center := track.samples[i]
+	var right := track.rights[i]
+	var fwd := track.tangents[i]
+	var span := _outside + 3.5
+	var feet: Array[float] = []
+	for side: float in [-1.0, 1.0]:
+		var f := center + right * side * span
+		feet.append(terrain.height_at(f.x, f.z) - 0.6)
+	var rise := 10.5
+	var md := Track.MeshData.new()
+	var rings := 28
+	var sides := 9
+	for r in rings + 1:
+		var t := float(r) / rings
+		var th := PI * t
+		var base_y := lerpf(feet[0], feet[1], t)
+		var c := center + right * (-cos(th) * span) + Vector3.UP * (base_y - center.y + sin(th) * rise)
+		# Direção do arco e os dois eixos da seção (um deles ao longo da pista).
+		var along_arc := (right * (sin(th) * span) + Vector3.UP * (cos(th) * rise + (feet[1] - feet[0]) / PI)).normalized()
+		var ax := fwd
+		var ay := along_arc.cross(ax).normalized()
+		# Mais grosso nos pés, largo ao longo da pista (uma laje de geleira) e irregular
+		# (gelo derretido e recongelado).
+		var thick := lerpf(1.1, 2.4, pow(absf(cos(th)), 3.0)) * (1.0 + 0.22 * sin(t * 17.0) + 0.12 * sin(t * 41.0))
+		var sway := ax * (0.6 * sin(t * 7.0)) + ay * (0.25 * sin(t * 13.0))
+		for k in sides + 1:
+			var a := TAU * k / sides
+			var bumpy := 1.0 + 0.28 * sin(a * 3.0 + t * 11.0) + 0.16 * sin(a * 5.0 - t * 23.0) + 0.08 * sin(a * 7.0 + t * 37.0)
+			var dir := (ax * cos(a) * 1.7 + ay * sin(a)).normalized()
+			md.add_vertex(c + sway + dir * thick * bumpy, dir, Vector2(t, float(k) / sides))
+	for r in rings:
+		for k in sides:
+			var a := r * (sides + 1) + k
+			var b := a + sides + 1
+			md.add_tri(a, a + 1, b, md.normals[a])
+			md.add_tri(a + 1, b + 1, b, md.normals[a])
+	# Pingentes de gelo pendurados na parte de baixo do arco.
+	var cone := _crystal_mesh(_ice_material(2.1))
+	var xs: Array[Transform3D] = []
+	for k in 26:
+		var t := rng.randf_range(0.2, 0.8)
+		var th := PI * t
+		var p := center + right * (-cos(th) * span) + Vector3.UP * (lerpf(feet[0], feet[1], t) - center.y + sin(th) * rise - 1.1)
+		p += fwd * rng.randf_range(-0.9, 0.9)
+		var h := rng.randf_range(0.4, 1.1) * (0.6 + 0.4 * sin(th))
+		var b := Basis(Vector3.RIGHT, PI) * Basis(Vector3.UP, rng.randf() * TAU)
+		xs.append(Transform3D(b.scaled(Vector3(h * 0.14, h, h * 0.14)), p))
+	_add(md.to_mesh(_ice_material(center.y + rise + 2.0)), Transform3D.IDENTITY, node).name = "ArcoDeGelo"
+	_multimesh(cone, xs, [], "Pingentes", node, true)
 
 
 # --- Vale ----------------------------------------------------------------------------

@@ -21,6 +21,9 @@ uniform float cloud_coverage : hint_range(0.0, 1.0) = 0.4;
 uniform float cloud_softness : hint_range(0.01, 0.5) = 0.035;
 uniform float cloud_scale = 1.6;
 uniform float energy = 1.0;
+// Halo de 22° em volta do sol (cristais de gelo no ar, dia frio de neve): anel fino com
+// as cores separadas, vermelho por dentro e azul por fora. 0 = sem.
+uniform float halo : hint_range(0.0, 2.0) = 0.0;
 
 float cloud_density(vec2 p) {
 	vec2 q = vec2(fbm(p * 0.45 + vec2(3.1, 1.7), 3), fbm(p * 0.45 + vec2(8.3, 2.8), 3));
@@ -47,6 +50,7 @@ void sky() {
 
 	// Abaixo de h = 0,05 as nuvens somem (fade abaixo), então nem calcula o ruído ali;
 	// e o fade entra antes do teste para pular a 2ª amostra onde a nuvem é invisível.
+	float cloud_a = 0.0;
 	if (h > 0.05 && !AT_CUBEMAP_PASS) {
 		vec2 p = dir.xz / (h + 0.22) * cloud_scale;
 		float d = cloud_density(p);
@@ -62,6 +66,16 @@ void sky() {
 			ccol += sun_color * pow(max(sd, 0.0), 6.0) * 0.25 * (1.0 - core);
 			col = mix(col, ccol, a);
 		}
+		cloud_a = a;
+	}
+	if (halo > 0.0 && LIGHT0_ENABLED && !AT_CUBEMAP_PASS) {
+		float ang = acos(clamp(sd, -1.0, 1.0));
+		vec3 ring = vec3(exp(-pow((ang - 0.379) / 0.009, 2.0)), exp(-pow((ang - 0.385) / 0.011, 2.0)),
+				exp(-pow((ang - 0.394) / 0.016, 2.0)));
+		// Por dentro do anel o céu fica um pouco mais escuro; por fora, um brilho largo.
+		float outer = exp(-pow((ang - 0.42) / 0.06, 2.0)) * step(0.385, ang);
+		col *= 1.0 - 0.06 * halo * smoothstep(0.385, 0.3, ang) * smoothstep(0.08, 0.2, ang);
+		col += (ring * vec3(1.0, 0.92, 0.95) * 0.55 + outer * 0.12) * halo * (1.0 - cloud_a * 0.5);
 	}
 	COLOR = col * energy;
 }

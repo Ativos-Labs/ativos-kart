@@ -28,9 +28,9 @@ static func terrain_params(scenery: int) -> Dictionary:
 		Scenery.NEVE:
 			return {
 				"grass_a": Color(0.78, 0.85, 0.96), "grass_b": Color(0.95, 0.97, 1.0), "grass_dark": Color(0.6, 0.7, 0.9),
-				"mowed_light": Color(0.88, 0.92, 0.98), "mowed_dark": Color(0.72, 0.79, 0.92),
+				"mowed_light": Color(0.93, 0.96, 1.0), "mowed_dark": Color(0.82, 0.88, 0.97),
 				"sand": Color(0.78, 0.85, 0.95), "rock": Color(0.52, 0.53, 0.58), "rock_dark": Color(0.3, 0.31, 0.36),
-				"snow": Color(0.95, 0.97, 1.0), "snow_height": 30.0, "sand_band": 1.2, "stripe_strength": 0.45,
+				"snow": Color(0.95, 0.97, 1.0), "snow_height": 30.0, "sand_band": 1.2, "stripe_strength": 0.3,
 				"rock_slope": 0.34,
 				"caustic_strength": 0.0,
 			}
@@ -45,7 +45,8 @@ static func water_params(scenery: int) -> Dictionary:
 		Scenery.DESERTO:
 			return {"shallow_color": Color(0.36, 0.78, 0.68), "deep_color": Color(0.05, 0.36, 0.5), "depth_range": 4.0}
 		Scenery.NEVE:
-			return {"ice": 1.0, "shallow_color": Color(0.86, 0.95, 1.0), "deep_color": Color(0.5, 0.74, 0.93), "depth_range": 5.0}
+			# O mesmo gelo da pista de gelo (snow_road.gdshader).
+			return {"ice": 1.0, "shallow_color": Color(0.6, 0.86, 0.97), "deep_color": Color(0.09, 0.33, 0.52), "depth_range": 5.0}
 	return {}
 
 

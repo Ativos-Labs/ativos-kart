@@ -76,8 +76,15 @@ rodapé mostra as teclas ou os botões do controle, conforme o último que foi u
     um **pulinho na crista** de cada duna. A **areia fofa** junto das muretas segura o
     kart, e os **redemoinhos de areia movediça** puxam para o meio e giram o kart (com
     turbo dá para escapar).
-  - **Lago congelado** (Pico): a pista passa por cima do gelo — **escorrega**: o kart
-    demora para seguir o bico e desliza de lado nas curvas. Marcas brancas no gelo.
+  - **Pista de neve e gelo** (Pico): não tem asfalto. A pista inteira é **neve batida**
+    (sulcos da máquina de neve, trilhas de pneu, cristais que brilham contra o sol; o kart
+    solta um pouco a traseira e levanta um véu de neve quando anda rápido), com montes de
+    neve no lugar das muretas e das zebras. Três trechos viram **rio congelado** — gelo
+    liso e transparente com rachaduras, bolhas presas e peixes nadando embaixo, que
+    **escorrega**: o kart demora para seguir o bico e desliza de lado nas curvas. A
+    descida do platô é um riacho congelado que deságua no lago, e a reta final é outro
+    riacho (com as bolas de neve). Cristais de gelo gigantes nas margens e um arco de
+    gelo sobre cada riacho; no céu, o halo de 22° em volta do sol.
 - **Caixas de item** (com o logo "at"): passe por elas para pegar um item. Elas estouram e
   voltam depois de alguns segundos. O item aparece no **slot do canto superior esquerdo**
   (como no Mario Kart) depois de uma **roleta vertical** (os ícones descem e freiam até
@@ -325,7 +332,7 @@ traçado, extensão, voltas, curvas, dificuldade e recordes. Vagas sem pista apa
 | Circuito Ativos  | Campo   | 1,5 km. Lagos, montanhas nevadas, "S" apertado no meio. Nova volta pelo leste: sobe uma colina, salta de asa-delta sobre o **Vale da Cachoeira** (cânion de pedra com rio, pedras, ponte pênsil de madeira, cachoeira com arco-íris e pássaros) e depois **mergulha no lago** (algas, nenúfares, cardumes, barco a remo afundado, píer com a bandeira da Ativos) |
 | Ilha Ativos      | Praia   | 1,3 km. Ilha com lagoa no meio, ponte estaiada com o logo na torre (com rampa de turbo), coqueiros, guarda-sóis, veleiros, farol e ondas do mar invadindo a pista. A asa-delta sai de um penhasco sobre a **Enseada dos Penhascos** (rochas no mar, golfinhos pulando, barco encalhado, cachoeira caindo no mar com arco-íris) e a pista **mergulha no recife** (corais, estrelas-do-mar, cardumes coloridos, navio pirata naufragado com o baú do tesouro da Ativos e o submarino amarelo da Ativos) |
 | Cânion Ativos    | Deserto | 1,7 km. Traçado em "8" com o viaduto passando por cima da própria pista, ponte em arco azul sobre o rio, caixa-d'água, letreiro gigante e fardos de feno. A asa-delta cruza a **Garganta do Cânion** (paredões em degraus, rio turquesa, cachoeira no paredão, torres de pedra, arco de pedra natural, urubus) e o laço da largada virou o **mar de dunas** (sobe e desce com pulinhos, areia fofa, três redemoinhos de areia movediça, bandeirinhas de rali, esqueletos de fóssil, areia voando, arco de pedra) |
-| Pico Nevado      | Neve    | 1,6 km. Subida até o platô, viaduto de pedra sobre o rio congelado, pinheiros, chalés, bonecos de neve e bolas de neve rolando. Do alto do platô a asa-delta atravessa o **Vale Glacial** (paredões de pedra nevada, cascata congelada, rio congelado, teleférico com cabines azul e amarela indo e vindo, águias) e a volta termina no **lago congelado** (gelo que escorrega, blocos de gelo, cabanas de pesca, pinguins patinando em roda) |
+| Pico Nevado      | Neve    | 1,6 km, **sem asfalto**: neve batida e rio congelado do começo ao fim, num dia de sol com halo em volta do sol. Subida até o platô, viaduto de pedra sobre o rio congelado, pinheiros, chalés, bonecos de neve e bolas de neve rolando. Do alto do platô a asa-delta atravessa o **Vale Glacial** (paredões de pedra nevada, cascata congelada, rio congelado, teleférico com cabines azul e amarela indo e vindo, águias); na volta, um **riacho congelado** desce do platô por baixo de um arco de gelo e deságua no **lago congelado** (blocos de gelo, cabanas de pesca, pinguins patinando em roda), e a reta final é outro riacho com bolas de neve. Cristais de gelo gigantes nas margens e peixes nadando debaixo do gelo |
 
 Todas usam as logos da Ativos no pórtico, nas muretas, outdoors, bandeiras, balões, dirigível,
 no asfalto e nas pontes.
@@ -456,7 +463,8 @@ scripts/
                         tela dividida (split_screen.gd), cartões de modo, seletor de
                         opção, etiqueta do jogador, o painel "Quem vai jogar?" e a janela
                         de opções (options_panel.gd, volume_slider.gd, key_button.gd)
-shaders/                Céu com nuvens, terreno, água (e gelo), asfalto, zebras, muretas com placas,
+shaders/                Céu com nuvens (e halo de 22°), terreno, água (e gelo), asfalto, neve batida e
+                        rio congelado, montes de neve, cristais de gelo, zebras, muretas com placas,
                         vegetação (com neve), pedra em blocos, painéis com logo, placas de curva,
                         turbos, rampas de pulo, caixas de item, moedas (com o "%" gravado no
                         verso), obstáculos, ondas, marcas de pneu, foguete da RPV, ofício da
@@ -524,6 +532,9 @@ tools/track_shots/                   Gera as imagens de assets/pistas/ (gerar.sh
 tools/pistas/                        Traçado (curva + conversão de frações), análise do
                                      traçado, sonda dos trechos especiais e fotos (veja o
                                      README.md de lá)
+tools/gelo/gerar_ruido.gd            Gera assets/textures/ruido.png (ruído branco 256×256 dos
+                                     shaders da pista de neve e gelo; veja
+                                     shaders/noise_tex.gdshaderinc)
 web/                                 Export para o navegador (veja web/README.md)
 linux/                               Export do executável Linux (veja linux/README.md)
 windows/                             Export do executável Windows (veja windows/README.md)
@@ -798,6 +809,16 @@ para mudar:
 
 - **Cenário:** Campo, Praia, Deserto ou Neve — muda as cores do chão, da água (Neve = gelo),
   a vegetação e as decorações típicas.
+- **Snow Track** (pista de neve e gelo, ligado no Pico Nevado): tira o asfalto, as zebras e
+  as placas das muretas. A pista vira neve batida (`shaders/snow_road.gdshader`; o kart
+  pisa `Kart.Surface.NEVE`, aderência ×0,72), as muretas viram barrancos de neve (só o
+  visual: a colisão continua a da mureta) com blocos de gelo com a marca da Ativos, as
+  zebras viram uma leira baixa de neve, e os trechos **GELO** viram rio congelado
+  (`shaders/ice.gdshaderinc`, o mesmo gelo da água congelada) com cristais de gelo nas
+  margens e um arco de gelo sobre cada riacho. O ruído desses shaders vem de uma textura
+  (`assets/textures/ruido.png`, `shaders/noise_tex.gdshaderinc`): com ruído por hash, a
+  pista custava até ~2,7 ms a mais por quadro na web (1080p, M4); com a textura, o mesmo
+  que o asfalto.
 - **Paisagem:** além das alturas, `hill_bias` (colinas mais altas/baixas), `terrace_step`
   (colinas em degraus, como mesas de deserto) e `sea_distance` (a partir dessa distância da
   pista o chão desce para o mar — vira uma ilha).
@@ -877,8 +898,11 @@ No nó raiz, em **Trechos especiais**, acrescente itens (`TrackSection`). Cada u
   `Track.SOFT_SAND_EDGE` m junto de cada borda é areia fofa (×0,78) e **Pits** são os
   redemoinhos de areia movediça (x = fração, y = lateral, z = raio; ×0,55 e puxam para o
   meio). Deixe ~6 m livres ao lado de cada redemoinho: o computador desvia por ali.
-- **GELO:** lago congelado — a pista fica rente ao gelo (use **Depth** −0,06) e o chão em
-  **Basin** m vira lago. No gelo a aderência cai para 24% (o kart desliza).
+- **GELO:** rio congelado — com **Basin** > 0 é um lago congelado: a pista fica rente ao
+  gelo (use **Depth** −0,06) e o chão em **Basin** m vira lago. Com **Basin** = 0 é um
+  riacho congelado: a pista fica na altura dela e só o piso vira gelo (dá para pôr em
+  descidas). No gelo a aderência cai para 24% (o kart desliza): evite curvas com menos
+  de ~75 m de raio.
 - **VALE:** veja abaixo.
 
 ### Vale da asa-delta

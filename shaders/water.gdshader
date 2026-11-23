@@ -1,9 +1,12 @@
 shader_type spatial;
 render_mode blend_mix, cull_back, depth_draw_opaque, specular_schlick_ggx;
 // Água dos lagos: azul-turquesa que escurece com a profundidade, ondinhas,
-// brilho do sol e espuma branca na beirada.
+// brilho do sol e espuma branca na beirada. Com `ice`, rio/lago congelado (o mesmo gelo
+// da pista de gelo, veja ice.gdshaderinc), com neve na margem.
 
 #include "res://shaders/noise.gdshaderinc"
+#include "res://shaders/noise_tex.gdshaderinc"
+#include "res://shaders/ice.gdshaderinc"
 
 uniform vec3 shallow_color : source_color = vec3(0.22, 0.86, 0.86);
 uniform vec3 deep_color : source_color = vec3(0.02, 0.33, 0.72);
@@ -43,20 +46,25 @@ void fragment() {
 
 	vec2 p = world_pos.xz;
 	if (ice > 0.5) {
-		vec3 icol = mix(shallow_color, deep_color, smoothstep(0.0, 1.0, depth_f));
-		float frost = fbm(p * 0.08, 3);
-		icol = mix(icol, vec3(0.95, 0.97, 1.0), smoothstep(0.45, 0.75, frost) * 0.7);
-		// Rachaduras: linhas finas onde o ruído passa pelo meio.
-		float c1 = abs(vnoise(p * 0.11) - 0.5);
-		float c2 = abs(vnoise(p * 0.27 + 7.3) - 0.5);
-		float crack = (1.0 - smoothstep(0.0, 0.012, c1)) * 0.6 + (1.0 - smoothstep(0.0, 0.008, c2)) * 0.35;
-		icol = mix(icol, deep_color * 0.7, crack * (1.0 - smoothstep(0.55, 0.8, frost)));
-		vec3 inorm = normalize(vec3((vnoise(p * 0.6) - 0.5) * 0.06, 1.0, (vnoise(p * 0.6 + 3.1) - 0.5) * 0.06));
+		// Gelo sem correnteza definida: as riscas ficam num ângulo qualquer.
+		vec2 ax = vec2(0.8, 0.6);
+		vec2 ay = vec2(-0.6, 0.8);
+		vec2 q = vec2(dot(p, ax), dot(p, ay));
+		vec3 ray = normalize(world_pos - CAMERA_POSITION_WORLD);
+		float lod = clamp(length(fwidth(p)) * 5.0, 0.0, 1.0);
+		vec3 icol;
+		float irough;
+		float ispec;
+		vec3 iemit;
+		// Neve na margem: onde o gelo é raso (perto do chão).
+		ice_shade(q, ray, ax, ay, water_depth * 4.0, lod, TIME, 0.3, shallow_color, deep_color, icol, irough, ispec, iemit);
+		vec3 inorm = normalize(vec3((vnoise(p * 0.6) - 0.5) * 0.04, 1.0, (vnoise(p * 0.6 + 3.1) - 0.5) * 0.04));
 		NORMAL = normalize((VIEW_MATRIX * vec4(inorm, 0.0)).xyz);
 		ALBEDO = icol;
-		ALPHA = clamp(mix(0.82, 0.98, depth_f), 0.0, 1.0);
-		ROUGHNESS = mix(0.12, 0.6, smoothstep(0.45, 0.75, frost));
-		SPECULAR = 0.6;
+		ALPHA = clamp(mix(0.86, 0.98, depth_f), 0.0, 1.0);
+		ROUGHNESS = irough;
+		SPECULAR = ispec;
+		EMISSION = iemit;
 	} else {
 	vec2 g = wave_slope(p) * 0.35;
 	vec3 wn = normalize(vec3(-g.x, 1.0, -g.y));

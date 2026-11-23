@@ -53,6 +53,15 @@ no 50cc. No 50cc a folga mínima na beira do pouso ficou em 0–2 m (com a decol
 88% da velocidade máxima); sem ela, karts batidos antes da rampa caíam no vale. Quedas que
 sobram são de itens no meio do voo (golpe, PEC no líder).
 
+### Pico Nevado de neve e gelo (2026-11-23, mais tarde)
+
+O Pico virou pista sem asfalto (`Track.snow_track`): neve batida (aderência ×0,72) e três
+trechos de gelo (×0,24) — o lago (0,728–0,806) e dois riachos sem lago (`basin` = 0):
+a descida 0,625–0,722 (raios de 75–150 m) e a reta final 0,885–0,952. Sonda de corrida,
+A/B contra o asfalto antigo (mesma build, 200 s): J1 passa ~25% do tempo no gelo; voltas
++1–5% (mais no 50cc), nenhum resgate, nenhuma queda no vale. As curvas fechadas do platô
+(raios de 33–45 m) ficaram de neve de propósito: gelo ali derrubaria a IA.
+
 ## Cuidados
 
 - O terreno não tem colisão: quem passa da mureta ou cai no vale só para em `y < -20` (ou

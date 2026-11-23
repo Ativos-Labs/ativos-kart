@@ -12,6 +12,10 @@ const TERRAIN_SHADER := preload("res://shaders/terrain.gdshader")
 const WATER_SHADER := preload("res://shaders/water.gdshader")
 const WALL_SHADER := preload("res://shaders/wall.gdshader")
 const BOOST_SHADER := preload("res://shaders/boost_pad.gdshader")
+const SNOW_ROAD_SHADER := preload("res://shaders/snow_road.gdshader")
+const SNOW_BANK_SHADER := preload("res://shaders/snow_bank.gdshader")
+## Ruído branco dos shaders que usam noise_tex.gdshaderinc (neve, gelo e água congelada).
+const NOISE_TEXTURE := preload("res://assets/textures/ruido.png")
 const LOGO_ICON := preload("res://assets/logos/ativos_icone.png")
 const WORDMARK := preload("res://assets/logos/ativos_marca.png")
 const WORDMARK_DARK := preload("res://assets/logos/ativos_marca_branca.png")
@@ -36,6 +40,13 @@ const ICE_ROAD_LIFT := 0.06
 @export var scenery := TrackTheme.Scenery.CAMPO:
 	set(value):
 		scenery = value
+		_queue_rebuild()
+## Pista inteira de neve e gelo, sem asfalto: neve batida com trilhas de pneu e brilho
+## (escorrega um pouco), montes de neve no lugar das zebras e das muretas, e os trechos
+## de GELO viram rio congelado transparente (com bolhas, rachaduras e peixes embaixo).
+@export var snow_track := false:
+	set(value):
+		snow_track = value
 		_queue_rebuild()
 
 @export_group("Pontes")
@@ -413,6 +424,8 @@ func gap_exit(index: int) -> int:
 ## O que o kart pisa (lateral em m, + = direita): Kart.Surface.
 func surface_at(index: int, lateral: float) -> int:
 	var kind := section_kind_at(index)
+	if snow_track and kind != TrackSection.Kind.GELO:
+		return Kart.Surface.NEVE
 	match kind:
 		TrackSection.Kind.GELO:
 			return Kart.Surface.GELO
@@ -604,6 +617,8 @@ func _setup_terrain_sections() -> void:
 				terrain.basin_radius[i] = sec.basin
 				terrain.basin_strength[i] = f
 			TrackSection.Kind.GELO:
+				if not sec.is_basin():
+					continue
 				terrain.basin_floor[i] = lerpf(samples[i].y - 0.03, water_level - 1.2, f * f)
 				terrain.basin_radius[i] = sec.basin
 				terrain.basin_strength[i] = f
@@ -849,7 +864,9 @@ func _apply_sections() -> void:
 				section_blend[i] = f
 			match sec.kind:
 				TrackSection.Kind.SUBMERSO, TrackSection.Kind.GELO:
-					samples[i].y = lerpf(samples[i].y, target, f)
+					# Riacho congelado (GELO sem lago): a pista fica na altura dela.
+					if sec.is_basin():
+						samples[i].y = lerpf(samples[i].y, target, f)
 				TrackSection.Kind.AREIA:
 					if f >= 1.0:
 						var u := (s - a) / (e - a) * dunes
@@ -1105,6 +1122,7 @@ func _build_water() -> void:
 	plane.size = Vector2(2600.0, 2600.0)
 	var mat := ShaderMaterial.new()
 	mat.shader = WATER_SHADER
+	mat.set_shader_parameter("noise_tex", NOISE_TEXTURE)
 	var params := TrackTheme.water_params(scenery)
 	for key: String in params:
 		mat.set_shader_parameter(key, params[key])
@@ -1144,14 +1162,19 @@ func _build_road() -> void:
 	_add_strip(md, _offset_rail(-half, 0.0), _offset_rail(-half, -0.6), _scaled_rights(-1.0), 0.0, 0.0, true, colors)
 	_add_strip(md, _offset_rail(half, 0.0), _offset_rail(half, -0.6), _scaled_rights(1.0), 1.0, 1.0, true, colors)
 	var mat := ShaderMaterial.new()
-	mat.shader = ROAD_SHADER
+	if snow_track:
+		mat.shader = SNOW_ROAD_SHADER
+		mat.set_shader_parameter("sun_dir", _sun_dir())
+		mat.set_shader_parameter("noise_tex", NOISE_TEXTURE)
+	else:
+		mat.shader = ROAD_SHADER
+		mat.set_shader_parameter("curb_min", curb_min_width)
+		mat.set_shader_parameter("soft_edge", SOFT_SAND_EDGE)
 	mat.set_shader_parameter("road_width", road_width)
 	mat.set_shader_parameter("track_length", length)
-	mat.set_shader_parameter("curb_min", curb_min_width)
 	mat.set_shader_parameter("logo_texture", LOGO_ICON)
-	mat.set_shader_parameter("soft_edge", SOFT_SAND_EDGE)
 	var road := _add_mesh(md.to_mesh(mat))
-	road.name = "Asfalto"
+	road.name = "Neve" if snow_track else "Asfalto"
 	road.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	if with_collision and not _is_flat():
 		# Pista com subidas/pontes: o chão de colisão acompanha a pista de mureta a
@@ -1168,7 +1191,11 @@ func _build_road() -> void:
 
 
 ## Zebras em relevo nas duas bordas, mais largas do lado de dentro das curvas.
+## Na pista de neve, uma leira baixa de neve empurrada no lugar delas.
 func _build_curbs() -> void:
+	if snow_track:
+		_build_snow_lips()
+		return
 	var half := road_width * 0.5
 	var mat := ShaderMaterial.new()
 	mat.shader = CURB_SHADER
@@ -1207,7 +1234,11 @@ func _build_curbs() -> void:
 	curbs.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
+## Muretas com placas. Na pista de neve elas ficam só na colisão (invisíveis) e o que
+## aparece são barrancos de neve (`_build_snow_banks`).
 func _build_walls() -> void:
+	if snow_track:
+		_build_snow_banks()
 	var outer_mat := ShaderMaterial.new()
 	outer_mat.shader = WALL_SHADER
 	outer_mat.set_shader_parameter("outer_side", true)
@@ -1237,9 +1268,10 @@ func _build_walls() -> void:
 		_add_strip(rest, top_in, top_out, _repeat(Vector3.UP), wall_height, wall_height)
 		_add_strip(rest, top_out, _offset_rail(outer, wall_height - bevel), _slope_normals(side, bevel, -bevel), wall_height, wall_height - bevel)
 		_add_strip(rest, _offset_rail(outer, wall_height - bevel), _offset_rail(outer, -0.3), _scaled_rights(side), wall_height - bevel, -0.3)
-		var wall := _add_mesh(face.to_mesh(inner_mat))
-		wall.name = "Mureta"
-		_add_mesh(rest.to_mesh(outer_mat))
+		if not snow_track:
+			var wall := _add_mesh(face.to_mesh(inner_mat))
+			wall.name = "Mureta"
+			_add_mesh(rest.to_mesh(outer_mat))
 		if not with_collision:
 			continue
 		var faces := face.collision_faces()
@@ -1249,6 +1281,169 @@ func _build_walls() -> void:
 			shape.backface_collision = true
 			shape.set_faces(faces)
 			_add_static_body(shape, Transform3D.IDENTITY, "wall"))
+
+
+# --- Pista de neve e gelo -----------------------------------------------------------
+
+## Perfil do barranco de neve: (para fora da linha da mureta, altura) em m.
+const SNOW_BANK_PROFILE := [Vector2(-0.75, -0.3), Vector2(-0.6, 0.04), Vector2(-0.42, 0.3),
+		Vector2(-0.2, 0.6), Vector2(0.05, 0.88), Vector2(0.32, 1.06), Vector2(0.62, 1.15),
+		Vector2(0.95, 1.1), Vector2(1.28, 0.92), Vector2(1.62, 0.6), Vector2(2.0, 0.2), Vector2(2.45, -0.3)]
+## Perfil da leira de neve na borda da pista: (para fora da borda, altura) em m.
+const SNOW_LIP_PROFILE := [Vector2(-0.85, 0.012), Vector2(-0.5, 0.045), Vector2(-0.2, 0.085),
+		Vector2(0.1, 0.1), Vector2(0.45, 0.055), Vector2(0.8, -0.05)]
+
+
+## Direção (espaço da pista) para o sol: o DirectionalLight3D filho da pista ilumina
+## para o -Z dele.
+func _sun_dir() -> Vector3:
+	for child in get_children():
+		if child is DirectionalLight3D:
+			return (child as DirectionalLight3D).transform.basis.z.normalized()
+	return Vector3(0.43, 0.64, 0.63)
+
+
+## Escala de cada amostra que faz o monte de neve subir e descer devagar (calombos).
+func _snow_lumps(side: float, base: float, amp: float) -> PackedFloat32Array:
+	var arr := PackedFloat32Array()
+	arr.resize(samples.size())
+	for i in samples.size():
+		var d := distances[i]
+		arr[i] = base + amp * (0.4 * sin(d * 0.083 + side * 1.3) + 0.3 * sin(d * 0.29 + side * 2.1)
+				+ 0.2 * sin(d * 0.97 + side * 0.4) + 0.1 * sin(d * 1.31 + side * 3.3))
+	return arr
+
+
+## Faixa com um perfil (pontos (para fora, altura) a partir de `base` m do centro, do
+## lado `side`) ao longo da pista, com normais suaves e tangentes. UV.x = metros pelo
+## perfil, UV.y = metros ao longo; COLOR por amostra. Pula o vão dos vales. `bump` (m)
+## empurra os pontos de dentro do perfil para fora/dentro em calombos irregulares (as
+## normais são refeitas pela malha, então a luz pega nos calombos).
+func _add_profile(md: MeshData, side: float, base: float, profile: Array,
+		scale_h: PackedFloat32Array, scale_w: PackedFloat32Array, colors: PackedColorArray, bump := 0.0) -> void:
+	var count := samples.size()
+	var cols := profile.size()
+	var first := md.verts.size()
+	for i in count + 1:
+		var j := i % count
+		var v := distances[j] if i < count else length
+		var out := rights[j] * side
+		var arc := 0.0
+		var prev := Vector2.ZERO
+		for c in cols:
+			var raw: Vector2 = profile[c]
+			var pr := Vector2(raw.x * scale_w[j], raw.y * scale_h[j])
+			if c > 0:
+				arc += pr.distance_to(prev)
+			prev = pr
+			var a: Vector2 = profile[maxi(c - 1, 0)]
+			var b: Vector2 = profile[mini(c + 1, cols - 1)]
+			var t := Vector2((b.x - a.x) * scale_w[j], (b.y - a.y) * scale_h[j]).normalized()
+			var n2 := Vector2(-t.y, t.x)
+			var normal := (out * n2.x + Vector3.UP * n2.y).normalized()
+			var pos := samples[j] + out * (base + pr.x) + Vector3.UP * pr.y
+			if bump > 0.0 and c > 0 and c < cols - 1:
+				var d := distances[j] + side * 37.0
+				var fc := float(c)
+				pos += normal * bump * (0.45 * sin(d * 0.62 + fc * 1.3) + 0.35 * sin(d * 1.17 + fc * 2.9)
+						+ 0.2 * sin(d * 1.53 + fc * 0.7))
+			md.add_vertex(pos, normal, Vector2(arc, v))
+			var tw := (out * t.x + Vector3.UP * t.y).normalized()
+			md.tangents.append_array([tw.x, tw.y, tw.z, 1.0])
+			md.colors.append(colors[j])
+	if bump > 0.0:
+		# Normais pela malha (com os calombos), viradas para o lado da do perfil.
+		var rows := count + 1
+		var fresh := PackedVector3Array()
+		fresh.resize(rows * cols)
+		for i in rows:
+			for c in cols:
+				var k := first + i * cols + c
+				var across := md.verts[first + i * cols + mini(c + 1, cols - 1)] - md.verts[first + i * cols + maxi(c - 1, 0)]
+				var i0 := maxi(i - 1, 0)
+				var i1 := mini(i + 1, rows - 1)
+				var along := md.verts[first + i1 * cols + c] - md.verts[first + i0 * cols + c]
+				var n := across.cross(along).normalized()
+				if n.dot(md.normals[k]) < 0.0:
+					n = -n
+				fresh[i * cols + c] = n if n.length_squared() > 0.5 else md.normals[k]
+		for k in fresh.size():
+			md.normals[first + k] = fresh[k]
+	var skipping := gap_mask.size() == count
+	for i in count:
+		if skipping and (gap_mask[i] != 0 or gap_mask[(i + 1) % count] != 0):
+			continue
+		for c in cols - 1:
+			var a := first + i * cols + c
+			var b := a + cols
+			md.add_tri(a, a + 1, b, md.normals[a])
+			md.add_tri(a + 1, b + 1, b, md.normals[a])
+
+
+## Quanto de rio congelado em cada amostra (para o pé dos montes de neve virar gelo).
+func _ice_colors() -> PackedColorArray:
+	var road := _road_colors()
+	var out := PackedColorArray()
+	out.resize(road.size())
+	for i in road.size():
+		out[i] = Color(road[i].b, 0.0, 0.0)
+	return out
+
+
+## Barrancos de neve na linha das muretas (só visual; a colisão é a da mureta). Nas
+## pontes o lado de fora fica mais curto (não passa muito da beira do tabuleiro).
+func _build_snow_banks() -> void:
+	var offset := road_width * 0.5 + shoulder_width
+	var colors := _ice_colors()
+	for side: float in [-1.0, 1.0]:
+		var heights := _snow_lumps(side, 1.1, 0.3)
+		var widths := _snow_lumps(-side, 1.0, 0.18)
+		var md := MeshData.new()
+		var profile: Array = SNOW_BANK_PROFILE
+		_add_profile(md, side, offset, profile, heights, widths, colors, 0.16)
+		if not bridge_spans.is_empty():
+			# Em cima das pontes: o perfil some para dentro da beira do tabuleiro.
+			var cols := profile.size()
+			for i in samples.size():
+				if bridge_mask[i] == 0 or bridge_mask[i] == 3:
+					continue
+				for c in cols:
+					var raw: Vector2 = profile[c]
+					if raw.x <= 0.5:
+						continue
+					var k := i * cols + c
+					var pull := (raw.x - 0.5) * widths[i] * 0.6
+					md.verts[k] -= rights[i] * side * pull
+		var mat := ShaderMaterial.new()
+		mat.shader = SNOW_BANK_SHADER
+		mat.set_shader_parameter("sun_dir", _sun_dir())
+		mat.set_shader_parameter("noise_tex", NOISE_TEXTURE)
+		mat.set_shader_parameter("mirror", -side)
+		mat.set_shader_parameter("wordmark", WORDMARK)
+		mat.set_shader_parameter("wordmark_aspect", float(WORDMARK.get_width()) / WORDMARK.get_height())
+		var bank := _add_mesh(md.to_mesh(mat))
+		bank.name = "MonteDeNeve"
+
+
+## Leira baixa de neve empurrada nas duas bordas da pista (no lugar das zebras).
+func _build_snow_lips() -> void:
+	var half := road_width * 0.5
+	var colors := _ice_colors()
+	var md := MeshData.new()
+	for side: float in [-1.0, 1.0]:
+		# Montinhos que somem aqui e ali (a leira não é uma faixa contínua).
+		var heights := _snow_lumps(side * 3.0, 0.6, 0.8)
+		for i in heights.size():
+			heights[i] = maxf(heights[i], 0.05)
+		_add_profile(md, side, half, SNOW_LIP_PROFILE, heights, _snow_lumps(side * 5.0, 1.0, 0.2), colors, 0.025)
+	var mat := ShaderMaterial.new()
+	mat.shader = SNOW_BANK_SHADER
+	mat.set_shader_parameter("sun_dir", _sun_dir())
+	mat.set_shader_parameter("noise_tex", NOISE_TEXTURE)
+	mat.set_shader_parameter("lip", true)
+	var lips := _add_mesh(md.to_mesh(mat))
+	lips.name = "LeiraDeNeve"
+	lips.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
 ## Pórtico de largada: colunas azuis, viga com a marca da Ativos dos dois lados

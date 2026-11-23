@@ -6,7 +6,9 @@ extends Resource
 ##   leve nos pulos e um pouco mais lento, bolhas, luz azulada, corais e peixes).
 ## - AREIA: dunas no deserto — o asfalto vira areia batida que sobe e desce, com areia
 ##   fofa nas bordas (segura o kart) e redemoinhos de areia movediça (`pits`).
-## - GELO: a pista atravessa um lago congelado — o gelo escorrega (pouca aderência).
+## - GELO: rio congelado — a pista vira gelo liso e transparente (escorrega, pouca
+##   aderência). Com `basin` > 0 ela desce até o gelo de um lago congelado em volta;
+##   com `basin` = 0 fica na altura dela (riacho congelado entre os montes de neve).
 ## - VALE: a pista acaba na beira de um vale e só continua do outro lado: ponha uma
 ##   rampa de asa-delta (`TrackRamp.glider`) com a borda em `start` — o kart plana por
 ##   cima do vale (rio, cachoeira, penhascos...) e pousa em `end`. A linha do meio do
@@ -44,7 +46,8 @@ enum Kind { SUBMERSO, AREIA, GELO, VALE }
 		depth = value
 		emit_changed()
 ## Raio (m) em volta da pista em que o chão fica no fundo (o lago, o recife ou o
-## lago congelado em volta do trecho).
+## lago congelado em volta do trecho). GELO com 0: riacho congelado, sem lago (a pista
+## não desce).
 @export_range(0.0, 200.0, 1.0) var basin := 70.0:
 	set(value):
 		basin = value
@@ -93,4 +96,4 @@ enum Kind { SUBMERSO, AREIA, GELO, VALE }
 
 
 func is_basin() -> bool:
-	return kind == Kind.SUBMERSO or kind == Kind.GELO
+	return kind == Kind.SUBMERSO or (kind == Kind.GELO and basin > 0.0)

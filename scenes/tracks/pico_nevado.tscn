@@ -51,6 +51,24 @@ ramp = 32.0
 depth = -0.06
 basin = 66.0
 
+[sub_resource type="Resource" id="Resource_trecho2"]
+script = ExtResource("5_section")
+kind = 2
+start = 0.625
+end = 0.722
+ramp = 25.0
+depth = -0.06
+basin = 0.0
+
+[sub_resource type="Resource" id="Resource_trecho3"]
+script = ExtResource("5_section")
+kind = 2
+start = 0.885
+end = 0.952
+ramp = 22.0
+depth = -0.06
+basin = 0.0
+
 [sub_resource type="Curve3D" id="Curve3D_vale"]
 bake_interval = 2.0
 _data = {
@@ -78,20 +96,21 @@ point_count = 7
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_ceu"]
 shader = ExtResource("2_sky")
-shader_parameter/zenith_color = Color(0.45, 0.55, 0.7, 1)
-shader_parameter/horizon_color = Color(1, 1, 1, 1)
+shader_parameter/zenith_color = Color(0.16, 0.38, 0.82, 1)
+shader_parameter/horizon_color = Color(0.78, 0.88, 0.98, 1)
 shader_parameter/ground_color = Color(0.8, 0.86, 0.95, 1)
 shader_parameter/bounce_color = Color(0.85, 0.9, 0.98, 1)
 shader_parameter/bounce_energy = 0.9
 shader_parameter/sun_color = Color(1, 0.95, 0.82, 1)
 shader_parameter/sun_size = 0.028
-shader_parameter/sun_glow = 0.3
+shader_parameter/sun_glow = 0.6
 shader_parameter/cloud_light = Color(1, 1, 1, 1)
-shader_parameter/cloud_shadow = Color(0.6, 0.64, 0.72, 1)
-shader_parameter/cloud_coverage = 0.75
+shader_parameter/cloud_shadow = Color(0.66, 0.74, 0.88, 1)
+shader_parameter/cloud_coverage = 0.45
 shader_parameter/cloud_softness = 0.035
 shader_parameter/cloud_scale = 1.6
 shader_parameter/energy = 1.0
+shader_parameter/halo = 0.6
 
 [sub_resource type="Sky" id="Sky_ceu"]
 sky_material = SubResource("ShaderMaterial_ceu")
@@ -101,10 +120,10 @@ background_mode = 2
 background_energy_multiplier = 1.25
 sky = SubResource("Sky_ceu")
 ambient_light_source = 3
-ambient_light_sky_contribution = 0.9
+ambient_light_sky_contribution = 0.6
 reflected_light_source = 2
 tonemap_mode = 3
-tonemap_exposure = 0.92
+tonemap_exposure = 0.84
 tonemap_white = 4.0
 ssao_enabled = true
 ssao_radius = 1.6
@@ -121,9 +140,10 @@ script = ExtResource("1_track")
 track_id = "pico_nevado"
 track_name = "Pico Nevado"
 scenery = 3
+snow_track = true
 bridges = Array[ExtResource("3_bridge")]([SubResource("Resource_ponte0")])
 ramps = Array[ExtResource("4_ramp")]([SubResource("Resource_rampa0"), SubResource("Resource_rampa1"), SubResource("Resource_rampa2")])
-sections = Array[ExtResource("5_section")]([SubResource("Resource_trecho0"), SubResource("Resource_trecho1")])
+sections = Array[ExtResource("5_section")]([SubResource("Resource_trecho0"), SubResource("Resource_trecho1"), SubResource("Resource_trecho2"), SubResource("Resource_trecho3")])
 item_rows = PackedFloat32Array(0.082, 0.274, 0.45, 0.66, 0.77)
 coin_lines = PackedVector3Array(0.038, -1.0, 4.0, 0.069, 5.3, 5.0, 0.117, -3.0, 5.0, 0.192, 4.0, 5.0, 0.247, 1.0, 4.0, 0.302, 1.0, 4.0, 0.374, -5.3, 4.0, 0.47, 3.0, 5.0, 0.64, -3.0, 5.0, 0.7, 2.0, 4.0, 0.75, -3.5, 5.0, 0.79, 3.0, 5.0, 0.86, -2.0, 5.0, 0.94, 2.0, 4.0)
 obstacle_zones = PackedFloat32Array(0.117, 0.885)
@@ -154,8 +174,8 @@ environment = SubResource("Environment_pista")
 
 [node name="Sol" type="DirectionalLight3D" parent="." unique_id=1989649055]
 transform = Transform3D(0.8253356, -0.36375266, 0.4318624, 0, 0.7648422, 0.64421767, -0.5646425, -0.5316958, 0.6312515, 0, 0, 0)
-light_color = Color(0.88, 0.93, 1, 1)
-light_energy = 0.5
+light_color = Color(1, 0.97, 0.92, 1)
+light_energy = 1.15
 light_angular_distance = 0.6
 shadow_enabled = true
 shadow_bias = 0.06
