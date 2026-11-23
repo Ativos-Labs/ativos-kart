@@ -49,17 +49,23 @@ func _draw() -> void:
 	_box(r, Color(0, 0, 0, 0.35), radius, Vector2(0, 7))
 	_box(r, dark, radius)
 
-	# Foto (ou "?" num fundo listrado).
+	# Foto (ou "?" num fundo listrado), com os cantos arredondados por dentro da borda
+	# (senão os cantos retos da foto vazam pela borda arredondada).
 	var photo := Rect2(Vector2(6, 6), size - Vector2(12, 12))
+	var photo_pts := _rounded_points(photo, radius - 6)
 	if unlocked and thumbnail:
-		draw_texture_rect(thumbnail, photo, false)
+		var uvs := PackedVector2Array()
+		for p in photo_pts:
+			uvs.append((p - photo.position) / photo.size)
+		draw_polygon(photo_pts, PackedColorArray([Color.WHITE]), uvs, thumbnail)
 	else:
-		UiKit.draw_gradient_poly(self, PackedVector2Array([photo.position, Vector2(photo.end.x, photo.position.y), photo.end, Vector2(photo.position.x, photo.end.y)]),
-				base, dark, photo.position.y, photo.end.y)
+		UiKit.draw_gradient_poly(self, photo_pts, base, dark, photo.position.y, photo.end.y)
 		for i in 9:
 			var x := photo.position.x + i * 34.0 - 40.0
-			draw_colored_polygon(PackedVector2Array([Vector2(x, photo.position.y), Vector2(x + 16, photo.position.y),
-					Vector2(x + 16 + 60, photo.end.y), Vector2(x + 60, photo.end.y)]), Color(1, 1, 1, 0.05))
+			var stripe := PackedVector2Array([Vector2(x, photo.position.y), Vector2(x + 16, photo.position.y),
+					Vector2(x + 16 + 60, photo.end.y), Vector2(x + 60, photo.end.y)])
+			for part in Geometry2D.intersect_polygons(stripe, photo_pts):
+				draw_colored_polygon(part, Color(1, 1, 1, 0.05))
 	if unlocked and not thumbnail:
 		# Pista liberada que ainda não ganhou foto: o logo "at" nas cores da pista.
 		var lw := photo.size.x * 0.36
@@ -74,9 +80,11 @@ func _draw() -> void:
 		UiKit.draw_outlined(self, font, Vector2((size.x - tw) * 0.5, size.y * 0.5 + fs * 0.2), "?", fs,
 				Color(1, 1, 1, 0.85), Color(0.05, 0.07, 0.16, 0.6), 8)
 
-	# Faixa com o nome.
+	# Faixa com o nome; o canto de baixo à esquerda sairia do cartão, então ela é cortada
+	# no contorno dele (a borda branca cobre o corte).
 	var strip := Rect2(Vector2(-6, size.y - 46), Vector2(size.x * 0.86, 36))
-	UiKit.draw_ribbon(self, strip, 12.0, base if unlocked else Color(0.25, 0.29, 0.4))
+	UiKit.draw_ribbon(self, strip, 12.0, base if unlocked else Color(0.25, 0.29, 0.4), Color(1, 1, 1, 0.9),
+			_rounded_points(r, radius))
 	var name_font: Font = UiKit.FONT_ITALIC
 	var label := data.display_name if unlocked else "Em breve"
 	var nfs := 21
@@ -98,6 +106,23 @@ func _draw() -> void:
 		_border(r, Color(1, 1, 1, 1.0 if hot else 0.85), 6, radius)
 	if not unlocked:
 		_draw_lock(Vector2(size.x - 30, 30))
+
+
+## Contorno de um retângulo com os cantos arredondados (para desenhar como polígono).
+static func _rounded_points(r: Rect2, radius: float, steps := 6) -> PackedVector2Array:
+	radius = minf(radius, minf(r.size.x, r.size.y) * 0.5)
+	var pts := PackedVector2Array()
+	var corners := [
+		[Vector2(r.end.x - radius, r.position.y + radius), -PI * 0.5],
+		[Vector2(r.end.x - radius, r.end.y - radius), 0.0],
+		[Vector2(r.position.x + radius, r.end.y - radius), PI * 0.5],
+		[Vector2(r.position.x + radius, r.position.y + radius), PI],
+	]
+	for c in corners:
+		for k in steps + 1:
+			var a: float = c[1] + PI * 0.5 * k / steps
+			pts.append(c[0] + Vector2(cos(a), sin(a)) * radius)
+	return pts
 
 
 func _draw_lock(c: Vector2) -> void:

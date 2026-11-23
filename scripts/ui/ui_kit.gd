@@ -79,13 +79,25 @@ static func closed(pts: PackedVector2Array) -> PackedVector2Array:
 
 
 ## Faixa inclinada com sombra, borda clara e brilho em cima.
-static func draw_ribbon(ci: CanvasItem, rect: Rect2, slant: float, color: Color, edge := Color(1, 1, 1, 0.9)) -> void:
+## `clip` (opcional): polígono que corta a faixa (o que sai dele não é desenhado).
+static func draw_ribbon(ci: CanvasItem, rect: Rect2, slant: float, color: Color, edge := Color(1, 1, 1, 0.9),
+		clip := PackedVector2Array()) -> void:
 	var pts := slant_points(rect, slant)
-	ci.draw_colored_polygon(offset_points(pts, Vector2(0, 5)), Color(0, 0, 0, 0.3))
-	draw_gradient_poly(ci, pts, color.lightened(0.18), color.darkened(0.12), rect.position.y, rect.end.y)
+	for part in _clipped(offset_points(pts, Vector2(0, 5)), clip):
+		ci.draw_colored_polygon(part, Color(0, 0, 0, 0.3))
+	for part in _clipped(pts, clip):
+		draw_gradient_poly(ci, part, color.lightened(0.18), color.darkened(0.12), rect.position.y, rect.end.y)
 	var gloss := slant_points(Rect2(rect.position, Vector2(rect.size.x, rect.size.y * 0.45)), slant * 0.45)
-	draw_gradient_poly(ci, gloss, Color(1, 1, 1, 0.22), Color(1, 1, 1, 0.04), rect.position.y, rect.position.y + rect.size.y * 0.45)
-	ci.draw_polyline(closed(pts), edge, 3.0, true)
+	for part in _clipped(gloss, clip):
+		draw_gradient_poly(ci, part, Color(1, 1, 1, 0.22), Color(1, 1, 1, 0.04), rect.position.y, rect.position.y + rect.size.y * 0.45)
+	for part in _clipped(pts, clip):
+		ci.draw_polyline(closed(part), edge, 3.0, true)
+
+
+static func _clipped(pts: PackedVector2Array, clip: PackedVector2Array) -> Array[PackedVector2Array]:
+	if clip.is_empty():
+		return [pts]
+	return Geometry2D.intersect_polygons(pts, clip)
 
 
 ## Ícones vetoriais simples para os botões.
