@@ -1,6 +1,6 @@
 shader_type spatial;
 // Moeda Ativos (assets/models/moeda/moeda.glb). Gira no próprio eixo e balança no
-// vertex shader, sem script por moeda: na pista todas são um MultiMesh só (veja
+// vertex shader, sem script por moeda: na pista elas são MultiMeshes por bloco (veja
 // scripts/track_coins.gd). Cada moeda começa o giro num ângulo diferente.
 // Frente (+Z): o "at" em relevo. Verso (-Z): um disco liso (tools/moeda/build_moeda.py)
 // onde este shader grava o "%" da Correção monetária.
@@ -27,7 +27,8 @@ varying vec3 v_local_normal;
 void vertex() {
 	v_local = VERTEX;
 	v_local_normal = NORMAL;
-	float phase = float(INSTANCE_ID) * 2.39996;
+	// Índice global da moeda (custom data do MultiMesh de cada bloco; 0 na moeda que voa).
+	float phase = INSTANCE_CUSTOM.r * 2.39996;
 	float a = TIME * spin_speed + phase + extra_spin;
 	float c = cos(a);
 	float s = sin(a);

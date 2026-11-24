@@ -3,8 +3,9 @@ class_name TrackCoins
 extends Node3D
 ## Moedas Ativos espalhadas pela pista (montadas por Track a partir de `coin_lines` e
 ## das rampas). Cada moeda pega soma um pouco na velocidade máxima do kart (até
-## Kart.MAX_COINS) e volta a aparecer depois de RESPAWN_TIME. Todas as moedas são um
-## MultiMesh só (uma chamada de desenho); o giro fica no shader (shaders/coin.gdshader).
+## Kart.MAX_COINS) e volta a aparecer depois de RESPAWN_TIME. As moedas são MultiMeshes
+## por bloco de CHUNK metros (veja `_build_chunks`); o giro fica no shader
+## (shaders/coin.gdshader).
 ## A coleta é uma conta de distância por kart (grade de células), sem física.
 
 const COIN_SCENE := preload("res://assets/models/moeda/moeda.glb")
@@ -24,6 +25,8 @@ const KART_CENTER := 0.55 * KartScale.ITEMS
 const RESPAWN_TIME := 12.0
 ## Lado das células da grade de busca (m).
 const CELL := 8.0
+## Lado dos blocos de desenho (m): cada bloco é um MultiMesh (veja `_build_chunks`).
+const CHUNK := 48.0
 ## Moeda que voa ao ser pega: duração (s), subida (m) e quantas podem voar juntas.
 const POP_TIME := 0.42
 const POP_RISE := 1.6 * KartScale.ITEMS
@@ -39,7 +42,10 @@ const GROW_TIME := 0.35
 ## Posições das moedas (espaço deste nó = espaço da pista).
 var positions := PackedVector3Array()
 
-var _mm: MultiMesh
+## Um MultiMesh por bloco; a moeda i está no bloco `_chunk_of[i]`, instância `_slot_of[i]`.
+var _mms: Array[MultiMesh] = []
+var _chunk_of := PackedInt32Array()
+var _slot_of := PackedInt32Array()
 var _bases: Array[Basis] = []
 ## Sombras: uma MultiMesh à parte; `_shadow_of[i]` = instância da sombra da moeda i (-1 = sem).
 var _shadow_mm: MultiMesh
@@ -128,23 +134,7 @@ func setup(p_positions: PackedVector3Array, directions: PackedVector3Array, with
 		var list: PackedInt32Array = _grid[cell]
 		list.append(i)
 		_grid[cell] = list
-	_mm = MultiMesh.new()
-	_mm.transform_format = MultiMesh.TRANSFORM_3D
-	_mm.mesh = coin_mesh()
-	_mm.instance_count = count
-	for i in count:
-		_mm.set_instance_transform(i, Transform3D(_bases[i], positions[i]))
-	var mmi := MultiMeshInstance3D.new()
-	mmi.name = "Moedas"
-	mmi.multimesh = _mm
-	mmi.material_override = coin_material()
-	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	# O balanço do shader passa um pouco da caixa das moedas.
-	mmi.extra_cull_margin = 0.5
-	# As moedas que voltam crescem no _process: sem interpolação da física (senão o
-	# Godot avisa e mantém um buffer de interpolação da MultiMesh inteira à toa).
-	mmi.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
-	add_child(mmi)
+	_build_chunks()
 	_build_shadows(directions, grounds)
 	var live := with_collision and not Engine.is_editor_hint()
 	set_physics_process(live)
@@ -167,9 +157,62 @@ func setup(p_positions: PackedVector3Array, directions: PackedVector3Array, with
 		_pop_dir.resize(POP_POOL)
 
 
+## As moedas em blocos de CHUNK metros, um MultiMesh por bloco. Com um MultiMesh só para
+## a pista toda o Godot desenhava todas as moedas em todo quadro (inclusive as de trás da
+## câmera) e sempre no LOD mais detalhado, porque o LOD e o descarte usam a caixa do
+## MultiMesh inteiro, que cobre a pista. A fase do giro vem do índice global da moeda
+## (INSTANCE_CUSTOM.r no shader), igual ao INSTANCE_ID de quando era um MultiMesh só.
+func _build_chunks() -> void:
+	var count := positions.size()
+	var groups := {}
+	var order: Array[Vector2i] = []
+	for i in count:
+		var p := positions[i]
+		var key := Vector2i(floori(p.x / CHUNK), floori(p.z / CHUNK))
+		if not groups.has(key):
+			groups[key] = PackedInt32Array()
+			order.append(key)
+		var ids: PackedInt32Array = groups[key]
+		ids.append(i)
+		groups[key] = ids
+	_chunk_of.resize(count)
+	_slot_of.resize(count)
+	_mms.clear()
+	for key in order:
+		var ids: PackedInt32Array = groups[key]
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.use_custom_data = true
+		mm.mesh = coin_mesh()
+		mm.instance_count = ids.size()
+		for k in ids.size():
+			var i := ids[k]
+			_chunk_of[i] = _mms.size()
+			_slot_of[i] = k
+			mm.set_instance_transform(k, Transform3D(_bases[i], positions[i]))
+			mm.set_instance_custom_data(k, Color(float(i), 0.0, 0.0, 0.0))
+		var mmi := MultiMeshInstance3D.new()
+		mmi.name = "Moedas"
+		mmi.multimesh = mm
+		mmi.material_override = coin_material()
+		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		# O balanço do shader passa um pouco da caixa das moedas.
+		mmi.extra_cull_margin = 0.5
+		# As moedas que voltam crescem no _process: sem interpolação da física (senão o
+		# Godot avisa e mantém um buffer de interpolação da MultiMesh à toa).
+		mmi.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
+		add_child(mmi, true)
+		_mms.append(mm)
+
+
+## Transformação da moeda i (no bloco dela).
+func _set_coin(i: int, xf: Transform3D) -> void:
+	_mms[_chunk_of[i]].set_instance_transform(_slot_of[i], xf)
+
+
 ## Mancha de sombra no chão embaixo de cada moeda baixa (uma chamada de desenho para
-## todas). Não usa a sombra de verdade do sol: a MultiMesh das moedas é uma peça só, e
-## sombreada ela seria desenhada inteira em cada divisão da sombra, a cada quadro.
+## todas). Não usa a sombra de verdade do sol: cada bloco de moedas sombreado seria
+## desenhado de novo em cada divisão (cascata) da sombra, a cada quadro.
 func _build_shadows(directions: PackedVector3Array, grounds: PackedVector3Array) -> void:
 	_shadow_of.resize(positions.size())
 	_shadow_of.fill(-1)
@@ -215,7 +258,7 @@ func _scale_shadow(i: int, s: float) -> void:
 
 
 func _ready() -> void:
-	if _mm == null:
+	if _mms.is_empty():
 		set_physics_process(false)
 		set_process(false)
 
@@ -276,7 +319,7 @@ func _collect(i: int, kart: Kart) -> void:
 	_respawn_at[i] = _time + RESPAWN_TIME
 	_waiting += 1
 	_growing.erase(i)
-	_mm.set_instance_transform(i, Transform3D(Basis().scaled(Vector3.ZERO), positions[i]))
+	_set_coin(i, Transform3D(Basis().scaled(Vector3.ZERO), positions[i]))
 	_scale_shadow(i, 0.0)
 	_spawn_pop(positions[i])
 	kart.add_coin()
@@ -324,7 +367,7 @@ func _process(delta: float) -> void:
 			var t: float = _growing[i] + delta
 			var k := clampf(t / GROW_TIME, 0.0, 1.0)
 			var s := 1.0 + 2.70158 * pow(k - 1.0, 3.0) + 1.70158 * pow(k - 1.0, 2.0)
-			_mm.set_instance_transform(i, Transform3D(_bases[i].scaled(Vector3.ONE * maxf(s, 0.001)), positions[i]))
+			_set_coin(i, Transform3D(_bases[i].scaled(Vector3.ONE * maxf(s, 0.001)), positions[i]))
 			_scale_shadow(i, clampf(k, 0.001, 1.0))
 			if k >= 1.0:
 				_growing.erase(i)
