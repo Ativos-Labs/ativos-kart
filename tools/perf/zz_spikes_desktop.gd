@@ -138,6 +138,10 @@ func _process(_d: float) -> bool:
 		if race.player.laps_done != last_lap:
 			last_lap = race.player.laps_done
 			events.append("lap%d" % last_lap)
+		var cam_env = race.get_node("Camera").environment
+		if cam_env != (get_meta(&"last_env") if has_meta(&"last_env") else null):
+			events.append("env:" + ("submerso" if cam_env else "normal"))
+			set_meta(&"last_env", cam_env)
 		if not is_equal_approx(root.scaling_3d_scale, last_scale):
 			events.append("scale%.2f->%.2f" % [last_scale, root.scaling_3d_scale])
 			last_scale = root.scaling_3d_scale

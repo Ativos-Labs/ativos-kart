@@ -9,13 +9,21 @@ extends Node
 ## - Luz e efeitos: oclusão de ambiente (SSAO) e brilho (glow). Simples (sem os dois)
 ##   / Médios (SSAO em qualidade baixa) / Completos.
 ## - Antisserrilhado: Desligado / Leve (FXAA, só no desktop: o renderizador da web
-##   não tem) / MSAA 2x / MSAA 4x.
+##   não tem) / MSAA 2x / MSAA 4x. Alta usa 2x (4x fica para quem escolher).
 ## - Resolução 3D: fração fixa da resolução da tela, ou Automática (RenderScale baixa
 ##   sozinha quando o jogo fica lento).
 ## - Cenário: Reduzido (sem grama e flores, menos neve, os modelos simplificam mais
 ##   perto da câmera) / Completo.
 ## Os níveis Baixa / Média / Alta mudam tudo de uma vez. Na primeira vez que o jogo
 ## abre (nada salvo) o nível vem da placa de vídeo (suggested_preset).
+##
+## Nível automático (desktop, enquanto ninguém escolheu nada nas opções): o nome da placa
+## não diz quanto ela aguenta (uma dedicada fraca ganhava "Alta"). Numa corrida de um
+## jogador, se a GPU medida pelo RenderScale só seguraria 60 fps baixando o 3D para menos
+## que ~1600×900, o jogo desce um nível (Alta → Média → Baixa) na próxima troca de tela,
+## atrás do fade (`apply_auto_step`), e guarda o nível em AUTO_KEY. Antes ele só borrava
+## a imagem: Alta numa placa fraca caía para 60% da resolução. Medido no M4 (4K, mesmo
+## quadro): Média custa 33% menos GPU que Alta e Baixa, 64% menos.
 ##
 ## Quando vale: o que é de cada tela (luz, ambiente, grama, neve) é ajustado quando os
 ## nós entram na árvore (node_added), antes do primeiro quadro. No desktop uma troca
@@ -62,6 +70,12 @@ const SIMPLE_SHADOW_ATLAS := 2048
 
 ## Valores como a tela/luz vieram, antes de qualquer ajuste (fica no recurso/nó).
 const META := &"graficos_original"
+## Nível escolhido pelo ajuste automático (veja o começo do arquivo).
+const AUTO_KEY := "nivel_automatico"
+## Versão dos níveis gravada nas opções. 2: Alta passou de MSAA 4x para 2x (quem tinha
+## salvo o Alta antigo passa para o novo uma vez; escolher 4x depois continua valendo).
+const VERSION_KEY := "versao"
+const VERSION := 2
 
 var show_fps := false
 
@@ -70,6 +84,10 @@ var _save := Callable()
 var _values := {}
 ## Web: a troca espera a próxima tela.
 var _pending := false
+## Nada salvo nas opções: o nível pode descer sozinho (veja AUTO_KEY).
+var _auto := false
+## Nível que entra na próxima troca de tela (-1 = nenhum).
+var _auto_pending := -1
 ## Últimos valores mandados ao RenderingServer (só manda o que mudou).
 var _last := {}
 var _fps_label: Label
@@ -81,12 +99,32 @@ var _fps_shown := -1
 func setup(cfg: ConfigFile, save: Callable) -> void:
 	_cfg = cfg
 	_save = save
-	var defaults := preset_values(suggested_preset())
+	_auto = not KEYS.any(func(k: StringName) -> bool: return _cfg.has_section_key(SECTION, k))
+	var start := suggested_preset()
+	if _auto and _cfg.has_section_key(SECTION, AUTO_KEY):
+		start = clampi(int(_cfg.get_value(SECTION, AUTO_KEY)), LOW, HIGH)
+	var defaults := preset_values(start)
 	for key in KEYS:
 		var v = _cfg.get_value(SECTION, key, defaults[key])
 		v = float(v) if key == SCALE else int(v)
 		_values[key] = v if _index_of(key, v) >= 0 else defaults[key]
+	_migrate()
 	show_fps = bool(_cfg.get_value(SECTION, "mostrar_fps", false))
+
+
+## Opções salvas por uma versão anterior dos níveis (veja VERSION_KEY).
+func _migrate() -> void:
+	var saved := int(_cfg.get_value(SECTION, VERSION_KEY, 1))
+	if saved >= VERSION:
+		return
+	if not _auto:
+		var old_high := preset_values(HIGH)
+		old_high[ANTIALIAS] = Aa.MSAA_4X
+		if KEYS.all(func(k: StringName) -> bool: return _same(_values[k], old_high[k])):
+			_values[ANTIALIAS] = Aa.MSAA_2X
+			_cfg.set_value(SECTION, ANTIALIAS, Aa.MSAA_2X)
+		_cfg.set_value(SECTION, VERSION_KEY, VERSION)
+		_save.call()
 
 
 func _ready() -> void:
@@ -151,6 +189,7 @@ func index_of(key: StringName) -> int:
 
 
 func set_value(key: StringName, v) -> void:
+	_stop_auto()
 	_values[key] = v
 	_cfg.set_value(SECTION, key, v)
 	_after_change()
@@ -166,6 +205,7 @@ func get_preset() -> int:
 
 
 func set_preset(p: int) -> void:
+	_stop_auto()
 	var want := preset_values(p)
 	for key in KEYS:
 		_values[key] = want[key]
@@ -179,7 +219,9 @@ func preset_values(p: int) -> Dictionary:
 			return {SHADOWS: 0, EFFECTS: 0, ANTIALIAS: Aa.FXAA if has_fxaa() else Aa.OFF, SCALE: 0.75, SCENERY: 0}
 		MEDIUM:
 			return {SHADOWS: 1, EFFECTS: 1, ANTIALIAS: Aa.MSAA_2X, SCALE: 0.0, SCENERY: 1}
-	return {SHADOWS: 2, EFFECTS: 2, ANTIALIAS: Aa.MSAA_4X, SCALE: 0.0, SCENERY: 1}
+	# Alta usa MSAA 2x desde 2026-11-24: 4x custava 13% a mais de GPU (M4, 4K; em placas
+	# Intel/NVIDIA/AMD costuma ser mais) e mudava 0,57% dos pixels (bordas finas).
+	return {SHADOWS: 2, EFFECTS: 2, ANTIALIAS: Aa.MSAA_2X, SCALE: 0.0, SCENERY: 1}
 
 
 func set_show_fps(on: bool) -> void:
@@ -187,6 +229,43 @@ func set_show_fps(on: bool) -> void:
 	_cfg.set_value(SECTION, "mostrar_fps", on)
 	_save.call()
 	_update_fps_label()
+
+
+## Quem mexe nas opções escolhe sozinho daí em diante.
+func _stop_auto() -> void:
+	_auto = false
+	_auto_pending = -1
+	# O que for gravado agora já é da versão atual dos níveis (não migra de novo).
+	_cfg.set_value(SECTION, VERSION_KEY, VERSION)
+
+
+## O RenderScale achou a GPU lenta demais para o nível atual (sinal `too_slow`): sem
+## nada escolhido nas opções, um nível abaixo entra na próxima troca de tela.
+func report_too_slow() -> void:
+	if not _auto or not applies_live() or _auto_pending >= 0:
+		return
+	var p := get_preset()
+	if p == CUSTOM or p <= LOW:
+		return
+	_auto_pending = p - 1
+
+
+## Chamado pelo GameState com a tela escura, antes de montar a próxima tela (os nós dela
+## já entram com o nível novo e o warm_up compila o que mudou). Devolve true se o nível
+## mudou: a resolução aprendida pelo RenderScale com o nível antigo deixa de valer.
+func apply_auto_step() -> bool:
+	if _auto_pending < 0:
+		return false
+	var p := _auto_pending
+	_auto_pending = -1
+	var want := preset_values(p)
+	for key in KEYS:
+		_values[key] = want[key]
+	_cfg.set_value(SECTION, AUTO_KEY, p)
+	_save.call()
+	_apply_globals()
+	changed.emit()
+	return true
 
 
 ## A troca vale na hora (desktop) ou só na próxima tela (web).

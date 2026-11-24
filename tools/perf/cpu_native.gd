@@ -65,6 +65,10 @@ func _process(d: float) -> bool:
 		current_scene = race
 		print("LOAD|corrida (instanciar + _ready, pista inclusa)=%.1f ms" % ((_us() - t0) / 1000.0))
 	elif frame == 3:
+		# A corrida monta o grid aos poucos: espera o kart do J1 existir.
+		if race.kart == null:
+			frame = 2
+			return false
 		# O J1 também pilota sozinho (IA de referência).
 		var ai = load("res://scripts/kart_ai.gd").new()
 		var line = load("res://scripts/racing_line.gd").build(race.track)
@@ -192,8 +196,9 @@ func _micro() -> void:
 var _ins := {}
 var _ticks := 0
 var _frames := 0
-var _phys_mon := 0.0
-var _phys_mon_max := 0.0
+var _step_ms := PackedFloat32Array()
+var _pf_t := 0
+var _pf_n := 0
 
 
 func _live_split() -> void:
@@ -221,15 +226,25 @@ func _live_split() -> void:
 	hook.set_script(s)
 	hook.set_meta("probe", self)
 	root.add_child(hook)
+	# Passo inteiro (scripts + Jolt + interpolação): do sinal physics_frame (começo do
+	# passo) ao process_frame seguinte. O monitor TIME_PHYSICS_PROCESS não serve: o Godot
+	# só o atualiza uma vez por segundo, com o MAIOR passo daquele segundo.
+	physics_frame.connect(func():
+		if _pf_n == 0:
+			_pf_t = _us()
+		_pf_n += 1)
+	process_frame.connect(func():
+		if _pf_n > 0:
+			var ms := (_us() - _pf_t) / 1000.0 / _pf_n
+			for i in _pf_n:
+				_step_ms.append(ms)
+			_pf_n = 0)
 	_phase = 2
 
 
 func _run(kind: String, d: float) -> void:
 	if kind == "pp":
 		_ticks += 1
-		var m := Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0
-		_phys_mon += m
-		_phys_mon_max = maxf(_phys_mon_max, m)
 	else:
 		_frames += 1
 	for key in _ins:
@@ -257,5 +272,9 @@ func _report_live() -> void:
 	for r in rows:
 		if r[0] > 0.005:
 			print("LIVE|%s|física=%.3f ms/passo|_process=%.3f ms/quadro" % [r[1], r[2], r[3]])
-	print("LIVE|scripts na física=%.3f ms/passo|passo inteiro (TIME_PHYSICS_PROCESS) média=%.3f máx=%.3f ms|passos=%d quadros=%d" % [
-		total, _phys_mon / maxi(_ticks, 1), _phys_mon_max, _ticks, _frames])
+	var steps := _step_ms.duplicate()
+	steps.sort()
+	var med: float = steps[steps.size() / 2] if steps.size() > 0 else 0.0
+	var p95: float = steps[int(steps.size() * 0.95)] if steps.size() > 0 else 0.0
+	print("LIVE|scripts na física=%.3f ms/passo|passo inteiro mediana=%.3f p95=%.3f ms|passos=%d quadros=%d" % [
+		total, med, p95, _ticks, _frames])

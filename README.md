@@ -311,8 +311,12 @@ Menu principal e pausa → **Opções** (salvas em `user://opcoes.cfg`):
   de 50% a 100% ou automática) e cenário (reduzido: sem grama e flores, menos neve,
   modelos simplificam mais cedo). Mostrar FPS liga um contador no topo da tela. Na
   primeira vez o nível vem da placa de vídeo (integrada → Média, renderização por
-  software → Baixa). No desktop a troca vale na hora; na web, a partir da próxima tela
-  (ligar/desligar sombras lá recompila todos os shaders e travaria o jogo).
+  software → Baixa). Enquanto ninguém mexe nas opções, o executável também mede a placa:
+  se numa corrida de um jogador ela só seguraria 60 fps com o 3D abaixo de ~1600×900, o
+  nível desce um degrau (Alta → Média → Baixa) na próxima troca de tela e fica guardado
+  (`nivel_automatico`); escolher qualquer coisa nas opções desliga isso. No desktop a
+  troca vale na hora; na web, a partir da próxima tela (ligar/desligar sombras lá
+  recompila todos os shaders e travaria o jogo).
 - **Teclas:** duas teclas para cada ação do kart. Escolha a vaga, aperte a tecla nova
   (Esc cancela); se outra ação usava essa tecla, as duas trocam. "Restaurar padrão" volta
   às teclas originais. A tela de controles e a dica da largada mostram as teclas atuais.

@@ -197,6 +197,9 @@ func _ready() -> void:
 	render_scale = RenderScale.new()
 	render_scale.name = "RenderScale"
 	add_child(render_scale)
+	# GPU lenta demais para o nível de qualidade (desktop): ele desce sozinho se ninguém
+	# escolheu nada nas opções (veja GraphicsQuality).
+	render_scale.too_slow.connect(settings.graphics.report_too_slow)
 
 	var layer := CanvasLayer.new()
 	layer.layer = 128
@@ -478,6 +481,10 @@ func goto_scene(path: String) -> void:
 	var fade_out := create_tween()
 	fade_out.tween_property(_fade_rect, "color:a", 1.0, 0.22)
 	await fade_out.finished
+	# Nível de qualidade que desceu sozinho na tela anterior entra agora, no escuro e
+	# antes da tela nova ser montada (os nós dela já entram com ele).
+	if settings and settings.graphics.apply_auto_step() and render_scale:
+		render_scale.forget()
 	# O ícone aparece já no escuro. Daqui até ele sair, nada pode travar a tela por muito
 	# tempo (o ícone para de animar): a carga é em pedaços (`_preload_scene`), o pesado
 	# vai para threads (`_prepare_scene`), a corrida se monta aos poucos (`loaded`) e os

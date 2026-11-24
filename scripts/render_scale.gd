@@ -45,6 +45,14 @@ const WINDOW := 90
 const SLOW_WINDOWS := 2
 ## Grupo das SubViewports de 3D que seguem a escala (as telas da tela dividida).
 const GROUP := &"scaled_3d_viewport"
+## Abaixo disto (pixels do 3D) baixar a resolução borra demais: numa corrida de um
+## jogador o RenderScale avisa (`too_slow`) e o GraphicsQuality desce um nível de
+## qualidade na próxima tela. Em telas grandes (1440p, 4K, Retina) a resolução ainda
+## cai antes, que lá quase não aparece.
+const AUTO_LEVEL_PIXELS := 1600.0 * 900.0
+
+## A GPU (desktop, medida) só seguraria a corrida com o 3D abaixo de AUTO_LEVEL_PIXELS.
+signal too_slow
 
 ## Fração atual do ajuste automático (1 = sem redução).
 var dynamic := 1.0
@@ -127,6 +135,15 @@ func reset(key := "", family := "") -> void:
 	_frames.clear()
 	_gpu.clear()
 	apply()
+
+
+## Esquece as escalas aprendidas (o nível de qualidade mudou: o custo de cada tela é
+## outro). Chame antes do `reset` da tela nova.
+func forget() -> void:
+	_learned.clear()
+	_family_last.clear()
+	_key = ""
+	_family = ""
 
 
 ## Desktop, uma vez por sessão e atrás do fade: liga o FSR por 2 quadros. A primeira
@@ -228,6 +245,13 @@ func _process(delta: float) -> void:
 	# O custo da GPU acompanha os pixels (escala²): uma queda só, direto ao alvo.
 	var ratio := (TARGET_GPU_MS / gpu) if _gpu_timing else (1.0 / 62.0) / frame
 	var want := _snap(clampf(dynamic * sqrt(ratio), MIN_DYNAMIC, dynamic - SNAP))
+	if _gpu_timing and _family == "race:1":
+		var root := get_tree().root
+		var pixels := float(root.size.x) * float(root.size.y)
+		var cap := minf(1.0, sqrt(_max_pixels / maxf(pixels, 1.0)))
+		var needed := cap * dynamic * sqrt(ratio)
+		if pixels * needed * needed < AUTO_LEVEL_PIXELS:
+			too_slow.emit()
 	_before_drop = dynamic
 	_frame_before = frame
 	dynamic = want
