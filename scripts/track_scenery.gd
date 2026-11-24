@@ -47,9 +47,13 @@ func build(preview: bool) -> void:
 	_outside = track.road_width * 0.5 + track.shoulder_width + track.wall_thickness
 	var start := track.get_point_at(0.0)
 	_start = Vector2(start.x, start.z)
-	_build_grandstand()
+	# O estádio tem o anel de arquibancadas dele (track_stadium.gd).
+	if not track.stadium_track:
+		_build_grandstand()
 	_build_flags()
-	_build_billboards()
+	# Na cidade neon, os letreiros acesos nos prédios fazem o papel dos outdoors.
+	if not track.city_track:
+		_build_billboards()
 	_build_turn_signs()
 	# Decorações de cada cenário (farol, caixa-d'água, chalés...). Usam um sorteio
 	# próprio para não mudar a decoração das pistas que já existem.
@@ -138,6 +142,9 @@ func _add_multimesh(mesh: Mesh, xforms: Array[Transform3D], colors: Array[Color]
 
 
 func _is_reserved(x: float, z: float) -> bool:
+	# Dentro do estádio (gramado, arquibancadas e torres) não vai árvore nem moita.
+	if track.stadium_track and TrackStadium.inside(track, x, z, TrackStadium.OUT_U + 14.0):
+		return true
 	for r in _reserved:
 		if Vector2(x - r.x, z - r.y).length() < r.z:
 			return true
@@ -317,6 +324,9 @@ func _build_billboards() -> void:
 	while i < count and track.distances[i] < track.length - 50.0:
 		var ok := track.distances[i] - last > 105.0 and absf(track.curvature[i]) < 0.012 and not track.is_bridge(i)
 		if temple >= 0 and absf(wrapf(track.distances[i] - track.distances[temple], -track.length * 0.5, track.length * 0.5)) < 110.0:
+			ok = false
+		# No estádio as propagandas ficam na mureta das arquibancadas.
+		if ok and track.stadium_track and TrackStadium.inside(track, track.samples[i].x, track.samples[i].z, TrackStadium.OUT_U + 30.0):
 			ok = false
 		if ok:
 			var side := track.outer_side_at(i)

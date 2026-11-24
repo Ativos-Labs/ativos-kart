@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="TrackData" format=3 uid="uid://ytex7o2cu15b"]
+
+[ext_resource type="Script" uid="uid://crj76uik6y37b" path="res://scripts/track_data.gd" id="1_data"]
+[ext_resource type="PackedScene" uid="uid://bm2jofx1svupv" path="res://scenes/tracks/estadio_celerino.tscn" id="2_scene"]
+
+[resource]
+script = ExtResource("1_data")
+id = "estadio_celerino"
+display_name = "Estádio Celerino"
+cup_name = "Copa Verão"
+description = "Noite na cidade neon: largue no estádio lotado sob o telão, saia pelo túnel, suba o elevado entre os arranha-céus e os letreiros acesos, cruze o canal de asa-delta e volte pelo outro túnel até a reta dos boxes."
+scene = ExtResource("2_scene")
+color = Color(0.78, 0.12, 0.72, 1)
+color_dark = Color(0.12, 0.03, 0.2, 1)
+background = "res://assets/pistas/estadio_celerino_fundo.jpg"
+thumbnail = "res://assets/pistas/estadio_celerino_cartao.jpg"

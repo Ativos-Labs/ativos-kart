@@ -19,6 +19,7 @@ const VIEWS := {
 	"canion_ativos": {"yaw": 90.0, "pitch": 55.0},
 	"pico_nevado": {"yaw": 90.0, "pitch": 55.0},
 	"baia_ativos": {"yaw": 90.0, "pitch": 55.0},
+	"estadio_celerino": {"yaw": 90.0, "pitch": 55.0},
 }
 const FOV := 40.0
 ## Quanto da tela a pista ocupa (o resto é margem).
@@ -159,6 +160,7 @@ func _full_detail(node: Node) -> void:
 		var env: Environment = node.environment.duplicate()
 		env.fog_density *= FOG_SCALE
 		env.fog_aerial_perspective *= FOG_SCALE
+		env.fog_height_density *= FOG_SCALE
 		node.environment = env
 	elif node is GPUParticles3D or node is CPUParticles3D:
 		node.visible = false

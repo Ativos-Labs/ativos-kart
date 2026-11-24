@@ -24,6 +24,8 @@ uniform float wall_height = 1.1;
 uniform float mirror = 1.0;
 // false = placas viradas para a pista; true = lado de fora e topo.
 uniform bool outer_side = false;
+// Placas acesas como painel de LED (cidade à noite). 0 = placas comuns.
+uniform float glow = 0.0;
 
 const float BANNER_BOTTOM = 0.14;
 const float PERIOD = 36.0;
@@ -103,4 +105,5 @@ void fragment() {
 	ALBEDO = col;
 	ROUGHNESS = rough;
 	SPECULAR = 0.4;
+	EMISSION = col * glow * step(BANNER_BOTTOM, h);
 }

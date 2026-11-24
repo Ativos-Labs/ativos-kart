@@ -54,6 +54,25 @@ static func beach_terrain_params() -> Dictionary:
 	}
 
 
+## Cidade neon à noite (Track.city_track), por cima de terrain_params(CAMPO): o chão vira
+## concreto e calçada escuros (as faixas de "grama aparada" viram placas de calçada) e as
+## margens do canal são de concreto.
+static func city_terrain_params() -> Dictionary:
+	return {
+		"grass_a": Color(0.11, 0.11, 0.15), "grass_b": Color(0.15, 0.15, 0.2), "grass_dark": Color(0.07, 0.07, 0.1),
+		"mowed_light": Color(0.22, 0.22, 0.28), "mowed_dark": Color(0.18, 0.18, 0.24), "stripe_strength": 0.5,
+		"sand": Color(0.2, 0.2, 0.25), "sand_band": 0.8,
+		"rock": Color(0.3, 0.31, 0.37), "rock_dark": Color(0.2, 0.21, 0.26), "rock_slope": 0.3,
+		"snow_height": 9999.0, "caustic_strength": 0.15, "shore_grass": Color(0.12, 0.12, 0.16),
+	}
+
+
+## Água do canal da cidade: escura, com o brilho da lua.
+static func city_water_params() -> Dictionary:
+	return {"shallow_color": Color(0.05, 0.3, 0.42), "deep_color": Color(0.02, 0.05, 0.16), "depth_range": 5.0,
+			"foam_color": Color(0.5, 0.8, 1.0), "foam_width": 0.25, "glitter": 1.4}
+
+
 ## Água da pista de praia: mar turquesa bem claro no raso, espuma só na beirada (o
 ## baixio passa por cima da pista).
 static func beach_water_params() -> Dictionary:

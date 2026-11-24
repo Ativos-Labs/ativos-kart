@@ -99,6 +99,19 @@ func _mat(key: String) -> Material:
 	if _mats.has(key):
 		return _mats[key]
 	var m: Material
+	if track.city_track and key in ["concrete", "pier", "fascia", "trim"]:
+		# Elevado da cidade neon: concreto escuro, faixa roxa e o friso aceso em ciano.
+		match key:
+			"concrete":
+				m = TrackScenery.color_material(Color(0.2, 0.2, 0.25), 0.85)
+			"pier":
+				m = TrackScenery.color_material(Color(0.17, 0.17, 0.22), 0.85)
+			"fascia":
+				m = TrackScenery.color_material(Color(0.16, 0.06, 0.3), 0.5)
+			"trim":
+				m = TrackCity.neon_material(2.4)
+		_mats[key] = m
+		return m
 	match key:
 		"concrete":
 			m = TrackScenery.color_material(Color(0.8, 0.8, 0.82), 0.85)

@@ -223,7 +223,7 @@ Menu principal → **Jogar** abre a tela **Modo de jogo**:
 
 | Modo | O que é |
 |------|---------|
-| **Grand Prix** | Uma copa inteira (a Copa Ativos são as 4 primeiras pistas; a Copa Verão, por enquanto, só a Baía Ativos) em sequência contra o computador. Pontos por chegada (15, 12, 10, 8, 6, 4, 2, 1); os mesmos adversários (piloto, kart e nível) correm as 4. Na 1ª corrida os jogadores largam no fim do grid; nas outras, o grid segue a chegada da anterior. No fim, classificação geral e troféu. |
+| **Grand Prix** | Uma copa inteira (a Copa Ativos são as 4 primeiras pistas; a Copa Verão, por enquanto, a Baía Ativos e o Estádio Celerino) em sequência contra o computador. Pontos por chegada (15, 12, 10, 8, 6, 4, 2, 1); os mesmos adversários (piloto, kart e nível) correm as 4. Na 1ª corrida os jogadores largam no fim do grid; nas outras, o grid segue a chegada da anterior. No fim, classificação geral e troféu. |
 | **Corrida** | Uma corrida avulsa na pista escolhida, com ou sem adversários do computador. |
 | **Contra-relógio** | Sem adversários. O melhor percurso de cada pista (e cilindrada) vira um **kart fantasma** transparente que corre junto na próxima vez; ao fechar cada volta aparece a diferença para ele (verde = na frente). |
 
@@ -287,7 +287,7 @@ frente, e a instrumentação muda com o cenário.
 | Faixa | Onde toca | Estilo |
 |---|---|---|
 | `menu` | Menus | City pop / fusion tranquilo, piano elétrico e baixo com slap (108 BPM) |
-| `campo` | Circuito Ativos | Fusion-rock ensolarado, metais e lead em uníssono (144 BPM) |
+| `campo` | Circuito Ativos e Estádio Celerino | Fusion-rock ensolarado, metais e lead em uníssono (144 BPM) |
 | `praia` | Ilha Ativos e Baía Ativos | Calypso/soca: tambor de aço com rufo, marimba, cavaquinho, congas (126 BPM) |
 | `deserto` | Cânion Ativos | Frígia dominante em Mi: violão com tremolo, galope, darbuka, assobio e trompetes (136 BPM) |
 | `neve` | Pico Nevado | Guizos, glockenspiel e celesta, pizzicato, vibrafone e flauta (132 BPM) |
@@ -363,6 +363,7 @@ pista é o `cup_name` do `TrackData`, na ordem da lista `GameState.tracks`).
 | Pista            | Cenário | Destaques                                                                 |
 |------------------|---------|---------------------------------------------------------------------------|
 | Baía Ativos      | Praia   | 2,0 km, **praia de areia branca sem asfalto**, num meio-dia de sol (mar turquesa no raso e azul no fundo, ondinhas de espuma chegando na areia, brilho do sol na água, ilhas no horizonte). Largada numa **vila de quiosques de sapê** (portal de bambu com telhado de palha e a placa da Ativos, bandeirinhas, guarda-sóis listrados, espreguiçadeiras, pranchas de surfe, farol); a reta da praia leva a uma **passarela de tábuas** sobre a baía, entre **palafitas**, que vai subindo até a ponta do píer: dali a asa-delta voa sobre o **canal** (ilhotas de pedra com coqueiros, golfinhos) até a ilha. Na ilha, a **trilha da mata** de terra batida (cerca de madeira escura, murinhos de pedra com flores vermelhas, bananeiras, samambaias e árvores grandes) passa por baixo de um **arco de pedra** com cipós e coqueiros em cima; na volta, o **baixio**: a pista atravessa o mar raso entre linhas de boias, bancos de areia com coqueiros e estrelas-do-mar no fundo (com uma rampa de pulo no meio), e termina nas curvas das dunas, com um grampo, até a vila |
+| Estádio Celerino | Cidade  | 1,8 km, **cidade neon à noite** (cyberpunk): céu estrelado com o brilho rosa da cidade no horizonte, asfalto molhado com as faixas acesas em ciano, zebras de neon, muretas de LED com tubos de neon, postes, **portais de neon** por cima da pista, **neblina** roxa nas ruas, no canal e rente ao asfalto, prédios com janelas acesas e **letreiros holográficos** da Ativos e do Celerino no kart, arranha-céus no horizonte e holofotes varrendo o céu. Largada num **estádio lotado** (torcida com bastões de luz e celulares, frisos de neon, telão de LED, boxes com as garagens acesas, pórtico de treliça com neon) com o **Celerino gigante** sob dois refletores coloridos. A pista sai por um **túnel** sob a arquibancada, sobe um **elevado** entre os prédios, salta de asa-delta sobre o **canal**, desce pelo outro elevado e volta pelo segundo túnel até a reta dos boxes |
 
 Todas usam as logos da Ativos no pórtico, nas muretas, outdoors, bandeiras, balões, dirigível,
 no asfalto e nas pontes (na Baía, nas placas de madeira penduradas nas cercas e nos quiosques).
@@ -384,6 +385,7 @@ scenes/
   tracks/canion_ativos.tscn     Cânion Ativos (deserto)
   tracks/pico_nevado.tscn       Pico Nevado (neve)
   tracks/baia_ativos.tscn       Baía Ativos (praia de areia branca, Copa Verão)
+  tracks/estadio_celerino.tscn  Estádio Celerino (estádio na cidade neon à noite, Copa Verão)
   ui/hud.tscn, ui/pause_menu.tscn, ui/controls_panel.tscn
 scripts/
   game_state.gd         Autoload: modo, cilindrada, jogadores (piloto e kart de cada um),
@@ -434,6 +436,12 @@ scripts/
   track_beach.gd        Pista de praia: cercas de corda e boias, portal de bambu, vila de
                         quiosques, palafitas, guarda-sóis, bandeirinhas, arco de pedra,
                         ilhotas, ilhas no horizonte e a mata da trilha (cerca, murinhos)
+  track_stadium.gd      Estádio: anel de arquibancadas com a torcida pintada, cobertura,
+                        túneis, torres de luz, telão, boxes, tendas, pódio, o Celerino
+                        gigante e o pórtico de treliça da largada (à noite, com neon)
+  track_city.gd         Cidade neon: prédios com janelas acesas, letreiros holográficos,
+                        arranha-céus no horizonte, portais e tubos de neon, postes e
+                        holofotes varrendo o céu
   track_bridge.gd       Recurso com os dados de uma ponte (trecho, altura, rampa, estilo)
   track_bridges.gd      Monta as pontes (tabuleiro, pilares, torre estaiada, arco, viaduto,
                         passarela de madeira)
@@ -875,6 +883,30 @@ para mudar:
   verdade, ondinhas de espuma na areia e brilho do sol (`TrackTheme.beach_water_params`,
   `vertical_foam` no `shaders/water.gdshader`). As cores foram acertadas na web
   (Compatibility usa as cores sem converter e o ACES desbota o claro): areia ~0,76/0,67/0,49.
+- **Stadium Track** (estádio, ligado no Estádio Celerino): anel de arquibancadas em volta de
+  `stadium_center` (retângulo arredondado de semieixos `stadium_radii`; o chão dentro dele
+  fica plano), com a torcida pintada nos degraus (`shaders/stadium_crowd.gdshader`: nada de
+  malha por pessoa), propaganda na mureta, cobertura com a marca, torres de luz, telão
+  (`shaders/telao.gdshader`), boxes com torre de controle, tendas, pódio, o Celerino gigante
+  (o modelo do jogo, ×6,5) e o pórtico de treliça com placar e luzes de largada
+  (`scripts/track_stadium.gd`). Onde a pista cruza o anel as filas de baixo somem e ela
+  passa num túnel por baixo das de cima. Sem árvores, moitas e outdoors dentro do anel.
+- **City Track** (cidade neon à noite, ligado no Estádio Celerino): prédios em quadras fora
+  da pista, do estádio e do canal (`shaders/city_building.gdshader`: janelas acesas
+  desenhadas no shader, sem malha por janela), faixas de neon nos prédios
+  (`shaders/neon.gdshader`, cor de vértice acesa para o glow), letreiros holográficos da
+  Ativos e do Celerino no kart, arranha-céus no horizonte, portais de neon, postes e tubos
+  de neon nas muretas e holofotes (`shaders/light_beam.gdshader`) e neblina baixa em três
+  camadas — rasante por cima da pista, e nas ruas, no canal e no gramado do estádio
+  (`shaders/city_mist.gdshader`, some perto da câmera, onde encosta nos prédios e nas
+  beiradas; fica no grupo de detalhes) (`scripts/track_city.gd`). No `track.gd` ela deixa o
+  asfalto molhado (`wet`) com as faixas acesas (`line_glow`), as zebras de neon (`glow` do
+  curb), as muretas de LED (`glow` da mureta) e o chão e a água de concreto e canal
+  (`TrackTheme.city_terrain_params`/`city_water_params`); as pontes viram elevado de
+  concreto escuro com friso aceso, sem arco-íris na cachoeira. A névoa do WorldEnvironment é
+  mais densa perto do chão (`fog_height`/`fog_height_density`; as fotos da tela de pistas a
+  reduzem junto). O céu de noite usa `stars` e `city_glow` do `shaders/sky.gdshader` (tudo
+  desligado nas outras pistas).
 - **Paisagem:** além das alturas, `hill_bias` (colinas mais altas/baixas), `terrace_step`
   (colinas em degraus, como mesas de deserto) e `sea_distance` (a partir dessa distância da
   pista o chão desce para o mar — vira uma ilha), com `sea_depth` (profundidade do mar) e

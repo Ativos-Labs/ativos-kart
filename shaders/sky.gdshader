@@ -24,6 +24,11 @@ uniform float energy = 1.0;
 // Halo de 22° em volta do sol (cristais de gelo no ar, dia frio de neve): anel fino com
 // as cores separadas, vermelho por dentro e azul por fora. 0 = sem.
 uniform float halo : hint_range(0.0, 2.0) = 0.0;
+// Noite na cidade: estrelas no alto e o brilho das luzes da cidade no horizonte.
+// 0 = sem (dia).
+uniform float stars : hint_range(0.0, 2.0) = 0.0;
+uniform vec3 city_glow_color : source_color = vec3(0.9, 0.2, 0.75);
+uniform float city_glow : hint_range(0.0, 2.0) = 0.0;
 
 float cloud_density(vec2 p) {
 	vec2 q = vec2(fbm(p * 0.45 + vec2(3.1, 1.7), 3), fbm(p * 0.45 + vec2(8.3, 2.8), 3));
@@ -76,6 +81,17 @@ void sky() {
 		float outer = exp(-pow((ang - 0.42) / 0.06, 2.0)) * step(0.385, ang);
 		col *= 1.0 - 0.06 * halo * smoothstep(0.385, 0.3, ang) * smoothstep(0.08, 0.2, ang);
 		col += (ring * vec3(1.0, 0.92, 0.95) * 0.55 + outer * 0.12) * halo * (1.0 - cloud_a * 0.5);
+	}
+	if (city_glow > 0.0) {
+		col += city_glow_color * city_glow * exp(-max(h, 0.0) * 9.0) * smoothstep(-0.12, 0.0, h);
+	}
+	if (stars > 0.0 && !AT_CUBEMAP_PASS && h > 0.04) {
+		vec2 sp = dir.xz / (h + 0.35) * 160.0;
+		vec2 cell = floor(sp);
+		vec2 pos = hash22(cell) * 0.7 + 0.15;
+		float bright = step(0.86, hash12(cell + 3.1));
+		float star = (1.0 - smoothstep(0.02, 0.09, length(fract(sp) - pos))) * bright;
+		col += vec3(0.85, 0.9, 1.0) * star * stars * smoothstep(0.04, 0.3, h) * (1.0 - cloud_a);
 	}
 	COLOR = col * energy;
 }

@@ -8,6 +8,8 @@ render_mode diffuse_burley, specular_schlick_ggx;
 uniform vec3 color_a : source_color = vec3(0.93, 0.1, 0.12);
 uniform vec3 color_b : source_color = vec3(0.98, 0.98, 0.98);
 uniform float block_length = 2.0;
+// Brilho próprio (zebras de neon na cidade à noite). 0 = zebra comum.
+uniform float glow = 0.0;
 
 void fragment() {
 	float b = mod(floor(UV.y / block_length), 2.0);
@@ -21,4 +23,5 @@ void fragment() {
 	ALBEDO = col;
 	ROUGHNESS = 0.38 + dirt * 0.15;
 	SPECULAR = 0.55;
+	EMISSION = col * glow;
 }

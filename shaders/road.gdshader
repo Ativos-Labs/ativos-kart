@@ -31,6 +31,10 @@ uniform vec3 sand_dark : source_color = vec3(0.78, 0.56, 0.33);
 uniform float soft_edge = 2.2;
 uniform vec3 ice_light : source_color = vec3(0.66, 0.84, 0.97);
 uniform vec3 ice_dark : source_color = vec3(0.24, 0.5, 0.78);
+// Asfalto molhado (cidade à noite): poças lisas que refletem o céu. 0 = seco.
+uniform float wet = 0.0;
+// Faixas pintadas acesas (neon), com a cor delas. 0 = tinta comum.
+uniform float line_glow = 0.0;
 
 varying vec3 special;
 
@@ -191,12 +195,22 @@ void fragment() {
 	vec2 h = fine_grad * (0.06 * 3.2);
 	NORMAL_MAP = normalize(vec3(-h.x * 1.6 * k, -h.y * 1.6 * k, 1.0)) * 0.5 + 0.5;
 
+	if (wet > 0.0) {
+		// Poças (manchas grandes) e o resto úmido: mais escuro e bem mais liso.
+		float puddle = smoothstep(0.52, 0.66, vnoise(p * vec2(0.11, 0.05) + 4.0));
+		float w = wet * (0.55 + 0.45 * puddle) * (1.0 - paint * 0.6);
+		col *= 1.0 - w * 0.35;
+		rough = mix(rough, 0.16, w);
+		spec = mix(spec, 0.7, w);
+	}
 	ALBEDO = col;
 	ROUGHNESS = rough;
 	SPECULAR = spec;
+	vec3 emit = paint_col * paint * line_glow;
 	if (under_f > 0.001) {
 		// Luz do sol dançando no fundo.
 		vec3 wp = (INV_VIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;
-		EMISSION = vec3(0.55, 0.85, 0.8) * caustics(wp.xz, TIME) * under_f * 0.5;
+		emit += vec3(0.55, 0.85, 0.8) * caustics(wp.xz, TIME) * under_f * 0.5;
 	}
+	EMISSION = emit;
 }

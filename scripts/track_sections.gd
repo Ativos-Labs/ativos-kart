@@ -1610,7 +1610,8 @@ func _build_waterfall(node: Node3D, origin: Vector3, into: Vector3, reach: float
 	mist.visibility_aabb = AABB(Vector3(-20, -4, -20), Vector3(40, 24, 40))
 	mist.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	node.add_child(mist)
-	if track.scenery == TrackTheme.Scenery.CAMPO or track.scenery == TrackTheme.Scenery.PRAIA:
+	# Arco-íris só de dia (a cidade neon é à noite).
+	if (track.scenery == TrackTheme.Scenery.CAMPO or track.scenery == TrackTheme.Scenery.PRAIA) and not track.city_track:
 		_build_rainbow(node, bottom + into * 6.0, into, height)
 	return true
 

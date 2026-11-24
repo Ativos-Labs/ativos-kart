@@ -108,3 +108,26 @@ com uma rampa de pulo em 0,656.
 Por volta o J1 passa ~18 s nas tábuas, ~36–48 s na terra da trilha e ~18 s no baixio
 (dois respingos: entrando e saindo). Web (Chrome headless, M4, 1 jogador): 101–110 fps
 contra 111–112 no Cânion, ~700 draw calls, carga da corrida ~6 s.
+
+### Estádio Celerino (2026-11-24)
+
+Pista nova (Copa Verão), 1763 m, traçado original feito com `tracado.py` (pontos em
+`scenes/tracks/estadio_celerino.tscn`): raio mínimo 40 m na análise (28 m pelo `tracado.py`,
+na chicane do miolo), nenhum trecho a menos de 50 m de outro. Vão de 104 m sobre o lago
+(beira y 15 → pouso y 7), rampa de pulo em 0,872. O estádio (`Track.stadium_track`) é um
+anel em volta de (72, −63) com semieixos 106 × 160 m que a pista cruza duas vezes (túneis).
+
+| Classe | Voltas do J1 | Voos (ar / pouso depois da beira / folga) | Quedas no lago | Resgates |
+| --- | --- | --- | --- | --- |
+| 50cc | ~82 s | 5,1 s / 18 m / 6,0 m (o 2º voo levou um item no ar) | 0 | 1 (o item) |
+| 150cc | 58–65 s | 3,6 s / 42 m / 9,7 m (um voo lento depois de levar item na subida) | 0 | 1 |
+
+Web (Chrome headless, 1 jogador, rodadas intercaladas com a Baía): 52–61 fps contra 51–69
+na Baía (ruído do Chrome), 500–530 draw calls contra 570–740, 1,4–1,5 M triângulos contra
+1,7 M; a maior travada da carga 1,6–1,7 s contra 2,4–2,5 s.
+
+Mais tarde no mesmo dia a pista virou **cidade neon à noite** e a subida e a descida do parque
+viraram elevado (`TrackBridge` PILARES, altura 0: 0,455–0,645 e 0,704–0,835) sobre a cidade,
+com o vale virando canal (`valley_plateau` 0). Sonda de corrida: nenhuma queda e nenhum
+resgate; folga mínima no pouso 2,3 m (50cc) e 6,5 m (150cc); voltas ~83 s (50cc) e 54–60 s
+(150cc).

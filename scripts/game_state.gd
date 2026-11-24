@@ -119,6 +119,7 @@ var tracks: Array[TrackData] = [
 	preload("res://data/pistas/canion_ativos.tres"),
 	preload("res://data/pistas/pico_nevado.tres"),
 	preload("res://data/pistas/baia_ativos.tres"),
+	preload("res://data/pistas/estadio_celerino.tres"),
 ]
 ## Quantas pistas cabem em cada copa e quantas copas aparecem (as vagas que
 ## sobram ficam como "?", em breve). Cada copa tem a sua página na tela de pistas

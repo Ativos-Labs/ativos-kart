@@ -29,6 +29,13 @@ func _init(p_scenery: TrackScenery) -> void:
 
 func build_landmarks(preview := false) -> void:
 	match track.scenery:
+		TrackTheme.Scenery.CAMPO:
+			if track.stadium_track:
+				# Estádio: arquibancadas, túneis, torres de luz, telão, boxes, pódio e o Celerino.
+				TrackStadium.new(track, terrain, s.root).build_landmarks(s._reserved, preview)
+			if track.city_track:
+				# Cidade neon: prédios, letreiros, portais, postes e holofotes (depois do estádio).
+				TrackCity.new(track, terrain, s.root).build_landmarks(s._reserved, preview)
 		TrackTheme.Scenery.PRAIA:
 			if track.beach_track:
 				# Praia de areia branca: vila de quiosques, palafitas, arco de pedra...

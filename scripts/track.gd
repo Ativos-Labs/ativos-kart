@@ -70,6 +70,32 @@ const ICE_ROAD_LIFT := 0.06
 	set(value):
 		beach_track = value
 		_queue_rebuild()
+## Estádio (veja track_stadium.gd): anel de arquibancadas lotadas, com cobertura, em
+## volta de `stadium_center` (retângulo arredondado de semieixos `stadium_radii`), com
+## túneis onde a pista passa por baixo, torres de luz, telão, boxes com torre de
+## controle, pódio e o Celerino gigante no miolo; pórtico de treliça na largada. O chão
+## dentro do anel fica plano.
+@export var stadium_track := false:
+	set(value):
+		stadium_track = value
+		_queue_rebuild()
+## Cidade neon à noite (veja track_city.gd): prédios com janelas acesas e letreiros
+## holográficos da Ativos, horizonte de arranha-céus, portais de neon por cima da pista,
+## postes, tubos de neon nas muretas, asfalto molhado com faixas acesas, zebras de neon,
+## muretas de LED e canal de concreto. O céu (estrelas, brilho da cidade) e a lua ficam
+## nos nós WorldEnvironment e Sol.
+@export var city_track := false:
+	set(value):
+		city_track = value
+		_queue_rebuild()
+@export var stadium_center := Vector2.ZERO:
+	set(value):
+		stadium_center = value
+		_queue_rebuild()
+@export var stadium_radii := Vector2(100.0, 150.0):
+	set(value):
+		stadium_radii = value
+		_queue_rebuild()
 ## Quanto do chão em volta vira mar de dunas (0 = relevo comum, 1 = só dunas; as
 ## montanhas do horizonte ficam).
 @export_range(0.0, 1.0, 0.05) var dune_cover := 0.0:
@@ -615,6 +641,10 @@ func build_geometry(defer_physics := false) -> void:
 		# A largada (arquibancada) fica num terreno plano.
 		var start := get_point_at(0.0)
 		terrain.flat_spots.append(Vector3(start.x, start.z, 55.0))
+		if stadium_track:
+			# O estádio inteiro (arquibancadas, torres e telão) num chão plano.
+			terrain.flat_spots.append(Vector3(stadium_center.x, stadium_center.y,
+					maxf(stadium_radii.x, stadium_radii.y) + TrackStadium.OUT_U + 16.0))
 		var ground_mesh := _build_ground(preview)
 		if cache_key != "":
 			_terrain_cache = {cache_key: {"terrain": terrain, "mesh": ground_mesh}}
@@ -1153,7 +1183,7 @@ func _terrain_key(rivers: Array[PackedVector2Array]) -> String:
 	return var_to_str([track_id, scenery, samples.size(), length, sum, bridged, river_points, river_sum, special,
 			decoration_seed, water_level, hill_height, hill_bias, mountain_height, terrace_step, dune_cover, mountain_start, mountain_end,
 			sea_distance, river_width, river_depth, river_bank, river_valley, road_width,
-			shoulder_width, wall_thickness, sea_depth, land_spots, beach_track])
+			shoulder_width, wall_thickness, sea_depth, land_spots, beach_track, stadium_track, stadium_center, stadium_radii, city_track])
 
 
 ## Chão em volta da pista. Devolve a malha (gerada aqui ou a `mesh` do cache).
@@ -1165,6 +1195,8 @@ func _build_ground(preview: bool, mesh: Mesh = null) -> Mesh:
 		var params := TrackTheme.terrain_params(scenery)
 		if beach_track:
 			params.merge(TrackTheme.beach_terrain_params(), true)
+		if city_track:
+			params.merge(TrackTheme.city_terrain_params(), true)
 		for key: String in params:
 			mat.set_shader_parameter(key, params[key])
 		# Grade com células de ~2,8 m perto da pista (pistas compridas ganham mais linhas).
@@ -1199,6 +1231,9 @@ func _build_water() -> void:
 	var params := TrackTheme.water_params(scenery)
 	if beach_track:
 		params.merge(TrackTheme.beach_water_params(), true)
+		params["sun_dir"] = _sun_dir()
+	if city_track:
+		params.merge(TrackTheme.city_water_params(), true)
 		params["sun_dir"] = _sun_dir()
 	for key: String in params:
 		mat.set_shader_parameter(key, params[key])
@@ -1260,6 +1295,14 @@ func _build_road() -> void:
 		mat.shader = ROAD_SHADER
 		mat.set_shader_parameter("curb_min", curb_min_width)
 		mat.set_shader_parameter("soft_edge", SOFT_SAND_EDGE)
+		if city_track:
+			# Asfalto escuro e molhado, faixas acesas em ciano e o logo da largada em magenta.
+			mat.set_shader_parameter("asphalt_light", Color(0.2, 0.2, 0.25))
+			mat.set_shader_parameter("asphalt_dark", Color(0.1, 0.1, 0.13))
+			mat.set_shader_parameter("line_color", Color(0.3, 0.95, 1.0))
+			mat.set_shader_parameter("paint_accent", Color(1.0, 0.25, 0.8))
+			mat.set_shader_parameter("wet", 0.75)
+			mat.set_shader_parameter("line_glow", 0.9)
 	mat.set_shader_parameter("road_width", road_width)
 	mat.set_shader_parameter("track_length", length)
 	mat.set_shader_parameter("logo_texture", LOGO_ICON)
@@ -1295,6 +1338,11 @@ func _build_curbs() -> void:
 	var half := road_width * 0.5
 	var mat := ShaderMaterial.new()
 	mat.shader = CURB_SHADER
+	if city_track:
+		# Zebras de neon: magenta aceso e blocos escuros.
+		mat.set_shader_parameter("color_a", Color(1.0, 0.12, 0.7))
+		mat.set_shader_parameter("color_b", Color(0.07, 0.07, 0.11))
+		mat.set_shader_parameter("glow", 1.3)
 	var md := MeshData.new()
 	# Sem zebras nas dunas (nem no vão do vale).
 	var skip := gap_mask.duplicate()
@@ -1330,6 +1378,22 @@ func _build_curbs() -> void:
 	curbs.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
+## Muretas da cidade: placas de LED acesas em roxo, magenta, azul-noite e o amarelo da
+## marca, com a base escura.
+## A face de fora (vista de baixo do elevado) fica escura, com pouco brilho.
+static func _city_wall_colors(mat: ShaderMaterial, outer := false) -> void:
+	mat.set_shader_parameter("brand_blue", Color(0.32, 0.08, 0.62))
+	mat.set_shader_parameter("brand_light", Color(1.0, 0.25, 0.85))
+	mat.set_shader_parameter("navy", Color(0.03, 0.03, 0.09))
+	mat.set_shader_parameter("trim_color", Color(0.78, 0.9, 1.0))
+	mat.set_shader_parameter("base_color", Color(0.05, 0.05, 0.08))
+	mat.set_shader_parameter("glow", 0.45)
+	if outer:
+		mat.set_shader_parameter("brand_blue", Color(0.14, 0.05, 0.3))
+		mat.set_shader_parameter("trim_color", Color(0.12, 0.12, 0.18))
+		mat.set_shader_parameter("glow", 0.25)
+
+
 ## Muretas com placas. Na pista de neve elas ficam só na colisão (invisíveis) e o que
 ## aparece são barrancos de neve (`_build_snow_banks`).
 func _build_walls() -> void:
@@ -1343,6 +1407,8 @@ func _build_walls() -> void:
 	outer_mat.shader = WALL_SHADER
 	outer_mat.set_shader_parameter("outer_side", true)
 	outer_mat.set_shader_parameter("wall_height", wall_height)
+	if city_track:
+		_city_wall_colors(outer_mat, true)
 	var offset := road_width * 0.5 + shoulder_width
 	var bevel := 0.1
 	for side: float in [-1.0, 1.0]:
@@ -1357,6 +1423,8 @@ func _build_walls() -> void:
 		inner_mat.set_shader_parameter("wordmark_dark", WORDMARK_DARK)
 		inner_mat.set_shader_parameter("icon_aspect", float(LOGO_ICON.get_width()) / LOGO_ICON.get_height())
 		inner_mat.set_shader_parameter("wordmark_aspect", float(WORDMARK.get_width()) / WORDMARK.get_height())
+		if city_track:
+			_city_wall_colors(inner_mat)
 		var inner := offset * side
 		var outer := (offset + wall_thickness) * side
 		var face := MeshData.new()
@@ -1641,6 +1709,10 @@ func _build_start_gate() -> void:
 	if beach_track:
 		# Na praia, um portal de bambu com telhado de sapê (veja track_beach.gd).
 		TrackBeach.new(self, terrain, _generated).build_start_gate(gate)
+		return
+	if stadium_track:
+		# No estádio, um pórtico de treliça com placar e luzes de largada.
+		TrackStadium.new(self, terrain, _generated).build_start_gate(gate)
 		return
 	var half := road_width * 0.5 + 1.4
 	var span := half * 2.0
