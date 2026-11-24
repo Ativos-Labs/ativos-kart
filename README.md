@@ -517,7 +517,6 @@ shaders/                Céu com nuvens (e halo de 22°), terreno, água (e gelo
                         Superpreferência e fundos da interface
 assets/logos/           Logos da Ativos usadas na pista e nas telas
 data/karts/standard_kart.tres        Dados do Kart Padrão
-data/karts/relampago.tres            Dados do Relâmpago (jon_arbuckles_kart_speed.glb)
 data/karts/kart_de_treino.tres       Dados do Kart de Treino (practice_kart.glb)
 data/karts/bolido.tres               Bólido (bolido.glb, kart azul clássico)
 data/karts/cometa.tres               Cometa (cometa.glb, kart futurista)
@@ -784,7 +783,7 @@ Ele aparece no lugar de um dos "?" da grade de seleção.
    apontar para -Z; **Model Scale** pode ficar numa escala qualquer em que dê para medir
    (o tamanho final sai do passo 5).
 3. (Opcional) Em **Rodas**, coloque os nomes das rodas para elas girarem. Podem ser nós
-   do modelo ou ossos de um esqueleto (o Relâmpago usa ossos).
+   do modelo ou ossos de um esqueleto.
 4. Em **Piloto e volante**, ajuste o banco e o volante. Se o volante for uma peça
    separada (nó ou osso), coloque o nome dela para ele girar; se fizer parte da
    carroceria (como no Kart de Treino), deixe vazio e as mãos ficam paradas nele.

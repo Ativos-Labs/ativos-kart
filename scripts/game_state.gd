@@ -50,7 +50,6 @@ const SIMILAR_HUE := 0.035
 ## Os adversários também correm com eles (sorteados a cada corrida).
 var karts: Array[KartData] = [
 	preload("res://data/karts/standard_kart.tres"),
-	preload("res://data/karts/relampago.tres"),
 	preload("res://data/karts/kart_de_treino.tres"),
 	preload("res://data/karts/bolido.tres"),
 	preload("res://data/karts/cometa.tres"),

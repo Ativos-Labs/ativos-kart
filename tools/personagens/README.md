@@ -295,7 +295,7 @@ as regras; o jogo segue assim:
 | Ulysses | (0,0001; 0,0604; −0,0038) | (1; 0,0004; 0,0004) | 6,1 cm |
 
 - **Volante longe ou baixo.** Nos veículos de volante bem mais baixo que o da referência
-  (Relâmpago, Cometa, Bugre) o punho passaria de 95% do braço esticado: o tronco inclina um
+  (Cometa, Bugre) o punho passaria de 95% do braço esticado: o tronco inclina um
   pouco a partir da coluna até ele chegar (`max_reach_lean` 0,4 = até 12° da
   `body_lean_forward`). No Kart Padrão, no Kart de Treino e no Bólido os cotovelos ficam
   dobrados e ele não inclina.
@@ -318,7 +318,6 @@ interno (180° = reto) e distância do centro do joelho ao aro.
 | Kart Padrão (referência) | topo 0,836; punho 8,8 cm; cotovelo 116°; virado 1,04; joelho 113°, 11,3 cm | 0,872; 5,3/6,8 cm; 128°/124°; 1,00; 119°, 8,9 cm | 0,839; 6,1 cm; 124°; 1,00; 114°, 8,9 cm |
 | Kart de Treino | 0,836; 114°; 1,00; joelho 113°, 8,5 cm | 0,872; 131°/127°; 1,00; 119°, 7,4 cm | 0,839; 125°; 1,00; 114°, 7,7 cm |
 | Bólido | 0,836; 113°; 1,04; 113°, 16,3 cm | 0,872; 119°/117°; 1,01; 119°, 13,7 cm | 0,839; 118°; 1,00; 114°, 13,4 cm |
-| Relâmpago (pernas no `foot_point`) | 0,837; 144°; 1,05; pernas retas, 7,2 cm | 0,872; 157°/146°; 1,11; retas, 6,9 cm | 0,842; 151°; 1,10; retas, 7,2 cm |
 | Cometa (pernas no `foot_point`) | 0,836; 143°; 1,00; 164°, 4,3 cm | 0,872; 156°/148°; 1,06; retas, 4,6 cm | 0,842; 150°; 1,06; retas, 4,7 cm |
 | Bugre (pernas no `foot_point`) | 0,836; 139°; 1,00; 132°, 7,9 cm | 0,872; 149°/140°; 1,00; 137°, 6,6 cm | 0,842; 145°; 1,01; 137°, 6,5 cm |
 | Motoca (`POSE_Moto`) | topo 0,956; 138°/153°; 1,03 | 0,959; 134°/161°; 1,06 | 0,966; 125°/132°; 1,00 |

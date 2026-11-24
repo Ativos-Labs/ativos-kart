@@ -60,7 +60,6 @@ REF_BAR_SPREAD = 0.161  # meia distância entre as manoplas na pose
 MEDIDAS = {
     "standard_kart": (0.0, 0.2405, 0.5211),
     "bolido": (0.0, 0.355, 0.155),
-    "relampago": (0.0, 0.47, 0.375),
     "kart_de_treino": (0.0, 0.37, 0.335),
     "cometa": (0.0, 0.60, 0.38),
     "bugre": (0.0, 0.43, 0.535),

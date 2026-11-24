@@ -32,7 +32,7 @@ const INTRO_TIME := 3.2
 ## Habilidade (mín, máx) e velocidade máxima em m/s (mín, máx, em 100cc) dos
 ## adversários em cada dificuldade (GameState.difficulty). Para comparar: o Celerino
 ## no Kart Padrão chega a 27,1 m/s. A velocidade do kart do adversário pesa só um
-## pouco (STAT_SPEED_WEIGHT), senão quem pega o Relâmpago dispara.
+## pouco (STAT_SPEED_WEIGHT), senão quem pega o kart mais veloz dispara.
 const DIFFICULTY := [
 	{"skill": Vector2(0.15, 0.5), "speed": Vector2(20.8, 22.4)},
 	{"skill": Vector2(0.3, 0.8), "speed": Vector2(22.4, 24.0)},

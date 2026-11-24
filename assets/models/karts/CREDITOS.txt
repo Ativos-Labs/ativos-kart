@@ -5,12 +5,6 @@ Licença: CC BY 4.0 (http://creativecommons.org/licenses/by/4.0/)
 No jogo: "Kart Padrão" (standard_kart.glb) — modificado: pintado de azul e com o "A"
 da Ativos no lugar da letra dos emblemas (bico e traseira).
 
-Modelo: "jon arbuckle's kart (speed)"
-Autor: amogusstrikesback2 (https://sketchfab.com/amogusstrikesback2)
-Fonte: https://sketchfab.com/3d-models/jon-arbuckles-kart-speed-dc709b0e6bf643b3a3d6980d1b938ac9
-Licença: CC BY 4.0 (http://creativecommons.org/licenses/by/4.0/)
-No jogo: "Relâmpago" (jon_arbuckles_kart_speed.glb)
-
 Modelo: "practice kart"
 Autor: amogusstrikesback2 (https://sketchfab.com/amogusstrikesback2)
 Fonte: https://sketchfab.com/3d-models/practice-kart-47a59d8980a44d318c489ebd054b11ba
