@@ -3,10 +3,12 @@ class_name TrackBridgeBuilder
 extends RefCounted
 ## Monta as pontes da pista (veja track_bridge.gd): tabuleiro com faixa azul e
 ## amarela, cabeceiras, pilares e a estrutura de cada estilo — torre estaiada com o
-## logo "at" e cabos, arco de aço azul com a marca no alto ou viaduto de arcos de
-## pedra — e as faixas com a marca da Ativos nas laterais.
+## logo "at" e cabos, arco de aço azul com a marca no alto, viaduto de arcos de
+## pedra ou passarela de tábuas em cima de estacas (praia) — e as faixas com a marca da
+## Ativos nas laterais.
 
 const STONE_SHADER := preload("res://shaders/stone.gdshader")
+const BEACH_ROAD_SHADER := preload("res://shaders/beach_road.gdshader")
 const LOGO_ICON := preload("res://assets/logos/ativos_icone.png")
 const WORDMARK := preload("res://assets/logos/ativos_marca.png")
 const WORDMARK_DARK := preload("res://assets/logos/ativos_marca_branca.png")
@@ -64,6 +66,9 @@ func build(_preview: bool) -> void:
 		var node := Node3D.new()
 		node.name = "Ponte"
 		root.add_child(node)
+		if b.style == TrackBridge.Style.PASSARELA:
+			_build_boardwalk(node, from, to)
+			continue
 		var viaduct := b.style == TrackBridge.Style.VIADUTO
 		var solid := Batch.new()
 		var thin := Batch.new()
@@ -109,6 +114,16 @@ func _mat(key: String) -> Material:
 			m = TrackScenery.color_material(TrackScenery.BRAND_BLUE, 0.35, 0.35)
 		"cable":
 			m = TrackScenery.color_material(Color(0.93, 0.93, 0.96), 0.3, 0.5)
+		"wood":
+			m = TrackScenery.color_material(Color(0.55, 0.36, 0.21), 0.88)
+		"wood_dark":
+			m = TrackScenery.color_material(Color(0.33, 0.22, 0.14), 0.9)
+		"lantern":
+			var l := TrackScenery.color_material(Color(1.0, 0.86, 0.5), 0.3)
+			l.emission_enabled = true
+			l.emission = Color(1.0, 0.78, 0.4)
+			l.emission_energy_multiplier = 1.4
+			m = l
 		"stone":
 			var s := ShaderMaterial.new()
 			s.shader = STONE_SHADER
@@ -528,3 +543,122 @@ func _build_viaduct(node: Node3D, solid: Batch, from: int, to: int) -> void:
 	arches.name = "Arcos"
 	arches.mesh = md.to_mesh(stone)
 	node.add_child(arches)
+
+
+# --- Passarela de madeira (praia) --------------------------------------------------------
+
+## Píer de tábuas: tabuleiro de tábuas (o mesmo desenho do piso da pista, que continua
+## por cima), testeira de madeira, vigas atravessadas, fileiras de estacas descendo até o
+## fundo com mãos-francesas em "X" e lampiões nos dois lados.
+func _build_boardwalk(node: Node3D, from: int, to: int) -> void:
+	var count := track.samples.size()
+	var i0 := maxi(from - 1, 0)
+	var i1 := mini(to, count - 1)
+	var lip := _outer + LIP
+	var deck_top := -0.05
+	var deck_bottom := -0.42
+	var body := Track.MeshData.new()
+	_strip(body, i0, i1, Vector2(-lip, deck_top), Vector2(lip, deck_top), Vector2(0, 1))
+	var under := Track.MeshData.new()
+	_strip(under, i0, i1, Vector2(-lip, deck_bottom), Vector2(lip, deck_bottom), Vector2(0, -1))
+	for side: float in [-1.0, 1.0]:
+		_strip(under, i0, i1, Vector2(side * lip, deck_top), Vector2(side * lip, deck_bottom), Vector2(side, 0))
+	var planks := ShaderMaterial.new()
+	planks.shader = BEACH_ROAD_SHADER
+	planks.set_shader_parameter("noise_tex", Track.NOISE_TEXTURE)
+	planks.set_shader_parameter("all_planks", true)
+	planks.set_shader_parameter("road_width", lip * 2.0)
+	planks.set_shader_parameter("track_length", track.length)
+	var deck := MeshInstance3D.new()
+	deck.name = "Tabuas"
+	deck.mesh = body.to_mesh(planks)
+	deck.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	node.add_child(deck)
+	var side_mi := MeshInstance3D.new()
+	side_mi.name = "Testeira"
+	side_mi.mesh = under.to_mesh(_mat("wood_dark"))
+	node.add_child(side_mi)
+
+	var solid := Batch.new()
+	var thin := Batch.new()
+	# Vigas atravessadas embaixo do tabuleiro e fileiras de estacas.
+	var total := (i1 - i0) * _step
+	var rows := maxi(2, int(round(total / 5.6)))
+	var lats: Array[float] = [-lip + 0.5, -lip * 0.45, lip * 0.45, lip - 0.5]
+	var prev: Array[Vector3] = []
+	for k in rows + 1:
+		var fi := lerpf(i0, i1, float(k) / rows)
+		var c := _pos(fi, 0.0, 0.0)
+		var basis := _track_basis(fi)
+		var beam := BoxMesh.new()
+		beam.size = Vector3(lip * 2.0 - 0.2, 0.32, 0.36)
+		solid.add(beam, Transform3D(basis, c + Vector3.UP * (deck_bottom - 0.16)), _mat("wood_dark"))
+		var tops: Array[Vector3] = []
+		for lat in lats:
+			var top := _pos(fi, lat, deck_bottom - 0.3)
+			var floor_y := terrain.height_at(top.x, top.z)
+			var bottom := minf(floor_y - 0.8, track.water_level - 1.0)
+			var h := top.y - bottom
+			if h < 0.3:
+				tops.append(Vector3.INF)
+				continue
+			var pile := CylinderMesh.new()
+			pile.top_radius = 0.2
+			pile.bottom_radius = 0.24
+			pile.height = h
+			pile.radial_segments = 8
+			pile.rings = 1
+			solid.add(pile, Transform3D(Basis(Vector3.UP, fi), Vector3(top.x, bottom + h * 0.5, top.z)), _mat("wood"))
+			tops.append(top)
+		# Mão-francesa em "X" entre as estacas de fora e as do meio, nas fileiras pares.
+		if k % 2 == 0:
+			for pair: Vector2i in [Vector2i(0, 1), Vector2i(2, 3)]:
+				var a := tops[pair.x]
+				var b := tops[pair.y]
+				if a == Vector3.INF or b == Vector3.INF:
+					continue
+				var low := maxf(track.water_level + 0.3, maxf(a.y, b.y) - 3.2)
+				if a.y - low < 1.0:
+					continue
+				_beam(thin, a, Vector3(b.x, low, b.z), 0.12, 0.16, _mat("wood_dark"))
+				_beam(thin, b, Vector3(a.x, low, a.z), 0.12, 0.16, _mat("wood_dark"))
+		# Longarinas ligando a fileira anterior a esta (embaixo das tábuas).
+		if not prev.is_empty():
+			for li in lats.size():
+				var a := prev[li]
+				var b := _pos(fi, lats[li], deck_bottom - 0.12)
+				_beam(solid, a, b, 0.22, 0.24, _mat("wood_dark"))
+		prev.clear()
+		for lat in lats:
+			prev.append(_pos(fi, lat, deck_bottom - 0.12))
+	# Lampiões dos dois lados, alternados, a cada ~26 m (pouco para fora da cerca).
+	var lamps := maxi(1, int(total / 26.0))
+	var post := CylinderMesh.new()
+	post.top_radius = 0.09
+	post.bottom_radius = 0.11
+	post.height = 3.4
+	post.radial_segments = 8
+	var arm := BoxMesh.new()
+	arm.size = Vector3(0.08, 0.08, 0.7)
+	var lantern := CylinderMesh.new()
+	lantern.top_radius = 0.16
+	lantern.bottom_radius = 0.2
+	lantern.height = 0.42
+	lantern.radial_segments = 6
+	var cap := CylinderMesh.new()
+	cap.top_radius = 0.02
+	cap.bottom_radius = 0.26
+	cap.height = 0.2
+	cap.radial_segments = 6
+	for k in lamps:
+		var fi := lerpf(i0, i1, (k + 0.5) / lamps)
+		var side := 1.0 if k % 2 == 0 else -1.0
+		var base := _pos(fi, side * (lip - 0.25), deck_top)
+		var inward := -track.rights[clampi(int(fi), 0, count - 1)] * side
+		solid.add(post, Transform3D(Basis(), base + Vector3.UP * 1.7), _mat("wood_dark"))
+		var arm_end := base + Vector3.UP * 3.25 + inward * 0.55
+		_beam(solid, base + Vector3.UP * 3.25, arm_end, 0.08, 0.08, _mat("wood_dark"))
+		solid.add(lantern, Transform3D(Basis(), arm_end + Vector3.DOWN * 0.3), _mat("lantern"))
+		solid.add(cap, Transform3D(Basis(), arm_end + Vector3.DOWN * 0.02), _mat("wood_dark"))
+	solid.commit(node, "Estrutura")
+	thin.commit(node, "Escoras", false)

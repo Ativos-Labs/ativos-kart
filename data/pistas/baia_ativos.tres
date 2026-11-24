@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="TrackData" format=3 uid="uid://dd7t6knjks77q"]
+
+[ext_resource type="Script" uid="uid://crj76uik6y37b" path="res://scripts/track_data.gd" id="1_data"]
+[ext_resource type="PackedScene" path="res://scenes/tracks/baia_ativos.tscn" id="2_scene"]
+
+[resource]
+script = ExtResource("1_data")
+id = "baia_ativos"
+display_name = "Baía Ativos"
+cup_name = "Copa Verão"
+description = "Areia branca e mar turquesa: cruze a baía pela passarela de madeira, decole de asa-delta da ponta do píer, passe pela trilha da mata sob o arco de pedra e volte pelo baixio, com água nas rodas."
+scene = ExtResource("2_scene")
+difficulty = 3
+color = Color(0.1, 0.72, 0.78, 1)
+color_dark = Color(0.03, 0.22, 0.3, 1)
+background = "res://assets/pistas/baia_ativos_fundo.jpg"
+thumbnail = "res://assets/pistas/baia_ativos_cartao.jpg"

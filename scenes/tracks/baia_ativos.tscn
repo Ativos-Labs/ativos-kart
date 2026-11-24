@@ -1,0 +1,175 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" uid="uid://b6nhub6iovuqo" path="res://scripts/track.gd" id="1_track"]
+[ext_resource type="Shader" uid="uid://w3dvvi0opuc0" path="res://shaders/sky.gdshader" id="2_sky"]
+[ext_resource type="Script" uid="uid://djlvhqy6ktt7f" path="res://scripts/track_bridge.gd" id="3_bridge"]
+[ext_resource type="Script" uid="uid://cmctvjjxwx0sn" path="res://scripts/track_ramp.gd" id="4_ramp"]
+[ext_resource type="Script" uid="uid://dga1qtl8l2npd" path="res://scripts/track_section.gd" id="5_section"]
+
+[sub_resource type="Resource" id="Resource_pier"]
+script = ExtResource("3_bridge")
+start = 0.172
+end = 0.2904
+height = 0.0
+ramp = 10.0
+over_water = true
+style = 4
+
+[sub_resource type="Resource" id="Resource_asa"]
+script = ExtResource("4_ramp")
+at = 0.2904
+length = 14.0
+height = 2.2
+angle = 26.0
+glider = true
+glide_distance = 200.0
+full_width = true
+
+[sub_resource type="Resource" id="Resource_pulo"]
+script = ExtResource("4_ramp")
+at = 0.656
+height = 1.3
+angle = 20.0
+
+[sub_resource type="Resource" id="Resource_canal"]
+script = ExtResource("5_section")
+kind = 3
+start = 0.2904
+end = 0.3406
+valley_width = 112.0
+valley_floor = -6.0
+valley_bed = 70.0
+valley_plateau = 0.0
+pits = PackedVector3Array()
+
+[sub_resource type="Resource" id="Resource_baixio"]
+script = ExtResource("5_section")
+kind = 4
+start = 0.604
+end = 0.7
+ramp = 28.0
+depth = 0.2
+basin = 64.0
+pits = PackedVector3Array()
+
+[sub_resource type="Resource" id="Resource_mata"]
+script = ExtResource("5_section")
+kind = 5
+start = 0.37
+end = 0.565
+ramp = 20.0
+pits = PackedVector3Array()
+
+[sub_resource type="Curve3D" id="Curve3D_tracado"]
+closed = true
+bake_interval = 0.5
+_data = {
+"points": PackedVector3Array(-18, 0, 0, 25.2, 0, 0, 0, 0, 150, -25.188, 0, 0.787, 20.919, 0, -0.654, 70, 0, 150, -20.183, 0, 5.54, 17.399, 0, -4.776, 128, 0, 146, -12.664, 0, 12.853, 12.545, 0, -12.732, 172, 0, 122, -4.819, 0, 17.212, 5.457, 0, -19.491, 195, 0, 78, -0.532, -0.284, 20.231, 0.55, 0.293, -20.891, 200, 0, 22, 1.94, -0.317, 20.808, -2.027, 0.332, -21.745, 198, 1.6, -36, 0.364, -0.073, 21.839, -0.362, 0.072, -21.743, 189, 1.8, -96, -2.088, -0.607, 21.638, 1.874, 0.545, -19.425, 196, 2, -156, -0.828, -1.366, 19.458, 0.613, 1.012, -14.41, 200, 5, -210, 0, -1.03, 14.421, 0, 0.77, -10.784, 200, 8.6, -250, 0, 0, 10.812, 0, 0, -18.058, 200, 10, -280, 0, 1.587, 17.988, 0, -1.653, -18.734, 200, 6, -330, 0.384, 0, 18.802, -0.338, 0, -16.572, 200, 1, -382, 3.755, -0.056, 16.145, -3.577, 0.054, -15.38, 198, 1.1, -428, 10.424, -0.054, 11.862, -11.337, 0.059, -12.901, 180, 1.3, -468, 16.004, -0.017, 6.233, -18.815, 0.02, -7.328, 140, 1.4, -494, 20.165, 0.035, 1.052, -21.646, -0.038, -1.129, 85, 1.4, -505, 21.408, 0.036, -3.39, -21.907, -0.037, 3.469, 25, 1.2, -500, 21.06, 0.037, -6.959, -20.512, -0.036, 6.778, -35, 1.2, -486, 18.178, 0.134, -11.672, -16.506, -0.122, 10.599, -90, 1, -462, 11.401, 0.19, -15.962, -10.688, -0.178, 14.963, -130, 0.5, -425, 4.738, 0.085, -17.768, -5.431, -0.097, 20.366, -150, 0, -378, 2.132, 0, -20.97, -2.19, 0, 21.537, -158, 0, -320, 0.361, 0, -21.645, -0.36, 0, 21.609, -162, 0, -260, -1.795, 0, -21.537, 1.81, 0, 21.716, -160, 0, -200, -3.37, 0, -21.529, 3.112, 0, 19.883, -152, 0, -140, -6.596, 0, -19.013, 5.811, 0, 16.749, -142, 0, -85, -12.815, 0, -12.25, 12.802, 0, 12.237, -118, 0, -42, -16.52, 0, -6.383, 15.315, 0, 5.917, -74, 0, -20, -14.429, 0, -7.833, 11.633, 0, 6.315, -30, 0, -8, -3.008, 0, -12.891, 2.949, 0, 12.64, -4, 0, 18, 9.722, 0, -8.6, -11.26, 0, 9.961, -16, 0, 52, 14.754, 0, -2.887, -18.494, 0, 3.618, -56, 0, 64, 18.06, 0, -5.38, -16.358, 0, 4.873, -108, 0, 70, 9.573, 0, -14.132, -8.076, 0, 11.922, -150, 0, 92, -8.948, 0, -11.282, 11.05, 0, 13.933, -150, 0, 132, -17.501, 0, -3.15, 19.133, 0, 3.444, -104, 0, 150, -19.44, 0, 0, 18, 0, 0, -50, 0, 150),
+"tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+}
+point_count = 39
+
+[sub_resource type="Curve3D" id="Curve3D_vale"]
+bake_interval = 2.0
+_data = {
+"points": PackedVector3Array(0, 0, 0, -28.856, 0, 0.12, 40, 0, -338, -28.829, 0, -1.261, 28.781, 0, 1.259, 120, 0, -333, -28.8, 0, -0.72, 28.8, 0, 0.72, 200, 0, -331, -28.804, 0, 0.54, 28.851, 0, -0.541, 280, 0, -329, 28.836, 0, 1.081, 0, 0, 0, 360, 0, -334),
+"tilts": PackedFloat32Array(0, 0, 0, 0, 0)
+}
+point_count = 5
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ceu"]
+shader = ExtResource("2_sky")
+shader_parameter/zenith_color = Color(0.03, 0.3, 0.86, 1)
+shader_parameter/horizon_color = Color(0.6, 0.86, 1, 1)
+shader_parameter/ground_color = Color(0.5, 0.75, 0.86, 1)
+shader_parameter/bounce_color = Color(0.86, 0.82, 0.68, 1)
+shader_parameter/bounce_energy = 0.9
+shader_parameter/sun_color = Color(1, 0.96, 0.86, 1)
+shader_parameter/sun_size = 0.03
+shader_parameter/sun_glow = 1.15
+shader_parameter/cloud_light = Color(1, 1, 1, 1)
+shader_parameter/cloud_shadow = Color(0.62, 0.74, 0.92, 1)
+shader_parameter/cloud_coverage = 0.42
+shader_parameter/cloud_softness = 0.035
+shader_parameter/cloud_scale = 1.4
+shader_parameter/energy = 1.0
+shader_parameter/halo = 0.0
+
+[sub_resource type="Sky" id="Sky_ceu"]
+sky_material = SubResource("ShaderMaterial_ceu")
+
+[sub_resource type="Environment" id="Environment_pista"]
+background_mode = 2
+sky = SubResource("Sky_ceu")
+ambient_light_source = 3
+ambient_light_sky_contribution = 0.9
+reflected_light_source = 2
+tonemap_mode = 3
+tonemap_exposure = 0.95
+tonemap_white = 5.0
+ssao_enabled = true
+ssao_radius = 1.8
+ssao_intensity = 1.6
+ssao_power = 1.3
+ssao_detail = 0.0
+ssao_light_affect = 0.3
+glow_enabled = true
+glow_intensity = 0.45
+glow_hdr_threshold = 1.6
+fog_enabled = true
+fog_light_color = Color(0.62, 0.82, 0.98, 1)
+fog_sun_scatter = 0.1
+fog_density = 0.00035
+fog_aerial_perspective = 0.3
+fog_sky_affect = 0.0
+adjustment_enabled = true
+adjustment_contrast = 1.08
+adjustment_saturation = 1.18
+
+[node name="BaiaAtivos" type="Node3D"]
+script = ExtResource("1_track")
+track_id = "baia_ativos"
+track_name = "Baía Ativos"
+scenery = 1
+beach_track = true
+bridges = Array[ExtResource("3_bridge")]([SubResource("Resource_pier")])
+ramps = Array[ExtResource("4_ramp")]([SubResource("Resource_asa"), SubResource("Resource_pulo")])
+sections = Array[ExtResource("5_section")]([SubResource("Resource_canal"), SubResource("Resource_baixio"), SubResource("Resource_mata")])
+item_rows = PackedFloat32Array(0.052, 0.205, 0.378, 0.472, 0.728, 0.862)
+coin_lines = PackedVector3Array(0.03, -4.0, 5.0, 0.09, 3.5, 5.0, 0.15, -4.0, 5.0, 0.19, 4.0, 5.0, 0.235, -4.0, 5.0, 0.4, -4.0, 4.0, 0.44, 4.0, 5.0, 0.495, -3.0, 5.0, 0.56, 4.0, 4.0, 0.59, -4.0, 4.0, 0.625, 3.0, 5.0, 0.69, -3.0, 5.0, 0.76, 4.0, 4.0, 0.88, -4.0, 5.0, 0.93, 3.0, 4.0)
+obstacle_zones = PackedFloat32Array(0.135)
+boost_pads = PackedFloat32Array(0.105, 0.262, 0.455, 0.64, 0.852, 0.955)
+tree_count = 380
+grass_count = 700
+flower_count = 70
+balloon_count = 4
+decoration_seed = 31
+hill_height = 3.5
+mountain_height = 45.0
+hill_bias = 0.6
+mountain_start = 1400.0
+mountain_end = 1800.0
+sea_distance = 34.0
+sea_depth = 6.5
+land_spots = PackedVector3Array(60, 50, 95, 150, -470, 55, 60, -545, 80, -55, -505, 70, -120, -440, 45)
+
+[node name="Tracado" type="Path3D" parent="."]
+curve = SubResource("Curve3D_tracado")
+
+[node name="Vale" type="Path3D" parent="."]
+curve = SubResource("Curve3D_vale")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_pista")
+
+[node name="Sol" type="DirectionalLight3D" parent="."]
+transform = Transform3D(-0.819152, -0.475516, 0.32074, 0, 0.559193, 0.829038, -0.573576, 0.679108, -0.458064, 0, 0, 0)
+light_color = Color(1, 0.95, 0.84, 1)
+light_energy = 1.25
+light_angular_distance = 0.6
+shadow_enabled = true
+shadow_bias = 0.06
+shadow_blur = 1.3
+directional_shadow_blend_splits = true
+directional_shadow_fade_start = 0.85
+directional_shadow_max_distance = 190.0

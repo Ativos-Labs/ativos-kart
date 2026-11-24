@@ -11,6 +11,9 @@ extends RefCounted
 ##   pinguins patinando em roda. No riacho congelado (sem lago) tudo fica no chão de neve
 ##   das margens. Na pista de neve e gelo: cristais de gelo gigantes nas margens e, sobre
 ##   cada riacho, um arco de gelo glacial por onde a pista passa.
+## - Baixio (praia): bancos de areia com coqueiros saindo da água rasa, estrelas-do-mar
+##   no fundo e gaivotas voando.
+## - Mata (praia): murinhos de pedra, cerca de madeira e mata fechada (track_beach.gd).
 ## - Vale: paredão de pedra onde a pista acaba, cachoeira na cabeceira (congelada na
 ##   neve) com névoa e arco-íris, pedras no rio, árvores, bichos voando (golfinhos no
 ##   mar) e um destaque de cada cenário: ponte pênsil (campo), rochas no mar e um barco
@@ -67,6 +70,10 @@ func build(preview: bool) -> void:
 				_build_dunes(s, preview)
 			TrackSection.Kind.GELO:
 				_build_ice(s)
+			TrackSection.Kind.RASO:
+				_build_shallows(s, preview)
+			TrackSection.Kind.SELVA:
+				TrackBeach.new(track, terrain, root).build_jungle(_indices(s), preview)
 	var paths := track._valley_paths()
 	for gi in track.gap_spans.size():
 		_build_gap_edges(track.gap_spans[gi])
@@ -389,6 +396,79 @@ func _build_underwater(s: TrackSection, preview: bool) -> void:
 		_build_oasis(ids, node, reach)
 	else:
 		_build_wreck(ids, node, reach, sea)
+
+
+# --- Baixio (praia) -------------------------------------------------------------------
+
+## Baixio da praia (RASO): bancos de areia saindo da água rasa dos dois lados, quase
+## todos com um coqueiro, estrelas-do-mar no fundo perto da pista e gaivotas voando.
+func _build_shallows(s: TrackSection, preview: bool) -> void:
+	var ids := _indices(s)
+	if ids.is_empty():
+		return
+	var node := _node("Baixio")
+	var wl := track.water_level
+	var bars := MeshMerge.new()
+	var palms: Array[Transform3D] = []
+	var palm_cols: Array[Color] = []
+	var spots: Array[Vector3] = []
+	for k in 160:
+		if spots.size() >= 8:
+			break
+		var p := _spot_beside(ids, _outside + 9.0, _outside + 46.0, 7.0)
+		if p == Vector3.INF or p.y > wl - 0.1:
+			continue
+		var close := false
+		for sp in spots:
+			if Vector2(sp.x - p.x, sp.z - p.z).length() < 28.0:
+				close = true
+				break
+		if close:
+			continue
+		spots.append(p)
+		var r := rng.randf_range(4.0, 8.5)
+		var top := wl + rng.randf_range(0.45, 0.85)
+		var ry := top - p.y + 0.3
+		bars.append_from(_sphere(1.0, 16), 0, Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(r, ry, r * rng.randf_range(0.65, 1.0))), Vector3(p.x, p.y - 0.3, p.z)))
+		if rng.randf() < 0.8:
+			palms.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * rng.randf_range(0.85, 1.2)), Vector3(p.x, top - 0.2, p.z)))
+			palm_cols.append(Color.from_hsv(rng.randf_range(0.24, 0.32), rng.randf_range(0.7, 0.85), rng.randf_range(0.55, 0.78)))
+	if not spots.is_empty():
+		bars.set_material(TrackScenery.color_material(Color(0.77, 0.68, 0.5), 0.95))
+		var bm := MeshInstance3D.new()
+		bm.name = "BancosDeAreia"
+		bm.mesh = bars.commit()
+		bm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		node.add_child(bm)
+		_multimesh(TrackProps._palm_mesh(), palms, palm_cols, "CoqueirosDoBaixio", node, true)
+	# Estrelas-do-mar no fundo (nos acostamentos e um pouco para fora).
+	var star_parts := []
+	for a in 5:
+		var ang := TAU * a / 5.0
+		star_parts.append([_box(Vector3(0.12, 0.05, 0.42)), Transform3D(Basis(Vector3.UP, ang), Vector3(sin(ang) * 0.2, 0.0, cos(ang) * 0.2))])
+	star_parts.append([_cyl(0.13, 0.15, 0.07, 8), Transform3D()])
+	var star := _parts(star_parts, _tint)
+	var sx: Array[Transform3D] = []
+	var sc: Array[Color] = []
+	var star_colors: Array[Color] = [Color(1.0, 0.45, 0.15), Color(0.95, 0.25, 0.3), Color(1.0, 0.75, 0.2), Color(0.6, 0.35, 0.85)]
+	for k in (20 if preview else 70):
+		var p := _spot_beside(ids, track.road_width * 0.5 + 0.8, _outside + 26.0, -_outside)
+		if p == Vector3.INF or p.y > wl - 0.08:
+			continue
+		var sz := rng.randf_range(0.7, 1.4)
+		sx.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * sz), p + Vector3.UP * 0.03))
+		sc.append(star_colors[rng.randi() % star_colors.size()])
+	_multimesh(star, sx, sc, "EstrelasDoMar", node)
+	# Gaivotas.
+	var bx: Array[Transform3D] = []
+	var bc: Array[Color] = []
+	var bcu: Array[Color] = []
+	var white: Array[Color] = [Color(0.97, 0.97, 0.97)]
+	for k in 2:
+		var i := ids[rng.randi() % ids.size()]
+		var c := track.samples[i] + track.rights[i] * rng.randf_range(-30.0, 30.0) + Vector3.UP * rng.randf_range(9.0, 15.0)
+		_flock(bx, bc, bcu, c, rng.randi_range(3, 5), Vector2(8.0, 18.0), rng.randf_range(6.0, 8.0), 1.2, 2.5, 1.2, white)
+	_multimesh(_creature_mesh(Creature.PASSARO), bx, bc, "Gaivotas", node, false, bcu)
 
 
 # --- Oásis (deserto) ------------------------------------------------------------------
@@ -1272,7 +1352,11 @@ func _build_gap_edges(span: Dictionary) -> void:
 		var wall := _box(Vector3(width, 16.0, 3.0))
 		wall.material = stone
 		var xf := Transform3D(basis, p - t * gap_dir * 1.5 + Vector3.DOWN * 8.05)
-		_add(wall, xf, node)
+		# Na ponta de uma passarela de madeira (praia) não há paredão: o píer acaba na
+		# água (a colisão fica, invisível).
+		var boardwalk := track.beach_track and (track.bridge_mask[i] == 1 or track.bridge_mask[i] == 2)
+		if not boardwalk:
+			_add(wall, xf, node)
 		if track.with_collision:
 			# Quem chega baixo demais bate no paredão (e cai no vale). Gerando numa thread,
 			# o corpo só é criado depois, na thread principal (Track.physics_job).
@@ -1323,7 +1407,10 @@ func _build_valley(span: Dictionary, path: Path3D, preview: bool) -> void:
 	var head_dir := (line[mini(3, line.size() - 1)] - line[0])
 	head_dir.y = 0.0
 	head_dir = head_dir.normalized()
-	if not _build_waterfall(node, head - head_dir * (half_top + 10.0), head_dir, half_top + 10.0, water_y, snow, preview):
+	if track.beach_track:
+		# Canal de mar aberto entre o píer e a ilha: sem cachoeira.
+		pass
+	elif not _build_waterfall(node, head - head_dir * (half_top + 10.0), head_dir, half_top + 10.0, water_y, snow, preview):
 		# Cabeceira sem paredão (na ilha o vale abre para o mar): a cachoeira cai do
 		# penhasco ao lado da ponta da pista mais alta.
 		_cliff_waterfall(node, span, water_y, snow, preview)
@@ -1371,7 +1458,9 @@ func _build_valley(span: Dictionary, path: Path3D, preview: bool) -> void:
 	_multimesh(_creature_mesh(Creature.PASSARO), bx, bc, "Passaros", node, false, bcu)
 	match track.scenery:
 		TrackTheme.Scenery.PRAIA:
-			_build_sea_stacks(node, line, cross_k, half_top, water_y)
+			# Na pista de praia as ilhotas de pedra (track_beach.gd) fazem esse papel.
+			if not track.beach_track:
+				_build_sea_stacks(node, line, cross_k, half_top, water_y)
 			var dx: Array[Transform3D] = []
 			var dc: Array[Color] = []
 			var dcu: Array[Color] = []

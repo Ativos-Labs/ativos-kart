@@ -1,17 +1,20 @@
 class_name KartWaterFx
 extends Node3D
-## Efeitos de água de um kart: bolhas saindo de trás enquanto ele anda submerso e um
-## respingo (gotas para cima e um anel) quando ele entra ou sai da água.
+## Efeitos de água de um kart: bolhas saindo de trás enquanto ele anda submerso, um
+## respingo (gotas para cima e um anel) quando ele entra ou sai da água e, andando na
+## água rasa da praia, a água que as rodas jogam para trás e para os lados.
 
 const BUBBLE_SHADER := preload("res://shaders/bubble.gdshader")
 
 var bubbles: GPUParticles3D
 var splash: GPUParticles3D
+var spray: GPUParticles3D
 
 static var _bubble_mat: ShaderMaterial
 static var _drop_mat: ShaderMaterial
 static var _bubble_process: ParticleProcessMaterial
 static var _splash_process: ParticleProcessMaterial
+static var _spray_process: ParticleProcessMaterial
 
 
 func _init() -> void:
@@ -42,6 +45,17 @@ func _init() -> void:
 	splash.visibility_aabb = AABB(Vector3(-6, -3, -6), Vector3(12, 10, 12))
 	splash.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(splash)
+	spray = GPUParticles3D.new()
+	spray.name = "Esguicho"
+	spray.amount = 44
+	spray.lifetime = 0.75
+	spray.local_coords = false
+	spray.emitting = false
+	spray.process_material = _spray_process
+	spray.draw_pass_1 = _quad(_drop_mat)
+	spray.visibility_aabb = AABB(Vector3(-5, -2, -3), Vector3(10, 6, 12))
+	spray.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(spray)
 
 
 static func _make_shared() -> void:
@@ -87,6 +101,20 @@ static func _make_shared() -> void:
 	ramp.gradient = fade
 	s.color_ramp = ramp
 	_splash_process = s
+	# Água das rodas: leque para trás e para os lados, gotas grandes que caem rápido.
+	var w := ParticleProcessMaterial.new()
+	w.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	w.emission_box_extents = Vector3(0.45, 0.05, 0.12)
+	w.direction = Vector3(0.0, 0.75, 1.0)
+	w.spread = 48.0
+	w.initial_velocity_min = 2.5
+	w.initial_velocity_max = 5.5
+	w.inherit_velocity_ratio = 0.35
+	w.gravity = Vector3(0.0, -16.0, 0.0)
+	w.scale_min = 0.06
+	w.scale_max = 0.17
+	w.color_ramp = ramp
+	_spray_process = w
 
 
 static func _quad(material: Material) -> QuadMesh:
@@ -102,6 +130,17 @@ func set_underwater(on: bool) -> void:
 		bubbles.emitting = on
 
 
+## Água jogada pelas rodas na água rasa; `strength` (0..1, a fração da velocidade
+## máxima) muda a quantidade.
+func set_spray(on: bool, strength := 1.0) -> void:
+	if on:
+		var ratio := clampf(0.35 + strength * 0.65, 0.0, 1.0)
+		if absf(spray.amount_ratio - ratio) > 0.05:
+			spray.amount_ratio = ratio
+	if spray.emitting != on:
+		spray.emitting = on
+
+
 ## Respingo em `at` (global), na superfície da água.
 func burst(at: Vector3) -> void:
 	splash.global_position = at
@@ -111,7 +150,7 @@ func burst(at: Vector3) -> void:
 
 ## Para os shaders compilarem atrás da tela de carregamento (Race.warm_up).
 func prewarm(on: bool) -> void:
-	for p: GPUParticles3D in [bubbles, splash]:
+	for p: GPUParticles3D in [bubbles, splash, spray]:
 		if on:
 			p.emitting = true
 		else:

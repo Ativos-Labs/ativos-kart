@@ -18,6 +18,7 @@ const VIEWS := {
 	"ilha_ativos": {"yaw": 0.0, "pitch": 55.0},
 	"canion_ativos": {"yaw": 90.0, "pitch": 55.0},
 	"pico_nevado": {"yaw": 90.0, "pitch": 55.0},
+	"baia_ativos": {"yaw": 90.0, "pitch": 55.0},
 }
 const FOV := 40.0
 ## Quanto da tela a pista ocupa (o resto é margem).
@@ -91,7 +92,11 @@ func _shots(explore: bool) -> void:
 	vp.msaa_3d = Viewport.MSAA_4X
 	vp.mesh_lod_threshold = 0.0
 	var root := get_tree().root
+	# ?ids=a,b fotografa só essas pistas (as outras imagens ficam como estão).
+	var only := _arg("ids", "")
 	for data: TrackData in gs.tracks:
+		if only != "" and not only.split(",").has(data.id):
+			continue
 		var track: Track = data.scene.instantiate()
 		root.add_child(track)
 		await get_tree().process_frame

@@ -14,8 +14,15 @@ extends Resource
 ##   cima do vale (rio, cachoeira, penhascos...) e pousa em `end`. A linha do meio do
 ##   vale é o filho Path3D "Vale" da pista (o começo dele é a cabeceira, com a
 ##   cachoeira). Quem cai no vale volta para a pista do outro lado.
+## - RASO: água rasa da praia — a pista desce até `depth` m abaixo da superfície (uns
+##   20 cm) e o chão em volta vira um baixio de areia (`basin`): o kart anda dentro
+##   d'água, um pouco mais devagar, levantando respingos.
+## - SELVA: trilha de terra batida no meio da mata (pista de praia): a areia vira terra
+##   alaranjada, a cerca de corda vira cerca de madeira escura de duas traves, com
+##   murinhos de pedra cobertos de grama e flores vermelhas atrás, e a mata fecha dos
+##   dois lados (coqueiros, bananeiras, samambaias e árvores grandes).
 
-enum Kind { SUBMERSO, AREIA, GELO, VALE }
+enum Kind { SUBMERSO, AREIA, GELO, VALE, RASO, SELVA }
 
 @export var kind := Kind.SUBMERSO:
 	set(value):
@@ -40,7 +47,8 @@ enum Kind { SUBMERSO, AREIA, GELO, VALE }
 
 @export_group("Água e gelo")
 ## SUBMERSO: quantos metros abaixo da superfície fica o asfalto. GELO: use um valor
-## negativo pequeno (a pista fica rente ao gelo, um pouco acima da água).
+## negativo pequeno (a pista fica rente ao gelo, um pouco acima da água). RASO: a
+## lâmina d'água em cima da areia (até ~0,22 m; mais fundo o kart conta como submerso).
 @export_range(-1.0, 20.0, 0.05) var depth := 8.0:
 	set(value):
 		depth = value
@@ -96,4 +104,4 @@ enum Kind { SUBMERSO, AREIA, GELO, VALE }
 
 
 func is_basin() -> bool:
-	return kind == Kind.SUBMERSO or (kind == Kind.GELO and basin > 0.0)
+	return kind == Kind.SUBMERSO or kind == Kind.RASO or (kind == Kind.GELO and basin > 0.0)

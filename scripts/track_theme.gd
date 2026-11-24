@@ -40,6 +40,28 @@ static func terrain_params(scenery: int) -> Dictionary:
 	return {}
 
 
+## Pista de praia (Track.beach_track), por cima de terrain_params(PRAIA): areia branca
+## de praia em volta da pista inteira (no lugar da grama aparada) e até uns 3 m acima
+## da água; grama só nos morros mais altos.
+static func beach_terrain_params() -> Dictionary:
+	return {
+		"mowed_light": Color(0.75, 0.66, 0.48), "mowed_dark": Color(0.72, 0.63, 0.45), "stripe_strength": 0.0,
+		"sand": Color(0.77, 0.68, 0.5), "sand_band": 3.4, "wet_band": 0.55,
+		"grass_a": Color(0.3, 0.57, 0.16), "grass_b": Color(0.44, 0.65, 0.2), "grass_dark": Color(0.17, 0.42, 0.12),
+		"rock": Color(0.62, 0.58, 0.5), "rock_dark": Color(0.42, 0.4, 0.36), "rock_slope": 0.38,
+		# Fundo de areia clara debaixo d'água fica turquesa (lagoa rasa).
+		"underwater_tint": 1.0,
+	}
+
+
+## Água da pista de praia: mar turquesa bem claro no raso, espuma só na beirada (o
+## baixio passa por cima da pista).
+static func beach_water_params() -> Dictionary:
+	return {"shallow_color": Color(0.16, 0.8, 0.74), "lagoon_color": Color(0.0, 0.56, 0.68),
+			"deep_color": Color(0.0, 0.26, 0.58), "depth_range": 6.0, "foam_width": 0.16, "vertical_foam": true,
+			"glitter": 2.4}
+
+
 ## Parâmetros do shaders/water.gdshader (lagos, rios e mar).
 static func water_params(scenery: int) -> Dictionary:
 	match scenery:

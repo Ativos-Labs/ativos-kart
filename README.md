@@ -93,6 +93,13 @@ rodapé mostra as teclas ou os botões do controle, conforme o último que foi u
     enterrados, entalhados com a marca da Ativos e hieróglifos pintados — e uma leira de
     areia no lugar das zebras. Depois das dunas a pista desce uma depressão até o
     **oásis** e passa por baixo d'água no meio das ruínas de um templo afundado.
+  - **Pista de praia** (Baía): também sem asfalto. **Areia branca de praia** (trilhas de
+    pneu, conchinhas; solta um pouquinho a traseira, como a areia do deserto), cercas de
+    corda com postes brancos no lugar das muretas, **passarela de tábuas** sobre a baía
+    (firme como o asfalto), a **trilha da mata** de terra batida alaranjada (aderência um
+    pouco menor, cerca de madeira escura e murinhos de pedra com flores) e o **baixio**:
+    a pista passa uns 20 cm debaixo d'água, entre linhas de boias — o kart fica um pouco
+    mais lento, joga água para os lados e respinga ao entrar e sair do mar.
 - **Caixas de item** (com o logo "at"): passe por elas para pegar um item. Elas estouram e
   voltam depois de alguns segundos. O item aparece no **slot do canto superior esquerdo**
   (como no Mario Kart) depois de uma **roleta vertical** (os ícones descem e freiam até
@@ -216,7 +223,7 @@ Menu principal → **Jogar** abre a tela **Modo de jogo**:
 
 | Modo | O que é |
 |------|---------|
-| **Grand Prix** | A Copa Ativos inteira: as 4 pistas em sequência contra o computador. Pontos por chegada (15, 12, 10, 8, 6, 4, 2, 1); os mesmos adversários (piloto, kart e nível) correm as 4. Na 1ª corrida os jogadores largam no fim do grid; nas outras, o grid segue a chegada da anterior. No fim, classificação geral e troféu. |
+| **Grand Prix** | Uma copa inteira (a Copa Ativos são as 4 primeiras pistas; a Copa Verão, por enquanto, só a Baía Ativos) em sequência contra o computador. Pontos por chegada (15, 12, 10, 8, 6, 4, 2, 1); os mesmos adversários (piloto, kart e nível) correm as 4. Na 1ª corrida os jogadores largam no fim do grid; nas outras, o grid segue a chegada da anterior. No fim, classificação geral e troféu. |
 | **Corrida** | Uma corrida avulsa na pista escolhida, com ou sem adversários do computador. |
 | **Contra-relógio** | Sem adversários. O melhor percurso de cada pista (e cilindrada) vira um **kart fantasma** transparente que corre junto na próxima vez; ao fechar cada volta aparece a diferença para ele (verde = na frente). |
 
@@ -281,7 +288,7 @@ frente, e a instrumentação muda com o cenário.
 |---|---|---|
 | `menu` | Menus | City pop / fusion tranquilo, piano elétrico e baixo com slap (108 BPM) |
 | `campo` | Circuito Ativos | Fusion-rock ensolarado, metais e lead em uníssono (144 BPM) |
-| `praia` | Ilha Ativos | Calypso/soca: tambor de aço com rufo, marimba, cavaquinho, congas (126 BPM) |
+| `praia` | Ilha Ativos e Baía Ativos | Calypso/soca: tambor de aço com rufo, marimba, cavaquinho, congas (126 BPM) |
 | `deserto` | Cânion Ativos | Frígia dominante em Mi: violão com tremolo, galope, darbuka, assobio e trompetes (136 BPM) |
 | `neve` | Pico Nevado | Guizos, glockenspiel e celesta, pizzicato, vibrafone e flauta (132 BPM) |
 | `podio` | Resultado | Fanfarra de metais (112 BPM) |
@@ -334,10 +341,15 @@ copa").
 
 Na tela de pistas a vista aérea da pista escolhida aparece ao fundo (uma imagem pronta, sem
 gerar a pista em 3D: a tela fica leve e troca de pista sem travar). À esquerda ficam
-as copas (a **Copa Ativos** usa o logo "at") e os cartões das pistas; à direita, o mapa do
-traçado, extensão, voltas, curvas, dificuldade e recordes. Vagas sem pista aparecem como "?".
+as copas (emblemas com o logo "at" no anel da cor da copa) e os cartões das pistas da copa
+escolhida; à direita, o mapa do traçado, extensão, voltas, curvas, dificuldade e recordes.
+Vagas sem pista aparecem como "?". Cada copa é uma página de 4 cartões: troca-se clicando
+no emblema, com **Page Up / Page Down** ou com **LB / RB** no controle (a copa de cada
+pista é o `cup_name` do `TrackData`, na ordem da lista `GameState.tracks`).
 
-## As pistas (Copa Ativos)
+## As pistas
+
+### Copa Ativos
 
 | Pista            | Cenário | Destaques                                                                 |
 |------------------|---------|---------------------------------------------------------------------------|
@@ -346,8 +358,14 @@ traçado, extensão, voltas, curvas, dificuldade e recordes. Vagas sem pista apa
 | Cânion Ativos    | Deserto | 2,0 km, **deserto do Egito sem asfalto**: areia batida do começo ao fim num mar de dunas, largada num portal de templo (pilonos com hieróglifos, bandeiras e o disco alado com o logo). Traçado em "8" com o viaduto por cima da própria pista e um viaduto de pedra sobre o rio; a asa-delta cruza a **Garganta do Cânion** (paredões, rio com margens verdes, cachoeira, tamareiras, urubus). O laço de baixo, maior, passa pelas **dunas** (pulinhos, areia fofa, areia movediça), pula de uma rampa e desce até o **oásis** — tamareiras, papiros, lótus azuis, um cais com obeliscos e um barco à vela da Ativos, camelos bebendo água — e **mergulha** entre colunas de um templo afundado, a cabeça de um faraó e ânforas. Na volta, a **avenida de esfinges**, o portal do templo com colunata e obeliscos e a esfinge gigante; a pirâmide com a ponta de ouro e o logo "at" no meio do laço (com uma caravana de camelos dando a volta) e mais duas no horizonte |
 | Pico Nevado      | Neve    | 1,6 km, **sem asfalto**: neve batida e rio congelado do começo ao fim, num dia de sol com halo em volta do sol. Subida até o platô, viaduto de pedra sobre o rio congelado, pinheiros, chalés, bonecos de neve e bolas de neve rolando. Do alto do platô a asa-delta atravessa o **Vale Glacial** (paredões de pedra nevada, cascata congelada, rio congelado, teleférico com cabines azul e amarela indo e vindo, águias); na volta, um **riacho congelado** desce do platô por baixo de um arco de gelo e deságua no **lago congelado** (blocos de gelo, cabanas de pesca, pinguins patinando em roda), e a reta final é outro riacho com bolas de neve. Cristais de gelo gigantes nas margens e peixes nadando debaixo do gelo |
 
+### Copa Verão
+
+| Pista            | Cenário | Destaques                                                                 |
+|------------------|---------|---------------------------------------------------------------------------|
+| Baía Ativos      | Praia   | 2,0 km, **praia de areia branca sem asfalto**, num meio-dia de sol (mar turquesa no raso e azul no fundo, ondinhas de espuma chegando na areia, brilho do sol na água, ilhas no horizonte). Largada numa **vila de quiosques de sapê** (portal de bambu com telhado de palha e a placa da Ativos, bandeirinhas, guarda-sóis listrados, espreguiçadeiras, pranchas de surfe, farol); a reta da praia leva a uma **passarela de tábuas** sobre a baía, entre **palafitas**, que vai subindo até a ponta do píer: dali a asa-delta voa sobre o **canal** (ilhotas de pedra com coqueiros, golfinhos) até a ilha. Na ilha, a **trilha da mata** de terra batida (cerca de madeira escura, murinhos de pedra com flores vermelhas, bananeiras, samambaias e árvores grandes) passa por baixo de um **arco de pedra** com cipós e coqueiros em cima; na volta, o **baixio**: a pista atravessa o mar raso entre linhas de boias, bancos de areia com coqueiros e estrelas-do-mar no fundo (com uma rampa de pulo no meio), e termina nas curvas das dunas, com um grampo, até a vila |
+
 Todas usam as logos da Ativos no pórtico, nas muretas, outdoors, bandeiras, balões, dirigível,
-no asfalto e nas pontes.
+no asfalto e nas pontes (na Baía, nas placas de madeira penduradas nas cercas e nos quiosques).
 
 ## Estrutura
 
@@ -365,6 +383,7 @@ scenes/
   tracks/ilha_ativos.tscn       Ilha Ativos (praia)
   tracks/canion_ativos.tscn     Cânion Ativos (deserto)
   tracks/pico_nevado.tscn       Pico Nevado (neve)
+  tracks/baia_ativos.tscn       Baía Ativos (praia de areia branca, Copa Verão)
   ui/hud.tscn, ui/pause_menu.tscn, ui/controls_panel.tscn
 scripts/
   game_state.gd         Autoload: modo, cilindrada, jogadores (piloto e kart de cada um),
@@ -412,12 +431,17 @@ scripts/
                         tamareiras, chalés, bonecos de neve)
   track_egypt.gd        Monumentos do deserto: pirâmides, esfinges, obeliscos, templo com
                         colunata, ruínas, camelos (caravan.gd) e o portal de largada
+  track_beach.gd        Pista de praia: cercas de corda e boias, portal de bambu, vila de
+                        quiosques, palafitas, guarda-sóis, bandeirinhas, arco de pedra,
+                        ilhotas, ilhas no horizonte e a mata da trilha (cerca, murinhos)
   track_bridge.gd       Recurso com os dados de uma ponte (trecho, altura, rampa, estilo)
-  track_bridges.gd      Monta as pontes (tabuleiro, pilares, torre estaiada, arco, viaduto)
+  track_bridges.gd      Monta as pontes (tabuleiro, pilares, torre estaiada, arco, viaduto,
+                        passarela de madeira)
   track_ramp.gd         Recurso com os dados de uma rampa de pulo ou de asa-delta (posição,
                         altura, ângulo, alcance do voo)
   track_ramps.gd        Monta as rampas de pulo (malha, colisão, turbo, paredes invisíveis)
-  track_section.gd      Recurso de um trecho especial (submerso, dunas, gelo, vale)
+  track_section.gd      Recurso de um trecho especial (submerso, dunas, gelo, vale, baixio,
+                        trilha da mata)
   track_sections.gd     Monta o visual dos trechos especiais (fundo do mar/lago, dunas,
                         lago congelado, vale com cachoeira e os destaques de cada cenário)
   kart_water_fx.gd      Bolhas e respingo do kart na água
@@ -841,9 +865,22 @@ para mudar:
   pelo arenito dos monumentos (`shaders/egypt_stone.gdshader`). **Dune Cover** transforma o
   chão em volta num mar de dunas (mais altas longe da pista); `mountain_start` /
   `mountain_end` afastam as montanhas do horizonte.
+- **Beach Track** (pista de praia, ligado na Baía): areia branca de praia no lugar do
+  asfalto (`shaders/beach_road.gdshader`, `Kart.Surface.AREIA_BATIDA`), sem zebras, cercas
+  de corda com postes brancos no lugar das muretas (só o visual: a colisão continua a da
+  mureta) com placas de madeira da Ativos, portal de bambu na largada, vila de quiosques,
+  palafitas, arco de pedra, ilhotas e ilhas no horizonte (`scripts/track_beach.gd`). O
+  chão perto da pista vira areia (`TrackTheme.beach_terrain_params`: faixa de areia molhada
+  na beira e fundo turquesa debaixo d'água) e a água ganha cor pela profundidade de
+  verdade, ondinhas de espuma na areia e brilho do sol (`TrackTheme.beach_water_params`,
+  `vertical_foam` no `shaders/water.gdshader`). As cores foram acertadas na web
+  (Compatibility usa as cores sem converter e o ACES desbota o claro): areia ~0,76/0,67/0,49.
 - **Paisagem:** além das alturas, `hill_bias` (colinas mais altas/baixas), `terrace_step`
   (colinas em degraus, como mesas de deserto) e `sea_distance` (a partir dessa distância da
-  pista o chão desce para o mar — vira uma ilha).
+  pista o chão desce para o mar — vira uma ilha), com `sea_depth` (profundidade do mar) e
+  `land_spots` (círculos x, z, raio que continuam terra firme: o continente e o morro da
+  ilha da Baía). Com `mountain_start` além da borda do terreno (~1250 m) o horizonte fica
+  só mar.
 
 O céu, a luz do sol e a névoa ficam nos nós **WorldEnvironment** e **Sol** da mesma cena
 (no material do céu, `bounce_color` é a cor do chão refletida na luz ambiente).
@@ -863,7 +900,9 @@ No nó raiz, em **Pontes**, acrescente itens (`TrackBridge`) com:
   subida é feita sozinha, não precisa mexer na curva.
 - **Over Water:** o chão embaixo afunda abaixo da água (mar/lagoa).
 - **Style:** Pilares, Estaiada (torre com o logo "at" e cabos), Arco (arco de aço azul com a
-  marca no alto) ou Viaduto (arcos de pedra com medalhões do logo).
+  marca no alto), Viaduto (arcos de pedra com medalhões do logo) ou Passarela (píer de
+  tábuas em cima de estacas com mãos-francesas e lampiões; o piso da pista vira tábuas —
+  na Baía ela tem altura 0 e a subida até a ponta do píer vem da própria curva).
 
 A ponte também pode passar por cima de outro trecho da pista (viaduto do Cânion): os pilares
 não caem em cima do asfalto de baixo. O traçado também aceita altura nos próprios pontos da
@@ -926,6 +965,18 @@ No nó raiz, em **Trechos especiais**, acrescente itens (`TrackSection`). Cada u
   descidas). No gelo a aderência cai para 24% (o kart desliza): evite curvas com menos
   de ~75 m de raio.
 - **VALE:** veja abaixo.
+- **RASO:** baixio de praia — a pista desce até **Depth** m (~0,2) abaixo da água e o chão
+  em **Basin** m vira um banco de areia raso. O kart pisa `Kart.Surface.AGUA_RASA`
+  (velocidade ×0,96, aceleração ×0,9, aderência ×0,9), nunca conta como submerso, joga água
+  para trás (`KartWaterFx.spray`) e respinga ao entrar e sair. Na pista de praia as
+  muretas viram linhas de boias, e o trecho ganha bancos de areia com coqueiros,
+  estrelas-do-mar e gaivotas. Com **Depth** acima de ~0,22 o kart passaria a contar como
+  submerso.
+- **SELVA:** trilha da mata na pista de praia — o piso vira terra batida alaranjada
+  (`Kart.Surface.TERRA`, aderência ×0,92), a cerca de corda vira cerca de madeira escura de
+  duas traves, com murinhos de pedra cobertos de grama e flores atrás, e o chão em volta
+  vira chão de mata (`TrackTerrain.jungle_strength` → `COLOR.a` do terreno) com árvores,
+  coqueiros, bananeiras, samambaias e moitas floridas (`TrackBeach.build_jungle`).
 
 ### Vale da asa-delta
 

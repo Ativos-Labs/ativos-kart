@@ -6,7 +6,7 @@ extends Resource
 ## ganha tabuleiro, pilares e a estrutura do estilo escolhido, e o chão embaixo
 ## fica livre (rio, mar, cânion ou outro trecho da pista passando por baixo).
 
-enum Style { PILARES, ESTAIADA, ARCO, VIADUTO }
+enum Style { PILARES, ESTAIADA, ARCO, VIADUTO, PASSARELA }
 
 ## Começo e fim da ponte ao longo da volta (0 = largada, 0.5 = metade).
 @export_range(0.0, 1.0, 0.001) var start := 0.2:
@@ -35,7 +35,8 @@ enum Style { PILARES, ESTAIADA, ARCO, VIADUTO }
 		over_water = value
 		emit_changed()
 ## Pilares: só colunas. Estaiada: torre com o logo e cabos. Arco: arco de aço
-## azul com o logo no alto. Viaduto: arcos de pedra.
+## azul com o logo no alto. Viaduto: arcos de pedra. Passarela: píer de tábuas de
+## madeira em cima de estacas (praia), com lampiões; o piso da pista vira tábuas.
 @export var style := Style.PILARES:
 	set(value):
 		style = value

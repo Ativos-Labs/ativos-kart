@@ -118,9 +118,11 @@ var tracks: Array[TrackData] = [
 	preload("res://data/pistas/ilha_ativos.tres"),
 	preload("res://data/pistas/canion_ativos.tres"),
 	preload("res://data/pistas/pico_nevado.tres"),
+	preload("res://data/pistas/baia_ativos.tres"),
 ]
 ## Quantas pistas cabem em cada copa e quantas copas aparecem (as vagas que
-## sobram ficam como "?", em breve).
+## sobram ficam como "?", em breve). Cada copa tem a sua página na tela de pistas
+## (TrackData.cup_name, na ordem em que aparecem aqui).
 var track_slots := 4
 var cup_slots := 4
 ## Resolução do 3D na web (teto de pixels + ajuste automático). null fora da web.

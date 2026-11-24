@@ -55,9 +55,10 @@ signal splashed(entering: bool)
 
 ## Chão embaixo do kart (a corrida define com Track.surface_at): areia batida nas dunas
 ## (igual ao asfalto), areia fofa nas bordas das dunas, redemoinho de areia movediça,
-## gelo (escorrega), neve batida (pista de neve: escorrega um pouco) e areia batida da
-## pista do deserto (escorrega bem pouco).
-enum Surface { ASFALTO, AREIA, AREIA_FOFA, AREIA_MOVEDICA, GELO, NEVE, AREIA_BATIDA }
+## gelo (escorrega), neve batida (pista de neve: escorrega um pouco), areia batida da
+## pista do deserto e da praia (escorrega bem pouco), água rasa da praia (segura um
+## pouco e levanta respingos) e terra batida da trilha da mata (quase como o asfalto).
+enum Surface { ASFALTO, AREIA, AREIA_FOFA, AREIA_MOVEDICA, GELO, NEVE, AREIA_BATIDA, AGUA_RASA, TERRA }
 
 const GRAVITY := 32.0
 const HOP_VELOCITY := 4.6
@@ -173,6 +174,16 @@ const SAND_GRIP := 0.84
 const SAND_DRIFT_GRIP := 0.95
 const SAND_SPRAY_SPEED := 17.0
 const SAND_SPRAY := 0.25
+## Água rasa da praia (TrackSection RASO): fração da velocidade máxima, da aceleração
+## e da aderência; acima de SHALLOW_SPRAY_SPEED (m/s) as rodas jogam água para os lados.
+const SHALLOW_SPEED := 0.96
+const SHALLOW_ACCEL := 0.9
+const SHALLOW_GRIP := 0.9
+const SHALLOW_SPRAY_SPEED := 6.0
+## Terra batida (trilha da mata na pista de praia): fração da aderência, fora e dentro
+## do drift.
+const DIRT_GRIP := 0.92
+const DIRT_DRIFT_GRIP := 0.97
 ## Areia fofa (bordas das dunas) e areia movediça: fração da velocidade máxima.
 const SOFT_SAND_SPEED := 0.78
 const QUICKSAND_SPEED := 0.55
@@ -326,6 +337,8 @@ var pit_center := Vector4.INF
 ## Altura (global) da água da pista: abaixo dela o kart fica submerso (-INF = sem água).
 var water_level := -INF
 var underwater := false
+## Andando no baixio da praia (Surface.AGUA_RASA).
+var _in_shallows := false
 ## Pulinho de duna pedido pela corrida (aplicado no próximo passo de física).
 var _dune_hop := 0.0
 ## Bolhas e respingos (criados na primeira vez que a pista tem água).
@@ -747,11 +760,20 @@ func set_water_level(level: float) -> void:
 		water_fx.position = Vector3(0.0, 0.25, 0.45) * KartScale.ITEMS
 
 
-## Entrou ou saiu da água neste passo?
+## Entrou ou saiu da água neste passo? Na água rasa da praia o kart nunca conta como
+## submerso: ele respinga ao entrar e ao sair do baixio e joga água enquanto anda.
 func _update_water() -> void:
 	if water_level == -INF:
 		return
-	var now := global_position.y + UNDERWATER_DEPTH * KartScale.ITEMS < water_level
+	var shallow := surface == Surface.AGUA_RASA and global_position.y > water_level - 1.0
+	if shallow != _in_shallows:
+		_in_shallows = shallow
+		if water_fx:
+			water_fx.burst(Vector3(global_position.x, water_level, global_position.z))
+		splashed.emit(shallow)
+	if water_fx:
+		water_fx.set_spray(shallow and is_on_floor() and absf(speed) > SHALLOW_SPRAY_SPEED, absf(speed) / maxf(max_speed, 1.0))
+	var now := global_position.y + UNDERWATER_DEPTH * KartScale.ITEMS < water_level and not shallow
 	if now == underwater:
 		return
 	underwater = now
@@ -926,6 +948,8 @@ func _physics_process(delta: float) -> void:
 			ground_factor = QUICKSAND_SPEED
 	if underwater:
 		ground_factor *= UNDERWATER_SPEED
+	elif surface == Surface.AGUA_RASA and on_floor and not judged:
+		ground_factor *= SHALLOW_SPEED
 	top *= ground_factor
 	var sinking := ground_factor < 0.95 and on_floor
 	if judged:
@@ -954,6 +978,8 @@ func _physics_process(delta: float) -> void:
 			var accel := acceleration * lerpf(1.5, 0.45, ratio) * (JUDGED_ACCEL if judged else 1.0)
 			if underwater:
 				accel *= UNDERWATER_ACCEL
+			elif surface == Surface.AGUA_RASA:
+				accel *= SHALLOW_ACCEL
 			speed = move_toward(speed, target, accel * delta)
 		else:
 			# Acima do alvo: na grama (e na areia fofa) freia forte; na curva o atrito
@@ -1010,6 +1036,10 @@ func _physics_process(delta: float) -> void:
 		traction *= SNOW_DRIFT_GRIP if drifting else SNOW_GRIP
 	elif surface == Surface.AREIA_BATIDA and not judged:
 		traction *= SAND_DRIFT_GRIP if drifting else SAND_GRIP
+	elif surface == Surface.AGUA_RASA and not judged:
+		traction *= SHALLOW_GRIP
+	elif surface == Surface.TERRA and not judged:
+		traction *= DIRT_DRIFT_GRIP if drifting else DIRT_GRIP
 	horizontal = horizontal.lerp(fwd * speed, 1.0 - exp(-traction * delta))
 	if surface == Surface.AREIA_MOVEDICA and on_floor and pit_center != Vector4.INF and not judged:
 		# Redemoinho: puxa para o meio e gira o kart devagar.
@@ -2018,7 +2048,8 @@ func _update_visuals(delta: float, steer: float) -> void:
 		boost_fx.update(delta, boost_time > 0.0)
 	_land_dust = maxf(_land_dust - delta, 0.0)
 	# Poeira (ou neve) das rodas de trás: fora do asfalto, no drift e na aterrissagem.
-	var grounded := is_on_floor() and not underwater
+	# Na água rasa a poeira dá lugar aos respingos (KartWaterFx).
+	var grounded := is_on_floor() and not underwater and surface != Surface.AGUA_RASA
 	# Nas dunas (e no redemoinho) a areia voa sempre que o kart anda.
 	var sandy := surface == Surface.AREIA_FOFA or surface == Surface.AREIA_MOVEDICA \
 			or (surface == Surface.AREIA and absf(speed) > 14.0)

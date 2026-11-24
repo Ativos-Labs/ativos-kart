@@ -16,9 +16,11 @@ Usa o kit de `tools/perf/` (export com o probe, servidor COOP/COEP e o `run_chro
 
 ```sh
 tools/track_shots/gerar.sh /tmp/ak_fotos   # pasta temporária fora do projeto
+IDS=baia_ativos tools/track_shots/gerar.sh /tmp/ak_fotos   # só essas pistas (?ids=)
 ```
 
-Rode de novo depois de mudar o traçado, o cenário ou as decorações de uma pista.
+Rode de novo depois de mudar o traçado, o cenário ou as decorações de uma pista. Com `IDS`
+as imagens das outras pistas ficam como estão (não aparecem como mudadas no git).
 
 ## Pista nova
 

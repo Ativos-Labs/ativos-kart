@@ -519,7 +519,11 @@ func _build_bushes() -> void:
 			continue
 		var s := rng.randf_range(0.7, 1.5)
 		xforms.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(s, s * rng.randf_range(0.8, 1.1), s)), Vector3(p.x, y - 0.15, p.z)))
-		colors.append(TrackTheme.bush_color(track.scenery, rng))
+		if track.beach_track:
+			# Praia de areia branca: arbustos verdes (a cor vem das flores e das moitas floridas).
+			colors.append(Color.from_hsv(rng.randf_range(0.25, 0.36), rng.randf_range(0.7, 0.9), rng.randf_range(0.45, 0.7)))
+		else:
+			colors.append(TrackTheme.bush_color(track.scenery, rng))
 	_add_multimesh(mesh, xforms, colors, "Arbustos", true, 100.0, 380.0)
 
 

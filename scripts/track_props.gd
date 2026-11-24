@@ -3,7 +3,8 @@ class_name TrackProps
 extends RefCounted
 ## Decorações típicas de cada cenário (veja TrackTheme), sempre com a marca da Ativos:
 ## - Praia: coqueiros, guarda-sóis azuis e amarelos, veleiros com o logo na vela e
-##   um farol listrado com o logo "at".
+##   um farol listrado com o logo "at" (na pista de praia, também a vila de quiosques,
+##   as palafitas, o arco de pedra e as ilhotas de track_beach.gd).
 ## - Deserto (Egito): pirâmides, esfinge, templo com obeliscos e colunas, ruínas e
 ##   camelos (veja track_egypt.gd); tamareiras perto da água, pedras e poucas tamareiras
 ##   no resto.
@@ -29,6 +30,9 @@ func _init(p_scenery: TrackScenery) -> void:
 func build_landmarks(preview := false) -> void:
 	match track.scenery:
 		TrackTheme.Scenery.PRAIA:
+			if track.beach_track:
+				# Praia de areia branca: vila de quiosques, palafitas, arco de pedra...
+				TrackBeach.new(track, terrain, s.root).build_landmarks(s._reserved, preview)
 			_build_lighthouse()
 		TrackTheme.Scenery.DESERTO:
 			TrackEgypt.new(track, terrain, s.root).build_landmarks(s._reserved, preview)
@@ -169,6 +173,10 @@ func build_trees() -> void:
 		var kind := _pick_kind(y)
 		var sc := rng.randf_range(0.8, 1.4)
 		var basis := Basis(Vector3.UP, rng.randf() * TAU)
+		if kind == "palm" and track.beach_track:
+			# Coqueiros de praia tortos, cada um para um lado.
+			var lean := rng.randf() * TAU
+			basis = Basis(Vector3(cos(lean), 0.0, sin(lean)), rng.randf_range(0.0, 0.18)) * basis
 		if kind == "rock":
 			basis = basis.scaled(Vector3(sc, sc * rng.randf_range(0.5, 0.85), sc * rng.randf_range(0.8, 1.2)))
 		else:
@@ -201,6 +209,8 @@ func _pick_kind(y := 0.0) -> String:
 	var r := rng.randf()
 	match track.scenery:
 		TrackTheme.Scenery.PRAIA:
+			if track.beach_track:
+				return "palm" if r < 0.9 else "broadleaf"
 			return "palm" if r < 0.8 else "broadleaf"
 		TrackTheme.Scenery.DESERTO:
 			# Tamareiras na beira da água (oásis e rio); no resto, pedras e algumas palmeiras.
@@ -217,7 +227,7 @@ func _kind_color(kind: String) -> Color:
 		"palm":
 			return Color.from_hsv(rng.randf_range(0.26, 0.33), rng.randf_range(0.7, 0.85), rng.randf_range(0.55, 0.78))
 		"broadleaf":
-			if rng.randf() < 0.15:
+			if rng.randf() < 0.15 and not track.beach_track:
 				return Color.from_hsv(rng.randf_range(0.95, 1.0), rng.randf_range(0.45, 0.6), 1.0)
 			return Color.from_hsv(rng.randf_range(0.25, 0.33), rng.randf_range(0.7, 0.9), rng.randf_range(0.55, 0.8))
 		"pine":

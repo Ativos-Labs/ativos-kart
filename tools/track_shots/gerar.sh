@@ -5,6 +5,7 @@
 # converte. Rode de novo depois de mudar o traçado ou o cenário de uma pista.
 #
 # Uso: tools/track_shots/gerar.sh [pasta_temporaria]
+#      IDS=baia_ativos tools/track_shots/gerar.sh   (só as pistas da lista)
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 PROJ="$(cd "$HERE/../.." && pwd)"
@@ -19,7 +20,7 @@ trap 'kill $SERVER 2>/dev/null' EXIT
 sleep 1
 rm -f "$OUT"/shots.log*
 SCRATCH="$OUT" node --experimental-websocket "$PROJ/tools/perf/run_chrome.mjs" \
-	"http://127.0.0.1:$PORT/index.html?s=shots" "$OUT/shots.log" \
+	"http://127.0.0.1:$PORT/index.html?s=shots&ids=${IDS:-}" "$OUT/shots.log" \
 	--viewport=1920,1080 --size=1920,1200 --timeout=300
 cat "$OUT/shots.log"
 grep -q "PERF|DONE" "$OUT/shots.log" || { echo "o probe não terminou" >&2; exit 1; }

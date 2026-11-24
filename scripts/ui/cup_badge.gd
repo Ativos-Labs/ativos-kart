@@ -1,12 +1,14 @@
 class_name CupBadge
 extends Button
-## Emblema redondo de uma copa. A Copa Ativos mostra o logo "at"; copas bloqueadas
-## mostram "?".
+## Emblema redondo de uma copa, com o logo "at" no anel da cor da copa (a Copa Ativos no
+## azul da marca); copas bloqueadas mostram "?".
 
 const LOGO := preload("res://assets/logos/ativos_icone.png")
 
 var cup_name := ""
 var unlocked := true
+## Cor do anel.
+var tint := Color("263dbf")
 var selected := false:
 	set(value):
 		selected = value
@@ -17,9 +19,10 @@ var selected := false:
 var _time := 0.0
 
 
-func setup(p_name: String, p_unlocked: bool) -> void:
+func setup(p_name: String, p_unlocked: bool, p_tint := Color("263dbf")) -> void:
 	cup_name = p_name
 	unlocked = p_unlocked
+	tint = p_tint
 	custom_minimum_size = Vector2(92, 92)
 	focus_mode = Control.FOCUS_NONE
 	tooltip_text = p_name if p_unlocked else "Em breve"
@@ -45,7 +48,7 @@ func _draw() -> void:
 	draw_circle(c + Vector2(0, 5), r, Color(0, 0, 0, 0.3))
 	draw_circle(c, r, Color.WHITE)
 	if unlocked:
-		draw_circle(c, r - 5.0, Color("263dbf"))
+		draw_circle(c, r - 5.0, tint)
 		draw_circle(c - Vector2(0, r * 0.3), r * 0.7, Color(1, 1, 1, 0.12))
 		draw_circle(c, r - 12.0, Color.WHITE)
 		var w := (r - 14.0) * 1.62

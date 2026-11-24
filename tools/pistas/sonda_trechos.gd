@@ -3,7 +3,8 @@ extends SceneTree
 ## adversários. Mede voos sobre o vale (quem atravessou, quem caiu, onde pousou, folga
 ## de altura na beira do pouso), tempo debaixo d'água, respingos, superfícies pisadas,
 ## tempo no ar nas dunas, resgates e voltas.
-## Args: track=0..3 cls=0..2 secs=150 pull=0 (pull=1: J1 freia no voo inteiro)
+## Args: track=0..4 (índice em GameState.tracks) cls=0..2 secs=150 pull=0 (pull=1: J1
+## freia no voo inteiro)
 var frame := 0
 var race: Node
 var args := {"track": "0", "cls": "1", "secs": "150", "pull": "0", "skill": "0.8"}
@@ -173,7 +174,7 @@ func _report() -> void:
 			mx_a = maxf(mx_a, f.after)
 	print("VOOS %d ar %.2f-%.2fs dist %.0f-%.0fm pouso %.0f-%.0fm depois da beira, folga minima na beira do pouso %.1fm QUEDAS NO VALE %d" % [
 			flights.size(), mn_air, mx_air, mn_d, mx_d, mn_a, mx_a, min_margin, falls])
-	var names := ["asfalto", "areia", "areia_fofa", "movedica", "gelo", "neve", "areia_batida"]
+	var names := ["asfalto", "areia", "areia_fofa", "movedica", "gelo", "neve", "areia_batida", "agua_rasa", "terra"]
 	var s := []
 	for key in surf:
 		s.append("%s %.1fs" % [names[key], surf[key]])

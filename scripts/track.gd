@@ -16,6 +16,7 @@ const SNOW_ROAD_SHADER := preload("res://shaders/snow_road.gdshader")
 const SNOW_BANK_SHADER := preload("res://shaders/snow_bank.gdshader")
 const SAND_ROAD_SHADER := preload("res://shaders/sand_road.gdshader")
 const SAND_BANK_SHADER := preload("res://shaders/sand_bank.gdshader")
+const BEACH_ROAD_SHADER := preload("res://shaders/beach_road.gdshader")
 ## Hieróglifos (grade 4×4, veja tools/deserto/gerar_hieroglifos.py) das pedras do Egito.
 const GLYPHS := preload("res://assets/textures/hieroglifos.png")
 ## Ruído branco dos shaders que usam noise_tex.gdshaderinc (neve, gelo e água congelada).
@@ -59,6 +60,15 @@ const ICE_ROAD_LIFT := 0.06
 @export var sand_track := false:
 	set(value):
 		sand_track = value
+		_queue_rebuild()
+## Pista de praia, sem asfalto: areia branca de praia com trilhas de pneu e conchinhas
+## (solta um pouco a traseira, como a areia do deserto), cercas de corda com postes de
+## madeira no lugar das muretas, tábuas nas passarelas (TrackBridge PASSARELA), boias no
+## baixio (TrackSection RASO), quiosques de sapê e o portal de bambu na largada (veja
+## track_beach.gd).
+@export var beach_track := false:
+	set(value):
+		beach_track = value
 		_queue_rebuild()
 ## Quanto do chão em volta vira mar de dunas (0 = relevo comum, 1 = só dunas; as
 ## montanhas do horizonte ficam).
@@ -272,6 +282,17 @@ const ICE_ROAD_LIFT := 0.06
 	set(value):
 		sea_distance = value
 		_queue_rebuild()
+## Profundidade do mar longe da pista (m abaixo do chão).
+@export var sea_depth := 9.0:
+	set(value):
+		sea_depth = value
+		_queue_rebuild()
+## Com mar: áreas de terra firme mesmo longe da pista (x, z, raio): o continente, o
+## morro de uma ilha.
+@export var land_spots := PackedVector3Array():
+	set(value):
+		land_spots = value
+		_queue_rebuild()
 
 @export_tool_button("Reconstruir pista", "Reload") var rebuild_button := rebuild
 
@@ -397,6 +418,8 @@ func has_water_sections() -> bool:
 	for s in sections:
 		if s and s.kind == TrackSection.Kind.VALE and s.valley_floor < water_level:
 			return true
+		if s and s.kind == TrackSection.Kind.RASO:
+			return true
 	return false
 
 
@@ -455,6 +478,15 @@ func surface_at(index: int, lateral: float) -> int:
 	if snow_track and kind != TrackSection.Kind.GELO:
 		return Kart.Surface.NEVE
 	if sand_track and kind != TrackSection.Kind.AREIA and kind != TrackSection.Kind.GELO:
+		return Kart.Surface.AREIA_BATIDA
+	if kind == TrackSection.Kind.RASO:
+		return Kart.Surface.AGUA_RASA
+	if kind == TrackSection.Kind.SELVA:
+		return Kart.Surface.TERRA
+	if beach_track and kind != TrackSection.Kind.AREIA and kind != TrackSection.Kind.GELO:
+		# Tábuas da passarela: firmes como o asfalto.
+		if index >= 0 and index < bridge_mask.size() and (bridge_mask[index] == 1 or bridge_mask[index] == 2):
+			return Kart.Surface.ASFALTO
 		return Kart.Surface.AREIA_BATIDA
 	match kind:
 		TrackSection.Kind.GELO:
@@ -570,6 +602,8 @@ func build_geometry(defer_physics := false) -> void:
 		terrain.mountain_start = mountain_start
 		terrain.mountain_end = mountain_end
 		terrain.sea_distance = sea_distance
+		terrain.sea_depth = sea_depth
+		terrain.land_spots = land_spots
 		terrain.river_width = river_width
 		terrain.river_depth = river_depth
 		terrain.river_bank = river_bank
@@ -637,6 +671,8 @@ func _setup_terrain_sections() -> void:
 	terrain.basin_strength.resize(count)
 	terrain.sand_strength = PackedFloat32Array()
 	terrain.sand_strength.resize(count)
+	terrain.jungle_strength = PackedFloat32Array()
+	terrain.jungle_strength.resize(count)
 	terrain.gap_edge = PackedByteArray()
 	terrain.gap_edge.resize(count)
 	for i in count:
@@ -645,7 +681,7 @@ func _setup_terrain_sections() -> void:
 			continue
 		var f := section_blend[i]
 		match sec.kind:
-			TrackSection.Kind.SUBMERSO:
+			TrackSection.Kind.SUBMERSO, TrackSection.Kind.RASO:
 				terrain.basin_floor[i] = samples[i].y - 0.03
 				terrain.basin_radius[i] = sec.basin
 				terrain.basin_strength[i] = f
@@ -657,6 +693,8 @@ func _setup_terrain_sections() -> void:
 				terrain.basin_strength[i] = f
 			TrackSection.Kind.AREIA:
 				terrain.sand_strength[i] = f
+			TrackSection.Kind.SELVA:
+				terrain.jungle_strength[i] = f
 	# Perto das bordas do vão o chão fica firme só embaixo da pista: o penhasco começa
 	# logo onde o asfalto acaba.
 	var step := length / maxf(count, 1)
@@ -896,7 +934,7 @@ func _apply_sections() -> void:
 				section_of[i] = si
 				section_blend[i] = f
 			match sec.kind:
-				TrackSection.Kind.SUBMERSO, TrackSection.Kind.GELO:
+				TrackSection.Kind.SUBMERSO, TrackSection.Kind.GELO, TrackSection.Kind.RASO:
 					# Riacho congelado (GELO sem lago): a pista fica na altura dela.
 					if sec.is_basin():
 						samples[i].y = lerpf(samples[i].y, target, f)
@@ -1115,7 +1153,7 @@ func _terrain_key(rivers: Array[PackedVector2Array]) -> String:
 	return var_to_str([track_id, scenery, samples.size(), length, sum, bridged, river_points, river_sum, special,
 			decoration_seed, water_level, hill_height, hill_bias, mountain_height, terrace_step, dune_cover, mountain_start, mountain_end,
 			sea_distance, river_width, river_depth, river_bank, river_valley, road_width,
-			shoulder_width, wall_thickness])
+			shoulder_width, wall_thickness, sea_depth, land_spots, beach_track])
 
 
 ## Chão em volta da pista. Devolve a malha (gerada aqui ou a `mesh` do cache).
@@ -1125,6 +1163,8 @@ func _build_ground(preview: bool, mesh: Mesh = null) -> Mesh:
 		mat.shader = TERRAIN_SHADER
 		mat.set_shader_parameter("water_level", water_level)
 		var params := TrackTheme.terrain_params(scenery)
+		if beach_track:
+			params.merge(TrackTheme.beach_terrain_params(), true)
 		for key: String in params:
 			mat.set_shader_parameter(key, params[key])
 		# Grade com células de ~2,8 m perto da pista (pistas compridas ganham mais linhas).
@@ -1157,6 +1197,9 @@ func _build_water() -> void:
 	mat.shader = WATER_SHADER
 	mat.set_shader_parameter("noise_tex", NOISE_TEXTURE)
 	var params := TrackTheme.water_params(scenery)
+	if beach_track:
+		params.merge(TrackTheme.beach_water_params(), true)
+		params["sun_dir"] = _sun_dir()
 	for key: String in params:
 		mat.set_shader_parameter(key, params[key])
 	plane.material = mat
@@ -1165,21 +1208,27 @@ func _build_water() -> void:
 	water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
-## Cor de cada amostra para o asfalto (COLOR): r = areia batida, g = debaixo d'água
-## (algas e cáusticas), b = gelo.
+## Cor de cada amostra para o asfalto (COLOR): r = areia batida (na praia, a terra da
+## trilha da mata), g = debaixo d'água (algas e cáusticas; na praia, o fundo do baixio),
+## b = gelo (na praia, as tábuas das passarelas).
 func _road_colors() -> PackedColorArray:
 	var colors := PackedColorArray()
 	colors.resize(samples.size())
 	for i in samples.size():
 		var c := Color(0.0, 0.0, 0.0, 1.0)
+		if beach_track and (bridge_mask[i] == 1 or bridge_mask[i] == 2):
+			c.b = 1.0
 		var sec := section_at(i)
 		if sec:
 			var f := section_blend[i]
 			match sec.kind:
-				TrackSection.Kind.AREIA:
+				TrackSection.Kind.AREIA, TrackSection.Kind.SELVA:
 					c.r = f
 				TrackSection.Kind.SUBMERSO:
 					c.g = smoothstep(water_level + 0.4, water_level - 1.6, samples[i].y)
+				TrackSection.Kind.RASO:
+					# O fundo molhado começa um pouco antes da água (areia da beirada).
+					c.g = smoothstep(water_level + 0.5, water_level - 0.1, samples[i].y)
 				TrackSection.Kind.GELO:
 					c.b = f
 		colors[i] = c
@@ -1203,6 +1252,10 @@ func _build_road() -> void:
 		mat.shader = SAND_ROAD_SHADER
 		mat.set_shader_parameter("noise_tex", NOISE_TEXTURE)
 		mat.set_shader_parameter("soft_edge", SOFT_SAND_EDGE)
+	elif beach_track:
+		mat.shader = BEACH_ROAD_SHADER
+		mat.set_shader_parameter("noise_tex", NOISE_TEXTURE)
+		mat.set_shader_parameter("soft_edge", SOFT_SAND_EDGE)
 	else:
 		mat.shader = ROAD_SHADER
 		mat.set_shader_parameter("curb_min", curb_min_width)
@@ -1211,7 +1264,7 @@ func _build_road() -> void:
 	mat.set_shader_parameter("track_length", length)
 	mat.set_shader_parameter("logo_texture", LOGO_ICON)
 	var road := _add_mesh(md.to_mesh(mat))
-	road.name = "Neve" if snow_track else ("Areia" if sand_track else "Asfalto")
+	road.name = "Neve" if snow_track else ("Areia" if sand_track or beach_track else "Asfalto")
 	road.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	if with_collision and not _is_flat():
 		# Pista com subidas/pontes: o chão de colisão acompanha a pista de mureta a
@@ -1235,6 +1288,9 @@ func _build_curbs() -> void:
 		return
 	if sand_track:
 		_build_sand_lips()
+		return
+	if beach_track:
+		# Na praia a pista é a própria areia: sem zebras.
 		return
 	var half := road_width * 0.5
 	var mat := ShaderMaterial.new()
@@ -1281,6 +1337,8 @@ func _build_walls() -> void:
 		_build_snow_banks()
 	elif sand_track:
 		_build_sand_banks()
+	elif beach_track:
+		TrackBeach.new(self, terrain, _generated).build_fences()
 	var outer_mat := ShaderMaterial.new()
 	outer_mat.shader = WALL_SHADER
 	outer_mat.set_shader_parameter("outer_side", true)
@@ -1310,7 +1368,7 @@ func _build_walls() -> void:
 		_add_strip(rest, top_in, top_out, _repeat(Vector3.UP), wall_height, wall_height)
 		_add_strip(rest, top_out, _offset_rail(outer, wall_height - bevel), _slope_normals(side, bevel, -bevel), wall_height, wall_height - bevel)
 		_add_strip(rest, _offset_rail(outer, wall_height - bevel), _offset_rail(outer, -0.3), _scaled_rights(side), wall_height - bevel, -0.3)
-		if not snow_track and not sand_track:
+		if not snow_track and not sand_track and not beach_track:
 			var wall := _add_mesh(face.to_mesh(inner_mat))
 			wall.name = "Mureta"
 			_add_mesh(rest.to_mesh(outer_mat))
@@ -1579,6 +1637,10 @@ func _build_start_gate() -> void:
 	if scenery == TrackTheme.Scenery.DESERTO:
 		# No deserto, um portal de templo egípcio (veja track_egypt.gd).
 		TrackEgypt.new(self, terrain, _generated).build_start_gate(gate)
+		return
+	if beach_track:
+		# Na praia, um portal de bambu com telhado de sapê (veja track_beach.gd).
+		TrackBeach.new(self, terrain, _generated).build_start_gate(gate)
 		return
 	var half := road_width * 0.5 + 1.4
 	var span := half * 2.0

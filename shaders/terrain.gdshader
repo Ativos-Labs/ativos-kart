@@ -3,7 +3,8 @@ render_mode diffuse_burley, specular_schlick_ggx;
 // Terreno: grama cortada em listras perto da pista, campos com manchas, areia na
 // beira dos lagos, pedra nas encostas e neve no alto das montanhas.
 // COLOR.r = 1 perto da pista (grama aparada), 0 longe. COLOR.g = dunas (mar de areia
-// em volta do trecho de areia da pista). COLOR.b = paredão de vale (pedra).
+// em volta do trecho de areia da pista). COLOR.b = paredão de vale (pedra). COLOR.a =
+// chão de mata em volta da trilha da mata da praia (grama escura, folhas e terra).
 // Debaixo d'água, cáusticas no fundo.
 
 #include "res://shaders/noise.gdshaderinc"
@@ -39,12 +40,22 @@ uniform vec3 dune_dark : source_color = vec3(0.84, 0.6, 0.36);
 // acima da água (0 = sem).
 uniform vec3 shore_grass : source_color = vec3(0.34, 0.58, 0.16);
 uniform float grass_band = 0.0;
+// Debaixo d'água o fundo puxa para o turquesa (praia: areia clara no raso), 0 = sem.
+uniform float underwater_tint = 0.0;
+// Faixa de areia molhada (mais escura e brilhante) logo acima da água (m), 0 = sem.
+uniform float wet_band = 0.0;
+// Chão de mata (COLOR.a).
+uniform vec3 jungle_grass : source_color = vec3(0.17, 0.36, 0.1);
+uniform vec3 jungle_grass_light : source_color = vec3(0.33, 0.56, 0.17);
+uniform vec3 jungle_litter : source_color = vec3(0.4, 0.3, 0.17);
+uniform vec3 jungle_dirt : source_color = vec3(0.6, 0.39, 0.2);
 
 varying vec3 world_pos;
 varying vec3 world_normal;
 varying float near_track;
 varying float dune;
 varying float cliff;
+varying float jungle;
 
 void vertex() {
 	world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
@@ -52,6 +63,7 @@ void vertex() {
 	near_track = COLOR.r;
 	dune = COLOR.g;
 	cliff = COLOR.b;
+	jungle = COLOR.a;
 }
 
 void fragment() {
@@ -92,6 +104,16 @@ void fragment() {
 		col = mix(col, rock_col, rock_mask);
 	}
 
+	// Chão de mata: grama escura com folhas caídas e a terra da trilha na beirada.
+	if (jungle > 0.001) {
+		float litter = smoothstep(0.4, 0.7, n_mid + (n_big - 0.5) * 0.5);
+		vec3 jg = mix(jungle_grass, jungle_grass_light, smoothstep(0.3, 0.8, n_big)) * (0.85 + 0.3 * n_fine);
+		jg = mix(jg, jungle_litter * (0.85 + 0.3 * n_fine), litter * 0.55);
+		float trail = near_track * smoothstep(0.35, 0.8, n_mid * 0.6 + near_track * 0.55);
+		jg = mix(jg, jungle_dirt * (0.9 + 0.15 * n_fine), trail);
+		col = mix(col, jg, jungle * (1.0 - rock_mask * 0.7));
+	}
+
 	// Neve no alto (só onde a encosta não é muito íngreme).
 	float snow_line = world_pos.y + (n_big - 0.5) * 36.0 + (n_mid - 0.5) * 10.0;
 	float snow_mask = smoothstep(snow_height - 1.2, snow_height + 1.2, snow_line)
@@ -118,8 +140,18 @@ void fragment() {
 		col = mix(col, gc, g * (1.0 - near_track * 0.6));
 	}
 
+	if (underwater_tint > 0.0) {
+		float under = smoothstep(water_level - 0.05, water_level - 1.6, world_pos.y);
+		col = mix(col, col * vec3(0.5, 0.82, 0.8), under * underwater_tint);
+	}
+	float wet = 0.0;
+	if (wet_band > 0.0) {
+		float above = world_pos.y - water_level + (n_fine - 0.5) * 0.12;
+		wet = (1.0 - smoothstep(wet_band * 0.4, wet_band, above)) * step(-0.3, above) * (1.0 - rock_mask);
+		col = mix(col, col * vec3(0.72, 0.7, 0.68), wet * 0.85);
+	}
 	ALBEDO = col;
-	ROUGHNESS = mix(0.92, 0.55, snow_mask);
+	ROUGHNESS = mix(mix(0.92, 0.55, snow_mask), 0.35, wet);
 	SPECULAR = 0.3;
 	if (caustic_strength > 0.0 && world_pos.y < water_level - 0.15) {
 		float depth = water_level - world_pos.y;

@@ -89,3 +89,22 @@ dunas (o J1 passa ~4 s por volta nela) e o mergulho custam ~4%.
 - A névoa soma a cor dela em materiais aditivos (`blend_add`): os raios de sol debaixo
   d'água viravam placas claras até ganharem `fog_disabled`.
 - Mudou o traçado? Regere as imagens da tela de pistas (`tools/track_shots/gerar.sh`).
+
+### Baía Ativos (2026-11-24)
+
+Pista nova de praia (Copa Verão), 2033 m, sem asfalto (`Track.beach_track`). Traçado feito
+com `tracado.py` (pontos em `scenes/tracks/baia_ativos.tscn`), raio mínimo 29 m (o grampo
+das dunas), nenhum trecho a menos de 60 m de outro. Passarela 0,172–0,290 (altura 0, a
+subida até 10 m vem da curva), vão de 104 m da ponta do píer (y 10) até a ilha (y 1,0),
+trilha da mata (`SELVA`) 0,37–0,565, baixio (`RASO`) 0,604–0,700 (`depth` 0,2, `basin` 64)
+com uma rampa de pulo em 0,656.
+
+| Classe | Voltas do J1 | Voos (ar / pouso depois da beira / folga mínima) | Quedas | Resgates |
+| --- | --- | --- | --- | --- |
+| 50cc | 86–94 s | 4,6–6,5 s / 2–22 m / 1,5 m (era 0 m com a beira do pouso em y 1,8) | 1 (golpe de item no voo) | 1 (a queda) |
+| 100cc | ~71 s | 4,4–5,6 s / 18–28 m / 6,1 m | 0 | 0 |
+| 150cc | 61–65 s | 3,8–5,5 s / 14–34 m / 5,4 m | 0 | 0 |
+
+Por volta o J1 passa ~18 s nas tábuas, ~36–48 s na terra da trilha e ~18 s no baixio
+(dois respingos: entrando e saindo). Web (Chrome headless, M4, 1 jogador): 101–110 fps
+contra 111–112 no Cânion, ~700 draw calls, carga da corrida ~6 s.

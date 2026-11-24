@@ -32,6 +32,9 @@ var dune_cover := 0.0
 ## Ilha: a partir dessa distância da pista o chão desce para o mar (0 = sem mar).
 var sea_distance := 0.0
 var sea_depth := 9.0
+## Com mar: áreas que continuam terra firme mesmo longe da pista (o continente e o
+## morro de uma ilha), Vector3(x, z, raio). A costa desce para o mar uns 45 m depois.
+var land_spots := PackedVector3Array()
 ## Rios: largura do leito, profundidade abaixo da água e largura da margem.
 var river_width := 22.0
 var river_depth := 2.5
@@ -56,6 +59,9 @@ var basin_floor := PackedFloat32Array()
 var basin_radius := PackedFloat32Array()
 var basin_strength := PackedFloat32Array()
 var sand_strength := PackedFloat32Array()
+## Trilha da mata (TrackSection SELVA): 0..1 em cada amostra; o chão em volta vira chão
+## de mata (grama escura, folhas e terra) — vai para COLOR.a da malha.
+var jungle_strength := PackedFloat32Array()
 var gap_edge := PackedByteArray()
 ## Vales: {"line": PackedVector2Array (x, z), "half_top", "half_bed", "floor"}.
 var valleys: Array[Dictionary] = []
@@ -77,6 +83,9 @@ var _basin := Field.new()
 ## do corredor do voo); o chão embaixo é o do vale.
 var _gap := Field.new()
 var _sand := Field.new()
+var _jungle := Field.new()
+## Chão de mata no último ponto de `_sample` (0..1).
+var _jungle_f := 0.0
 var _valley := Field.new()
 ## Vale de cada ponto de `_valley`.
 var _valley_of := PackedInt32Array()
@@ -298,7 +307,12 @@ func setup(samples: PackedVector3Array, seed_value: int, bridge_mask := PackedBy
 	var basin_ids := PackedInt32Array()
 	var sand_pts := PackedVector2Array()
 	var sand_ids := PackedInt32Array()
+	var jungle_pts := PackedVector2Array()
+	var jungle_ids := PackedInt32Array()
 	for i in count:
+		if i < jungle_strength.size() and jungle_strength[i] > 0.0:
+			jungle_pts.append(_pts[i])
+			jungle_ids.append(i)
 		if i < basin_strength.size() and basin_strength[i] > 0.0:
 			basin_pts.append(_pts[i])
 			basin_ids.append(i)
@@ -317,6 +331,8 @@ func setup(samples: PackedVector3Array, seed_value: int, bridge_mask := PackedBy
 		_basin.build(basin_pts, basin_ids, b_min - Vector2.ONE * (reach + 30.0), b_max + Vector2.ONE * (reach + 30.0), RIVER_CELL)
 	if not sand_pts.is_empty():
 		_sand.build(sand_pts, sand_ids, lo - Vector2.ONE * 120.0, hi + Vector2.ONE * 120.0, RIVER_CELL)
+	if not jungle_pts.is_empty():
+		_jungle.build(jungle_pts, jungle_ids, lo - Vector2.ONE * 60.0, hi + Vector2.ONE * 60.0, RIVER_CELL)
 	# Vales: pontos a cada ~3 m ao longo das linhas do meio.
 	var valley_pts := PackedVector2Array()
 	_valley_of = PackedInt32Array()
@@ -380,6 +396,12 @@ func height_at(x: float, z: float) -> float:
 	return _sample(x, z).x
 
 
+## 0..1: quanto o chão ali é chão de mata (perto da trilha da mata).
+func jungle_at(x: float, z: float) -> float:
+	_sample(x, z)
+	return _jungle_f
+
+
 ## 0..1: quanto o chão ali é de dunas de areia (perto do trecho de areia).
 func sand_at(x: float, z: float) -> float:
 	return _sample(x, z).z
@@ -393,6 +415,11 @@ func mow_factor(distance: float) -> float:
 ## (altura do chão, fator de grama aparada, dunas, paredão do vale) num ponto.
 func _sample(x: float, z: float) -> Vector4:
 	_cliff = 0.0
+	_jungle_f = 0.0
+	if not _jungle.is_empty():
+		var kj := _jungle.find(x, z)
+		if kj >= 0:
+			_jungle_f = jungle_strength[_jungle.ids[kj]] * (1.0 - smoothstep(55.0, 110.0, Vector2(x, z).distance_to(_jungle.pts[kj])))
 	var k := _solid.find(x, z)
 	var d: float
 	var road_y: float
@@ -436,7 +463,12 @@ func _sample(x: float, z: float) -> Vector4:
 		h += m * relief
 	if sea_distance > 0.0:
 		var coast := _coast.get_noise_2d(x, z) * 14.0
-		h -= sea_depth * smoothstep(sea_distance, sea_distance + 42.0, d + coast)
+		var sea := smoothstep(sea_distance, sea_distance + 42.0, d + coast)
+		for spot in land_spots:
+			if sea <= 0.0:
+				break
+			sea *= smoothstep(spot.z, spot.z + 45.0, Vector2(x - spot.x, z - spot.y).length() + coast)
+		h -= sea_depth * sea
 	if not _basin.is_empty():
 		h = _carve_basin(x, z, h, d, sid)
 	if not _river.is_empty():
@@ -612,7 +644,7 @@ func build_mesh(resolution: Vector2i, inner_half: Vector2, outer_half: float, ma
 			var z := center.y + zs[j]
 			var s := _sample(x, z)
 			verts[j * row + i] = Vector3(x, s.x, z)
-			colors[j * row + i] = Color(s.y, s.z, s.w)
+			colors[j * row + i] = Color(s.y, s.z, s.w, _jungle_f)
 	var normals := PackedVector3Array()
 	normals.resize(row * rows)
 	for j in rows:

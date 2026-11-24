@@ -1,8 +1,9 @@
 extends Node
 ## Tela de seleção de pista: ao fundo, a vista aérea da pista escolhida (uma imagem
-## pronta), com as copas (a Copa Ativos traz o logo "at"), os cartões das pistas,
-## o mapa do traçado, os recordes e o botão para correr. Vagas sem pista ainda
-## aparecem como "?" (em breve).
+## pronta), com as copas (emblemas com o logo "at"), os cartões das pistas da copa
+## escolhida, o mapa do traçado, os recordes e o botão para correr. Vagas sem pista
+## ainda aparecem como "?" (em breve). Cada copa é uma página de cartões: troca-se
+## clicando no emblema, com Page Up/Page Down ou com os gatilhos LB/RB do controle.
 ## No Grand Prix a escolha é da copa: dá para olhar cada pista, e "Começar copa"
 ## corre todas em sequência, a partir da primeira.
 ##
@@ -43,6 +44,9 @@ var index := 0
 var _slots: Array[TrackData] = []
 var _cards: Array[TrackCard] = []
 var _cups: Array[CupBadge] = []
+## Copas com pista (na ordem da lista de pistas) e a que está na tela.
+var _cup_names: Array[String] = []
+var _cup := 0
 ## TrackData → Track fora da árvore, só com o traçado (`prepare_layout`).
 var _layouts := {}
 ## Caminho → imagem de fundo já carregada; e os caminhos pedidos à thread de carga.
@@ -57,6 +61,11 @@ var _toast_tween: Tween
 
 
 func _ready() -> void:
+	for t in GameState.tracks:
+		if not _cup_names.has(t.cup_name):
+			_cup_names.append(t.cup_name)
+	var current := GameState.get_selected_track()
+	_cup = maxi(_cup_names.find(current.cup_name), 0) if current else 0
 	_build_slots()
 	_build_cups()
 	_build_cards()
@@ -67,14 +76,11 @@ func _ready() -> void:
 	if _is_cup_mode():
 		($UI/Root/Header as RibbonLabel).text = "ESCOLHA A COPA"
 		race_button.text = "Começar copa"
-	index = clampi(GameState.selected_track_index, 0, _slots.size() - 1)
+	index = maxi(_slots.find(current), 0)
 	_select(index, true)
 	# A imagem da pista escolhida já carregou (atrás do fade); as outras vêm numa
 	# thread, para trocar de pista sem travar.
-	for data in _slots:
-		if data.is_unlocked() and data.background != "" and not _backgrounds.has(data.background):
-			if ResourceLoader.load_threaded_request(data.background) == OK:
-				_loading[data.background] = true
+	_request_backgrounds()
 	race_button.grab_focus()
 	_animate_intro()
 
@@ -96,33 +102,53 @@ func _exit_tree() -> void:
 
 # --- Montagem ---------------------------------------------------------------------
 
+## Pistas da copa na tela, completando as vagas com "?".
 func _build_slots() -> void:
-	_slots.assign(GameState.tracks)
+	var cup_name := _cup_names[_cup] if not _cup_names.is_empty() else "Copa Ativos"
+	_slots.clear()
+	for t in GameState.tracks:
+		if t.cup_name == cup_name:
+			_slots.append(t)
 	while _slots.size() < GameState.track_slots:
 		var placeholder := TrackData.new()
 		placeholder.display_name = "???"
-		placeholder.cup_name = _slots[0].cup_name if not _slots.is_empty() else "Copa Ativos"
+		placeholder.cup_name = cup_name
 		placeholder.locked = true
 		_slots.append(placeholder)
 
 
 func _build_cups() -> void:
-	var names: Array[String] = []
-	for t in GameState.tracks:
-		if not names.has(t.cup_name):
-			names.append(t.cup_name)
-	for i in maxi(GameState.cup_slots, names.size()):
+	for i in maxi(GameState.cup_slots, _cup_names.size()):
 		var badge := CupBadge.new()
-		var unlocked := i < names.size()
-		badge.setup(names[i] if unlocked else "???", unlocked)
-		badge.selected = i == 0
+		var unlocked := i < _cup_names.size()
+		var tint := Color("263dbf")
+		if unlocked:
+			# A cor da primeira pista da copa (a Copa Ativos fica no azul da marca).
+			for t in GameState.tracks:
+				if t.cup_name == _cup_names[i]:
+					tint = t.color
+					break
+		badge.setup(_cup_names[i] if unlocked else "???", unlocked, tint)
+		badge.selected = i == _cup
 		badge.pressed.connect(_on_cup_pressed.bind(i))
 		cups_row.add_child(badge)
 		_cups.append(badge)
-	cup_ribbon.text = (names[0] if not names.is_empty() else "Copa").to_upper()
+	cup_ribbon.text = (_cup_names[_cup] if not _cup_names.is_empty() else "Copa").to_upper()
+
+
+## Pede à thread as imagens de fundo das pistas da copa que ainda não carregaram.
+func _request_backgrounds() -> void:
+	for data in _slots:
+		if data.is_unlocked() and data.background != "" and not _backgrounds.has(data.background) and not _loading.has(data.background):
+			if ResourceLoader.load_threaded_request(data.background) == OK:
+				_loading[data.background] = true
 
 
 func _build_cards() -> void:
+	for card in _cards:
+		grid.remove_child(card)
+		card.queue_free()
+	_cards.clear()
 	grid.columns = COLUMNS
 	for i in _slots.size():
 		var card := TrackCard.new()
@@ -230,7 +256,21 @@ func _input(event: InputEvent) -> void:
 		move = -COLUMNS
 	elif event.is_action_pressed("ui_down"):
 		move = COLUMNS
-	if move != 0:
+	var cup_step := 0
+	if event.is_action_pressed("ui_page_up"):
+		cup_step = -1
+	elif event.is_action_pressed("ui_page_down"):
+		cup_step = 1
+	elif event is InputEventJoypadButton and event.pressed:
+		if event.button_index == JOY_BUTTON_LEFT_SHOULDER:
+			cup_step = -1
+		elif event.button_index == JOY_BUTTON_RIGHT_SHOULDER:
+			cup_step = 1
+	if cup_step != 0:
+		if _cup_names.size() > 1:
+			_switch_cup(wrapi(_cup + cup_step, 0, _cup_names.size()))
+		get_viewport().set_input_as_handled()
+	elif move != 0:
 		_move(move)
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("ui_accept") and not back_button.has_focus():
@@ -264,10 +304,45 @@ func _on_card_pressed(i: int) -> void:
 
 func _on_cup_pressed(i: int) -> void:
 	if _cups[i].unlocked:
+		_switch_cup(i)
 		return
 	_show_toast("Novas copas em breve!")
 	Sfx.play(self, &"ui_back", -10.0)
 	_shake(_cups[i])
+
+
+## Mostra as pistas de outra copa (a primeira delas fica escolhida).
+func _switch_cup(i: int) -> void:
+	if i == _cup or i < 0 or i >= _cup_names.size() or _confirming:
+		return
+	_cup = i
+	Sfx.play(self, &"ui_move", -10.0)
+	for k in _cups.size():
+		_cups[k].selected = k == _cup
+	cup_ribbon.text = _cup_names[_cup].to_upper()
+	var badge := _cups[_cup]
+	badge.pivot_offset = badge.size * 0.5
+	badge.scale = Vector2.ONE * 1.15
+	create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT).tween_property(badge, "scale", Vector2.ONE, 0.25)
+	_build_slots()
+	_build_cards()
+	_request_backgrounds()
+	_select(0, false)
+	_animate_cards()
+
+
+## Cartões entrando (troca de copa).
+func _animate_cards() -> void:
+	await get_tree().process_frame
+	var delay := 0.0
+	for card in _cards:
+		card.pivot_offset = card.size * 0.5
+		card.scale = Vector2.ONE * 0.6
+		card.modulate.a = 0.0
+		var tw := create_tween().set_parallel().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tw.tween_property(card, "scale", Vector2.ONE, 0.3).set_delay(delay)
+		tw.tween_property(card, "modulate:a", 1.0, 0.18).set_delay(delay)
+		delay += 0.05
 
 
 func _select(i: int, first: bool) -> void:
