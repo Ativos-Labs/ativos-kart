@@ -99,11 +99,20 @@ void fragment() {
 	float rough = mix(0.8, 0.62, wear) - speck * 0.15;
 
 	// Faixa branca contínua perto das bordas e tracejado discreto no meio.
+	// A borda de cada linha suaviza só o quanto a sua direção muda por pixel: de longe,
+	// olhando rasante, `along` muda muito mais por pixel que `across`, e o `aa` (das duas
+	// juntas) borrava as linhas para os lados. Linha mais fina que um pixel fica mais
+	// fraca em vez de piscar (a smoothstep larga conserva a cobertura).
+	float aa_x = max(fwidth(across) * 0.75, 0.004);
+	float aa_y = max(fwidth(along) * 0.75, 0.004);
 	float paint = 0.0;
 	float line_pos = curb_min + 0.28;
-	paint = max(paint, 1.0 - smoothstep(0.11 - aa, 0.11 + aa, abs(edge - line_pos)));
-	float dash = step(fract(along / 6.0), 0.45);
-	paint = max(paint, dash * (1.0 - smoothstep(0.1 - aa, 0.1 + aa, abs(lateral))) * 0.55);
+	paint = max(paint, 1.0 - smoothstep(0.11 - aa_x, 0.11 + aa_x, abs(edge - line_pos)));
+	// Tracejado: 2,7 m pintados a cada 6 m, com as pontas suavizadas também.
+	float t = fract(along / 6.0) * 6.0;
+	float dash = clamp(smoothstep(-aa_y, aa_y, t) - smoothstep(2.7 - aa_y, 2.7 + aa_y, t)
+			+ smoothstep(6.0 - aa_y, 6.0 + aa_y, t), 0.0, 1.0);
+	paint = max(paint, dash * (1.0 - smoothstep(0.1 - aa_x, 0.1 + aa_x, abs(lateral))) * 0.55);
 
 	// Posição relativa à linha de chegada (negativo = atrás dela).
 	float s = along > track_length * 0.5 ? along - track_length : along;
