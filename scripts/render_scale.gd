@@ -234,8 +234,9 @@ func _process(delta: float) -> void:
 		return
 	if _dropped:
 		return
-	var gpu_bound := not _gpu_timing or gpu > SLOW_FRAME * 1000.0 * 0.85
-	if frame > SLOW_FRAME and gpu_bound:
+	var slow := _slow_frame()
+	var gpu_bound := not _gpu_timing or gpu > slow * 1000.0 * 0.85
+	if frame > slow and gpu_bound:
 		_slow_count += 1
 		_had_slow = true
 	else:
@@ -243,7 +244,8 @@ func _process(delta: float) -> void:
 	if _slow_count < SLOW_WINDOWS or dynamic <= MIN_DYNAMIC + 0.001:
 		return
 	# O custo da GPU acompanha os pixels (escala²): uma queda só, direto ao alvo.
-	var ratio := (TARGET_GPU_MS / gpu) if _gpu_timing else (1.0 / 62.0) / frame
+	var target := TARGET_GPU_MS * slow / SLOW_FRAME
+	var ratio := (target / gpu) if _gpu_timing else (slow * 55.0 / 62.0) / frame
 	var want := _snap(clampf(dynamic * sqrt(ratio), MIN_DYNAMIC, dynamic - SNAP))
 	if _gpu_timing and _family == "race:1":
 		var root := get_tree().root
@@ -258,6 +260,14 @@ func _process(delta: float) -> void:
 	_dropped = true
 	_checking = not _gpu_timing
 	apply()
+
+
+## Quadro lento demais. Com um limite de FPS abaixo de ~55 nas opções (Tela), o lento é
+## relativo ao limite: a 30 fps cada quadro já passa de SLOW_FRAME e a resolução cairia
+## à toa.
+static func _slow_frame() -> float:
+	var cap := Engine.max_fps
+	return SLOW_FRAME if cap <= 0 or cap >= 55 else SLOW_FRAME * 55.0 / cap
 
 
 func _snap(v: float) -> float:

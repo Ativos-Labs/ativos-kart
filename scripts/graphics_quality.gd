@@ -6,8 +6,12 @@ extends Node
 ## - Sombras: Desligadas / Simples (2 divisões, até 100 m, sem a sombra suave que
 ##   varia com a distância, mapa de sombras menor) / Completas (como a pista foi
 ##   feita; na web e com 3 ou 4 telas já usam 2 divisões e vão menos longe).
-## - Luz e efeitos: oclusão de ambiente (SSAO) e brilho (glow). Simples (sem os dois)
-##   / Médios (SSAO em qualidade baixa) / Completos.
+## - Brilho (glow): Desligado / Ligado.
+## - Oclusão de ambiente (SSAO): Desligada / Ligada (só a Alta liga). Custa caro e muda
+##   pouco a imagem (só escurece um pouco o pé das muretas e embaixo dos karts): medido
+##   em 2026-11-26 (GTX 1650, 1080p, Circuito e Ilha) desligar economizava 1,4-2,2 ms
+##   (~20% do quadro), e a qualidade baixa em meia resolução só 0-0,25 ms (por isso não
+##   há um meio-termo). No M4 (4K), -7,3 ms.
 ## - Antisserrilhado: Desligado / Leve (FXAA, só no desktop: o renderizador da web
 ##   não tem) / MSAA 2x / MSAA 4x. Alta usa 2x (4x fica para quem escolher).
 ## - Resolução 3D: fração fixa da resolução da tela, ou Automática (RenderScale baixa
@@ -40,13 +44,15 @@ const PRESET_NAMES := ["Baixa", "Média", "Alta", "Personalizada"]
 const SECTION := "graficos"
 const SHADOWS := &"sombras"
 const EFFECTS := &"efeitos"
+const AO := &"ssao"
 const ANTIALIAS := &"antisserrilhado"
 const SCALE := &"resolucao_3d"
 const SCENERY := &"cenario"
-const KEYS: Array[StringName] = [SHADOWS, EFFECTS, ANTIALIAS, SCALE, SCENERY]
+const KEYS: Array[StringName] = [SHADOWS, EFFECTS, AO, ANTIALIAS, SCALE, SCENERY]
 const CAPTIONS := {
 	SHADOWS: "Sombras",
-	EFFECTS: "Luz e efeitos",
+	EFFECTS: "Brilho",
+	AO: "Oclusão (SSAO)",
 	ANTIALIAS: "Antisserrilhado",
 	SCALE: "Resolução 3D",
 	SCENERY: "Cenário",
@@ -54,7 +60,8 @@ const CAPTIONS := {
 
 enum Aa { OFF, FXAA, MSAA_2X, MSAA_4X }
 const SHADOW_NAMES := ["Desligadas", "Simples", "Completas"]
-const EFFECT_NAMES := ["Simples", "Médios", "Completos"]
+const EFFECT_NAMES := ["Desligado", "Ligado"]
+const AO_NAMES := ["Desligada", "Ligada"]
 const AA_NAMES := ["Desligado", "Leve (FXAA)", "2x (MSAA)", "4x (MSAA)"]
 ## Fração da resolução da tela no 3D (0 = automática).
 const SCALES := [0.5, 0.6, 0.75, 0.85, 1.0, 0.0]
@@ -72,10 +79,12 @@ const SIMPLE_SHADOW_ATLAS := 2048
 const META := &"graficos_original"
 ## Nível escolhido pelo ajuste automático (veja o começo do arquivo).
 const AUTO_KEY := "nivel_automatico"
-## Versão dos níveis gravada nas opções. 2: Alta passou de MSAA 4x para 2x (quem tinha
-## salvo o Alta antigo passa para o novo uma vez; escolher 4x depois continua valendo).
+## Versão dos níveis gravada nas opções. 2: Alta passou de MSAA 4x para 2x. 3: Alta
+## sem SSAO. 4: o SSAO virou uma opção à parte (volta ligado na Alta) e "Luz e efeitos"
+## (Simples / Médios / Completos) virou só o brilho. Quem tinha salvo um Alta antigo
+## passa para o novo uma vez; escolher 4x depois continua valendo.
 const VERSION_KEY := "versao"
-const VERSION := 2
+const VERSION := 4
 
 var show_fps := false
 
@@ -118,13 +127,22 @@ func _migrate() -> void:
 	if saved >= VERSION:
 		return
 	if not _auto:
-		var old_high := preset_values(HIGH)
-		old_high[ANTIALIAS] = Aa.MSAA_4X
-		if KEYS.all(func(k: StringName) -> bool: return _same(_values[k], old_high[k])):
-			_values[ANTIALIAS] = Aa.MSAA_2X
-			_cfg.set_value(SECTION, ANTIALIAS, Aa.MSAA_2X)
-		_cfg.set_value(SECTION, VERSION_KEY, VERSION)
-		_save.call()
+		# "Luz e efeitos" de antes da 4: 0 = nada, 1 = só o brilho, 2 = brilho e SSAO.
+		var effects := int(_cfg.get_value(SECTION, EFFECTS, 1))
+		_values[EFFECTS] = 1 if effects > 0 else 0
+		if not _cfg.has_section_key(SECTION, AO):
+			_values[AO] = 1 if effects == 2 else 0
+		# O Alta como era na versão gravada (o SSAO não conta; 1: MSAA 4x).
+		var high := preset_values(HIGH)
+		var old_high := high.duplicate()
+		if saved < 2:
+			old_high[ANTIALIAS] = Aa.MSAA_4X
+		if KEYS.all(func(k: StringName) -> bool: return k == AO or _same(_values[k], old_high[k])):
+			_values = high
+		for k in KEYS:
+			_cfg.set_value(SECTION, k, _values[k])
+	_cfg.set_value(SECTION, VERSION_KEY, VERSION)
+	_save.call()
 
 
 func _ready() -> void:
@@ -133,8 +151,6 @@ func _ready() -> void:
 	_last[&"atlas"] = [_project("rendering/lights_and_shadows/directional_shadow/size"),
 			_project("rendering/lights_and_shadows/directional_shadow/16_bits")]
 	_last[&"filter"] = _project("rendering/lights_and_shadows/directional_shadow/soft_shadow_filter_quality")
-	_last[&"ssao"] = [_project("rendering/environment/ssao/quality"), _project("rendering/environment/ssao/half_size")]
-	_last[&"glow"] = int(_project("rendering/environment/glow/upscale_mode")) == 1
 	_build_fps_label()
 	get_tree().node_added.connect(_on_node_added)
 	# Depois do GameState montar o RenderScale (é criado depois das opções).
@@ -146,8 +162,10 @@ func _ready() -> void:
 ## Valores possíveis da opção, na ordem da tela.
 func values(key: StringName) -> Array:
 	match key:
-		SHADOWS, EFFECTS:
+		SHADOWS:
 			return [0, 1, 2]
+		EFFECTS, AO:
+			return [0, 1]
 		ANTIALIAS:
 			return [Aa.OFF, Aa.FXAA, Aa.MSAA_2X, Aa.MSAA_4X] if has_fxaa() else [Aa.OFF, Aa.MSAA_2X, Aa.MSAA_4X]
 		SCALE:
@@ -170,6 +188,8 @@ static func value_name(key: StringName, v) -> String:
 			return SHADOW_NAMES[v]
 		EFFECTS:
 			return EFFECT_NAMES[v]
+		AO:
+			return AO_NAMES[v]
 		ANTIALIAS:
 			return AA_NAMES[v]
 		SCALE:
@@ -216,12 +236,13 @@ func set_preset(p: int) -> void:
 func preset_values(p: int) -> Dictionary:
 	match p:
 		LOW:
-			return {SHADOWS: 0, EFFECTS: 0, ANTIALIAS: Aa.FXAA if has_fxaa() else Aa.OFF, SCALE: 0.75, SCENERY: 0}
+			return {SHADOWS: 0, EFFECTS: 0, AO: 0, ANTIALIAS: Aa.FXAA if has_fxaa() else Aa.OFF,
+					SCALE: 0.75, SCENERY: 0}
 		MEDIUM:
-			return {SHADOWS: 1, EFFECTS: 1, ANTIALIAS: Aa.MSAA_2X, SCALE: 0.0, SCENERY: 1}
+			return {SHADOWS: 1, EFFECTS: 1, AO: 0, ANTIALIAS: Aa.MSAA_2X, SCALE: 0.0, SCENERY: 1}
 	# Alta usa MSAA 2x desde 2026-11-24: 4x custava 13% a mais de GPU (M4, 4K; em placas
 	# Intel/NVIDIA/AMD costuma ser mais) e mudava 0,57% dos pixels (bordas finas).
-	return {SHADOWS: 2, EFFECTS: 2, ANTIALIAS: Aa.MSAA_2X, SCALE: 0.0, SCENERY: 1}
+	return {SHADOWS: 2, EFFECTS: 1, AO: 1, ANTIALIAS: Aa.MSAA_2X, SCALE: 0.0, SCENERY: 1}
 
 
 func set_show_fps(on: bool) -> void:
@@ -332,7 +353,7 @@ static func _project(setting: String) -> Variant:
 # --- Aplicar -------------------------------------------------------------------------
 
 ## O que vale para o jogo todo: antisserrilhado e LOD das telas, mapa e filtro das
-## sombras, qualidade do SSAO e do brilho, resolução do 3D.
+## sombras, resolução do 3D.
 func _apply_globals() -> void:
 	_pending = false
 	var aa: int = _values[ANTIALIAS]
@@ -366,21 +387,6 @@ func _apply_globals() -> void:
 	_send(&"atlas", [atlas, bits16], func(): RenderingServer.directional_shadow_atlas_set_size(atlas, bits16))
 	_send(&"filter", filter, func(): RenderingServer.directional_soft_shadow_filter_set_quality(
 			filter as RenderingServer.ShadowQuality))
-
-	var ssao_quality: int = _project("rendering/environment/ssao/quality")
-	var half: bool = _project("rendering/environment/ssao/half_size")
-	var bicubic := int(_project("rendering/environment/glow/upscale_mode")) == 1
-	if _values[EFFECTS] == 1:
-		ssao_quality = mini(ssao_quality, RenderingServer.ENV_SSAO_QUALITY_LOW)
-		half = true
-		bicubic = false
-	_send(&"ssao", [ssao_quality, half], func(): RenderingServer.environment_set_ssao_quality(
-			ssao_quality as RenderingServer.EnvironmentSSAOQuality, half,
-			_project("rendering/environment/ssao/adaptive_target"),
-			_project("rendering/environment/ssao/blur_passes"),
-			_project("rendering/environment/ssao/fadeout_from"),
-			_project("rendering/environment/ssao/fadeout_to")))
-	_send(&"glow", bicubic, func(): RenderingServer.environment_glow_set_use_bicubic_upscale(bicubic))
 
 	if GameState.render_scale:
 		GameState.render_scale.fixed = float(_values[SCALE])
@@ -442,13 +448,12 @@ func _apply_environment(env: Environment) -> void:
 	if env == null:
 		return
 	# O recurso pode ser o mesmo em várias telas (vem da cena da pista): o original fica
-	# guardado nele para dar para voltar ao "Completos".
+	# guardado nele para dar para ligar de novo.
 	if not env.has_meta(META):
 		env.set_meta(META, {"ssao": env.ssao_enabled, "glow": env.glow_enabled})
 	var original: Dictionary = env.get_meta(META)
-	var on: bool = _values[EFFECTS] > 0
-	env.ssao_enabled = original.ssao and on
-	env.glow_enabled = original.glow and on
+	env.ssao_enabled = original.ssao and _values[AO] == 1
+	env.glow_enabled = original.glow and _values[EFFECTS] == 1
 
 
 func _apply_light(light: DirectionalLight3D) -> void:

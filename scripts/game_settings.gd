@@ -1,7 +1,7 @@
 class_name GameSettings
 extends Node
 ## Opções do jogo (tela "Opções", filho do GameState): volume de cada canal de áudio,
-## tela cheia, resolução da janela, qualidade gráfica (GraphicsQuality, em `graphics`)
+## tela cheia, resolução da janela, VSync e limite de FPS, qualidade gráfica (GraphicsQuality, em `graphics`)
 ## e as teclas do kart. Ficam em user://opcoes.cfg e valem desde a abertura do jogo.
 ##
 ## Os canais de áudio estão em res://default_bus_layout.tres: "Musica" (MusicPlayer) e
@@ -32,6 +32,9 @@ const RESOLUTIONS: Array[Vector2i] = [
 ## Ações do kart que dá para trocar de tecla (as mesmas que cada jogador tem
 ## separadas no multijogador). A pausa fica fixa em Esc / P / Start: o Esc também
 ## volta nos menus.
+## Limites de FPS das opções (0 = sem limite).
+const FPS_LIMITS: Array[int] = [0, 30, 60, 120, 144, 240]
+
 const KEY_ACTIONS: Array[StringName] = [&"acelerar", &"frear", &"esquerda", &"direita", &"drift", &"usar_item", &"reposicionar"]
 const KEY_ACTION_NAMES := {
 	&"acelerar": "Acelerar",
@@ -80,6 +83,8 @@ func _ready() -> void:
 			_resize_window(size)
 		if _cfg.get_value("tela", "tela_cheia", false):
 			set_fullscreen(true, false)
+		_apply_vsync(get_vsync())
+		Engine.max_fps = get_max_fps()
 
 
 func save() -> void:
@@ -180,6 +185,39 @@ func _resize_window(size: Vector2i) -> void:
 
 static func format_resolution(size: Vector2i) -> String:
 	return "%d × %d" % [size.x, size.y]
+
+
+## VSync e limite de FPS: só no desktop (no navegador quem manda é a página).
+func can_limit_fps() -> bool:
+	return not OS.has_feature("web")
+
+
+func get_vsync() -> bool:
+	return bool(_cfg.get_value("tela", "vsync", true))
+
+
+func set_vsync(on: bool) -> void:
+	_cfg.set_value("tela", "vsync", on)
+	save()
+	_apply_vsync(on)
+
+
+func _apply_vsync(on: bool) -> void:
+	var mode := DisplayServer.VSYNC_ENABLED if on else DisplayServer.VSYNC_DISABLED
+	if DisplayServer.window_get_vsync_mode() != mode:
+		DisplayServer.window_set_vsync_mode(mode)
+
+
+## 0 = sem limite.
+func get_max_fps() -> int:
+	var fps := int(_cfg.get_value("tela", "max_fps", 0))
+	return fps if FPS_LIMITS.has(fps) else 0
+
+
+func set_max_fps(fps: int) -> void:
+	_cfg.set_value("tela", "max_fps", fps)
+	save()
+	Engine.max_fps = fps
 
 
 # --- Teclas --------------------------------------------------------------------------

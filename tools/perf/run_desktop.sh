@@ -9,8 +9,13 @@
 #
 # O probe precisa estar em _probe/ (o Godot não enxerga tools/, que tem .gdignore).
 set -u
-GODOT=${GODOT:-/Users/marcosbueno/Downloads/Godot.app/Contents/MacOS/Godot}
-UD="$HOME/Library/Application Support/Godot/app_userdata/Ativos Kart"
+if [ "$(uname)" = "Darwin" ]; then
+	GODOT=${GODOT:-/Users/marcosbueno/Downloads/Godot.app/Contents/MacOS/Godot}
+	UD="$HOME/Library/Application Support/Godot/app_userdata/Ativos Kart"
+else
+	GODOT=${GODOT:-godot}
+	UD="${XDG_DATA_HOME:-$HOME/.local/share}/godot/app_userdata/Ativos Kart"
+fi
 PROBE=$1
 LOG=$2
 TO=${3:-900}

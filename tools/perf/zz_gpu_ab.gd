@@ -266,6 +266,9 @@ func _build_steps() -> void:
 	var q0: int = ProjectSettings.get_setting("rendering/environment/ssao/quality")
 	var h0: bool = ProjectSettings.get_setting("rendering/environment/ssao/half_size")
 	vars.append(["ssao_low", func(): ssao_set.call(RenderingServer.ENV_SSAO_QUALITY_LOW, h0), func(): ssao_set.call(q0, h0)])
+	# O "Luz e efeitos: Médios" de antes de 2026-11-26: qualidade baixa em meia resolução
+	# (economizava quase nada; hoje o Médios desliga o SSAO).
+	vars.append(["ssao_medios", func(): ssao_set.call(RenderingServer.ENV_SSAO_QUALITY_LOW, true), func(): ssao_set.call(q0, h0)])
 	var bic0: bool = int(ProjectSettings.get_setting("rendering/environment/glow/upscale_mode")) == 1
 	vars.append(["glow_linear", func(): RenderingServer.environment_glow_set_use_bicubic_upscale(false), func(): RenderingServer.environment_glow_set_use_bicubic_upscale(bic0)])
 	var f0: int = ProjectSettings.get_setting("rendering/lights_and_shadows/directional_shadow/soft_shadow_filter_quality")

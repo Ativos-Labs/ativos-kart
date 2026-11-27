@@ -2,10 +2,11 @@ class_name OptionsPanel
 extends Control
 ## Janela "Opções" (menu principal e pausa), em quatro abas:
 ## - Som: volume geral, da música e dos efeitos (canais de default_bus_layout.tres);
-## - Tela: tela cheia e resolução da janela (no navegador só a tela cheia);
+## - Tela: tela cheia, resolução da janela, VSync e limite de FPS (no navegador só a
+##   tela cheia) e o contador de FPS;
 ## - Gráficos: qualidade (Baixa / Média / Alta, para PC fraco), e cada parte dela
-##   separada: sombras, luz e efeitos, antisserrilhado, resolução do 3D e cenário
-##   (GraphicsQuality); e o contador de FPS;
+##   separada: sombras, brilho, oclusão (SSAO), antisserrilhado, resolução do 3D e cenário
+##   (GraphicsQuality);
 ## - Teclas: duas teclas para cada ação do kart. Escolha a vaga e aperte a tecla nova
 ##   (Esc cancela); se outra ação usava essa tecla, as duas trocam.
 ## Tudo é salvo na hora (GameSettings, user://opcoes.cfg).
@@ -33,6 +34,8 @@ var _volumes := {}
 var _fullscreen: OptionSelector
 var _resolution: OptionSelector
 var _resolutions: Array[Vector2i] = []
+var _vsync: OptionSelector
+var _max_fps: OptionSelector
 var _quality: OptionSelector
 ## Opção de GraphicsQuality → OptionSelector.
 var _graphics := {}
@@ -175,12 +178,35 @@ func _build_screen(page: Control) -> void:
 		_page_items[PAGE_SCREEN].append(_resolution)
 	else:
 		_resolution.hide()
+	_vsync = OptionSelector.new()
+	_vsync.setup("VSync", PackedStringArray(["Desligado", "Ligado"]), 0)
+	_vsync.changed.connect(func(i: int): GameState.settings.set_vsync(i == 1))
+	page.add_child(_vsync)
+	_max_fps = OptionSelector.new()
+	var limits := PackedStringArray()
+	for fps in GameSettings.FPS_LIMITS:
+		limits.append("Sem limite" if fps == 0 else str(fps))
+	_max_fps.setup("Limite de FPS", limits, 0)
+	_max_fps.changed.connect(func(i: int): GameState.settings.set_max_fps(GameSettings.FPS_LIMITS[i]))
+	page.add_child(_max_fps)
+	if GameState.settings.can_limit_fps():
+		_page_items[PAGE_SCREEN].append(_vsync)
+		_page_items[PAGE_SCREEN].append(_max_fps)
+	else:
+		_vsync.hide()
+		_max_fps.hide()
+	_show_fps = OptionSelector.new()
+	_show_fps.setup("Mostrar FPS", PackedStringArray(["Não", "Sim"]), 0)
+	_show_fps.changed.connect(func(i: int): GameState.settings.graphics.set_show_fps(i == 1))
+	page.add_child(_show_fps)
+	_page_items[PAGE_SCREEN].append(_show_fps)
 
 
 ## Qualidade (Baixa / Média / Alta) em cima e cada parte dela embaixo: mexer numa
 ## parte vira "Personalizada"; escolher um nível muda todas.
 func _build_graphics(page: Control) -> void:
-	# 7 linhas: um pouco mais juntas que nas outras abas para caber na página.
+	# 7 linhas (a qualidade e as 6 partes): um pouco mais juntas que nas outras abas
+	# para caber na página.
 	page.add_theme_constant_override("separation", 8)
 	var gfx := GameState.settings.graphics
 	_quality = OptionSelector.new()
@@ -195,11 +221,6 @@ func _build_graphics(page: Control) -> void:
 		page.add_child(selector)
 		_graphics[key] = selector
 		_page_items[PAGE_GRAPHICS].append(selector)
-	_show_fps = OptionSelector.new()
-	_show_fps.setup("Mostrar FPS", PackedStringArray(["Não", "Sim"]), 0)
-	_show_fps.changed.connect(func(i: int): GameState.settings.graphics.set_show_fps(i == 1))
-	page.add_child(_show_fps)
-	_page_items[PAGE_GRAPHICS].append(_show_fps)
 
 
 func _build_keys(page: Control) -> void:
@@ -333,6 +354,8 @@ func _refresh_all() -> void:
 		(_volumes[bus] as VolumeSlider).set_value(GameState.settings.get_volume(bus), false)
 	_fullscreen.set_index(1 if GameState.settings.is_fullscreen() else 0, false)
 	_refresh_resolution()
+	_vsync.set_index(1 if GameState.settings.get_vsync() else 0, false)
+	_max_fps.set_index(maxi(GameSettings.FPS_LIMITS.find(GameState.settings.get_max_fps()), 0), false)
 	_refresh_graphics()
 	_refresh_keys()
 

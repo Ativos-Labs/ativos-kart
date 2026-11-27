@@ -311,12 +311,15 @@ de cada instrumento e de cada faixa de frequência para ajudar na mixagem.
 Menu principal e pausa → **Opções** (salvas em `user://opcoes.cfg`):
 
 - **Som:** volume geral, música e efeitos.
-- **Tela:** tela cheia e resolução da janela (na web, só tela cheia).
+- **Tela:** tela cheia, resolução da janela, VSync e limite de FPS (sem limite, 30,
+  60, 120, 144 ou 240; na web, só tela cheia) e Mostrar FPS (um contador no topo da
+  tela).
 - **Gráficos:** qualidade **Baixa / Média / Alta** para o jogo rodar liso num PC fraco,
-  e cada parte separada: sombras (desligadas, simples, completas), luz e efeitos (SSAO
-  e brilho), antisserrilhado (FXAA só no desktop, MSAA 2x/4x), resolução do 3D (fixa
+  e cada parte separada: sombras (desligadas, simples, completas), brilho (glow),
+  oclusão de ambiente (SSAO, só a Alta liga: pesa ~20% do quadro numa placa modesta),
+  antisserrilhado (FXAA só no desktop, MSAA 2x/4x), resolução do 3D (fixa
   de 50% a 100% ou automática) e cenário (reduzido: sem grama e flores, menos neve,
-  modelos simplificam mais cedo). Mostrar FPS liga um contador no topo da tela. Na
+  modelos simplificam mais cedo). Na
   primeira vez o nível vem da placa de vídeo (integrada → Média, renderização por
   software → Baixa). Enquanto ninguém mexe nas opções, o executável também mede a placa:
   se numa corrida de um jogador ela só seguraria 60 fps com o 3D abaixo de ~1600×900, o
