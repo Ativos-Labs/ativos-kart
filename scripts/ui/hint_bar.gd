@@ -10,6 +10,11 @@ extends Control
 const PAD_BUTTONS := {
 	"Enter": ["A", Color(0.3, 0.7, 0.24)],
 	"Esc": ["B", Color(0.86, 0.2, 0.2)],
+	# Trocar de página (a copa na seleção de pista): os gatilhos de cima.
+	"Q": ["LB", Color(0.4, 0.42, 0.5)],
+	"E": ["RB", Color(0.4, 0.42, 0.5)],
+	"PgUp": ["LB", Color(0.4, 0.42, 0.5)],
+	"PgDn": ["RB", Color(0.4, 0.42, 0.5)],
 }
 const ARROWS: Array[String] = ["↑", "↓", "←", "→"]
 const MOUSE_ONLY: Array[String] = ["Arraste"]

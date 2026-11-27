@@ -3,7 +3,8 @@ extends Node
 ## pronta), com as copas (emblemas com o logo "at"), os cartões das pistas da copa
 ## escolhida, o mapa do traçado, os recordes e o botão para correr. Vagas sem pista
 ## ainda aparecem como "?" (em breve). Cada copa é uma página de cartões: troca-se
-## clicando no emblema, com Page Up/Page Down ou com os gatilhos LB/RB do controle.
+## clicando no emblema, com Q/E ou Page Up/Page Down no teclado ou com os gatilhos LB/RB
+## do controle.
 ## No Grand Prix a escolha é da copa: dá para olhar cada pista, e "Começar copa"
 ## corre todas em sequência, a partir da primeira.
 ##
@@ -261,6 +262,9 @@ func _input(event: InputEvent) -> void:
 		cup_step = -1
 	elif event.is_action_pressed("ui_page_down"):
 		cup_step = 1
+	elif event is InputEventKey and event.pressed and not event.echo \
+			and (event.physical_keycode == KEY_Q or event.physical_keycode == KEY_E):
+		cup_step = -1 if event.physical_keycode == KEY_Q else 1
 	elif event is InputEventJoypadButton and event.pressed:
 		if event.button_index == JOY_BUTTON_LEFT_SHOULDER:
 			cup_step = -1
