@@ -8,8 +8,9 @@ const RECORDS_PATH := "user://recordes.cfg"
 ## Versão do traçado das pistas (veja record_section).
 const TRACK_LAYOUT := 2
 ## Pistas que mudaram de traçado de novo depois disso (versão própria): o Cânion virou o
-## deserto do Egito com o oásis em 2026-11-23.
-const TRACK_LAYOUT_OF := {"canion_ativos": 3}
+## deserto do Egito com o oásis em 2026-11-23; o Estádio ganhou o laço oeste com a
+## parede inclinada em 2026-11-27.
+const TRACK_LAYOUT_OF := {"canion_ativos": 3, "estadio_celerino": 3}
 
 const SCENE_MAIN_MENU := "res://scenes/main_menu.tscn"
 const SCENE_MODE_SELECT := "res://scenes/mode_select.tscn"

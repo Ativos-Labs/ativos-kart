@@ -161,9 +161,10 @@ func drive(k: Kart) -> Dictionary:
 	var lat := _target_lateral(k, along, target_d, lat_now, delta)
 	var target_local := track.get_point_at(target_d) + _right_at(target_d) * lat
 	var to_target := track.to_global(target_local) - k.global_position
-	to_target.y = 0.0
+	var k_up := k.get_up()
+	to_target -= k_up * to_target.dot(k_up)
 	var dist := maxf(to_target.length(), 2.0)
-	var alpha := k.get_forward().signed_angle_to(to_target, Vector3.UP)
+	var alpha := k.get_forward().signed_angle_to(to_target, k_up)
 
 	# Giro que leva o kart até o alvo (pure pursuit), em rad/s (+ = esquerda), e o
 	# volante que dá esse giro (o mesmo cálculo do Kart, ao contrário).
@@ -240,15 +241,16 @@ func _set_output(throttle: float, brake: float, steer: float, drift: bool, drift
 func _drive_reverse(k: Kart, delta: float) -> Dictionary:
 	_reverse -= delta
 	var tangent := track.global_basis * track.tangents[_index]
-	tangent.y = 0.0
-	var alpha := k.get_forward().signed_angle_to(tangent, Vector3.UP)
+	var k_up := k.get_up()
+	tangent -= k_up * tangent.dot(k_up)
+	var alpha := k.get_forward().signed_angle_to(tangent, k_up)
 	# Dando ré o volante vira ao contrário.
 	var steer := -signf(alpha) if absf(alpha) > 0.15 else 0.0
 	return _set_output(0.0, 1.0, steer, false, false)
 
 
 func _right_at(dist: float) -> Vector3:
-	return track.get_direction_at(dist).cross(Vector3.UP).normalized()
+	return track.get_right_at(dist)
 
 
 # --- Trajetória ------------------------------------------------------------------

@@ -366,7 +366,7 @@ pista é o `cup_name` do `TrackData`, na ordem da lista `GameState.tracks`).
 | Pista            | Cenário | Destaques                                                                 |
 |------------------|---------|---------------------------------------------------------------------------|
 | Baía Ativos      | Praia   | 2,0 km, **praia de areia branca sem asfalto**, num meio-dia de sol (mar turquesa no raso e azul no fundo, ondinhas de espuma chegando na areia, brilho do sol na água, ilhas no horizonte). Largada numa **vila de quiosques de sapê** (portal de bambu com telhado de palha e a placa da Ativos, bandeirinhas, guarda-sóis listrados, espreguiçadeiras, pranchas de surfe, farol); a reta da praia leva a uma **passarela de tábuas** sobre a baía, entre **palafitas**, que vai subindo até a ponta do píer: dali a asa-delta voa sobre o **canal** (ilhotas de pedra com coqueiros, golfinhos) até a ilha. Na ilha, a **trilha da mata** de terra batida (cerca de madeira escura, murinhos de pedra com flores vermelhas, bananeiras, samambaias e árvores grandes) passa por baixo de um **arco de pedra** com cipós e coqueiros em cima; na volta, o **baixio**: a pista atravessa o mar raso entre linhas de boias, bancos de areia com coqueiros e estrelas-do-mar no fundo (com uma rampa de pulo no meio), e termina nas curvas das dunas, com um grampo, até a vila |
-| Estádio Celerino | Cidade  | 1,8 km, **cidade neon à noite** (cyberpunk): céu estrelado com o brilho rosa da cidade no horizonte, asfalto molhado com as faixas acesas em ciano, zebras de neon, muretas de LED com tubos de neon, postes, **portais de neon** por cima da pista, **neblina** roxa nas ruas, no canal e rente ao asfalto, prédios com janelas acesas e **letreiros holográficos** da Ativos e do Celerino no kart, arranha-céus no horizonte e holofotes varrendo o céu. Largada num **estádio lotado** (torcida com bastões de luz e celulares, frisos de neon, telão de LED, boxes com as garagens acesas, pórtico de treliça com neon) com o **Celerino gigante** sob dois refletores coloridos. A pista sai por um **túnel** sob a arquibancada, sobe um **elevado** entre os prédios, salta de asa-delta sobre o **canal**, desce pelo outro elevado e volta pelo segundo túnel até a reta dos boxes |
+| Estádio Celerino | Cidade  | 2,35 km, **cidade neon à noite** (cyberpunk): céu estrelado com o brilho rosa da cidade no horizonte, asfalto molhado com as faixas acesas em ciano, zebras de neon, muretas de LED com tubos de neon, postes, **portais de neon** por cima da pista, **neblina** roxa nas ruas, no canal e rente ao asfalto, prédios com janelas acesas e **letreiros holográficos** da Ativos e do Celerino no kart, arranha-céus no horizonte e holofotes varrendo o céu. Largada num **estádio lotado** (torcida com bastões de luz e celulares, frisos de neon, telão de LED, boxes com as garagens acesas, pórtico de treliça com neon) com o **Celerino gigante** sob dois refletores coloridos. A pista sai por um **túnel** sob a arquibancada, sobe um **elevado** entre os prédios, salta de asa-delta sobre o **canal**, desce pelo outro elevado, entra no **laço oeste** — curva inclinada, **esses inclinados** e o **grampo na parede** (70°: a gravidade do kart segue o chão e ele anda de lado na parede) — e volta pelo segundo túnel até a reta dos boxes. A primeira curva, dentro do estádio, também é **inclinada** |
 
 Todas usam as logos da Ativos no pórtico, nas muretas, outdoors, bandeiras, balões, dirigível,
 no asfalto e nas pontes (na Baía, nas placas de madeira penduradas nas cercas e nos quiosques).
@@ -893,6 +893,16 @@ para mudar:
   (o modelo do jogo, ×6,5) e o pórtico de treliça com placar e luzes de largada
   (`scripts/track_stadium.gd`). Onde a pista cruza o anel as filas de baixo somem e ela
   passa num túnel por baixo das de cima. Sem árvores, moitas e outdoors dentro do anel.
+- **Curvas inclinadas** (`Track.banks`, `scripts/track_bank.gd`): entre `start` e `end` a
+  pista deita `angle` graus para fora da curva (lado automático pelo sentido da curva, ou
+  `side`), com transições de `ramp` m. Ela gira em volta da borda de dentro (que fica na
+  altura do traçado), então com ângulo alto o meio sobe e a pista vira parede (no Estádio,
+  70° e o meio só ~2,5 m acima do chão: o ponto de giro (`BANK_PIVOT`) fica perto do meio e a borda de dentro afunda junto com o chão). `Track.ups`/`rights` deitam junto; asfalto, zebras,
+  muretas e a colisão seguem; o acostamento vira laje e uma parede fecha o lado de cima até
+  o chão. O terreno segue as amostras antes de inclinar (`ground_samples`). No kart, a
+  corrida passa o "cima" da pista (`Kart.ground_up`): a gravidade, o giro e o corpo seguem
+  esse eixo (por isso ele não escorrega na parede), e a câmera deita junto. Não ponha em
+  cima de pontes nem perto dos túneis do estádio.
 - **City Track** (cidade neon à noite, ligado no Estádio Celerino): prédios em quadras fora
   da pista, do estádio e do canal (`shaders/city_building.gdshader`: janelas acesas
   desenhadas no shader, sem malha por janela), faixas de neon nos prédios

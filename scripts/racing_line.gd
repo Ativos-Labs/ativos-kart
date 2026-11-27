@@ -71,7 +71,7 @@ static func _compute(p_track: Track, margin: float) -> RacingLine:
 	right.resize(n)
 	for i in n:
 		center[i] = Vector2(p_track.samples[i].x, p_track.samples[i].z)
-		right[i] = Vector2(p_track.rights[i].x, p_track.rights[i].z)
+		right[i] = Vector2(p_track.rights[i].x, p_track.rights[i].z).normalized()
 	var lim := line.limit
 	for k: int in [18, 12, 7, 4, 2]:
 		for _it in 36:

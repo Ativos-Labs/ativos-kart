@@ -33,6 +33,14 @@ const ITEM_BOX_SPACING := 1.7
 const SOFT_SAND_EDGE := 2.2
 ## Quanto o asfalto do trecho de gelo fica acima da água congelada (m).
 const ICE_ROAD_LIFT := 0.06
+## Quanto (m) a inclinação das curvas é alisada ao longo da pista.
+const BANK_SMOOTH := 10.0
+## Onde a pista gira nas curvas inclinadas: 0 = no meio, 1 = na borda de dentro.
+const BANK_PIVOT := 0.2
+## Folga (m) da água em volta dos vales e rios numa pista com curvas inclinadas.
+const WATER_AREA_MARGIN := 100.0
+## Largura máxima (m) de cada faixa da pista nas pistas com curvas inclinadas.
+const BANK_STRIP_WIDTH := 1.25
 
 @export var track_id := "circuito_ativos"
 @export var track_name := "Circuito Ativos"
@@ -127,6 +135,15 @@ const ICE_ROAD_LIFT := 0.06
 @export var sections: Array[TrackSection] = []:
 	set(value):
 		sections = value
+		_watch_bridges()
+		_queue_rebuild()
+
+@export_group("Curvas inclinadas")
+## Trechos em que a pista deita para dentro da curva (veja track_bank.gd); com ângulo
+## alto viram parede (a gravidade do kart segue o chão).
+@export var banks: Array[TrackBank] = []:
+	set(value):
+		banks = value
 		_watch_bridges()
 		_queue_rebuild()
 
@@ -336,6 +353,13 @@ var _physics_jobs: Array[Callable] = []
 var samples := PackedVector3Array()
 var tangents := PackedVector3Array()
 var rights := PackedVector3Array()
+## "Cima" da pista em cada amostra: Vector3.UP, menos nas curvas inclinadas (aí
+## `rights` também deita junto, ao longo do chão). Vazio = pista sem inclinação.
+var ups := PackedVector3Array()
+## Inclinação de cada amostra (rad, + = o lado direito sobe). Vazio sem `banks`.
+var bank_angles := PackedFloat32Array()
+## As amostras antes de inclinar (o terreno segue estas: a borda de dentro).
+var ground_samples := PackedVector3Array()
 var distances := PackedFloat32Array()
 ## Curvatura (1/raio) em cada amostra; positivo = curva para a direita.
 var curvature := PackedFloat32Array()
@@ -396,6 +420,9 @@ func _watch_bridges() -> void:
 	for s in sections:
 		if s and not s.changed.is_connected(_queue_rebuild):
 			s.changed.connect(_queue_rebuild)
+	for b in banks:
+		if b and not b.changed.is_connected(_queue_rebuild):
+			b.changed.connect(_queue_rebuild)
 
 
 ## Ponte ou trecho no ar sobre um vale (o chão embaixo não segue a pista).
@@ -637,7 +664,7 @@ func build_geometry(defer_physics := false) -> void:
 		terrain.deck_half = road_width * 0.5 + shoulder_width + wall_thickness
 		terrain.flat_distance = road_width * 0.5 + shoulder_width + wall_thickness + 2.5
 		_setup_terrain_sections()
-		terrain.setup(samples, decoration_seed, bridge_mask, rivers)
+		terrain.setup(ground_samples, decoration_seed, bridge_mask, rivers)
 		# A largada (arquibancada) fica num terreno plano.
 		var start := get_point_at(0.0)
 		terrain.flat_spots.append(Vector3(start.x, start.z, 55.0))
@@ -655,6 +682,8 @@ func build_geometry(defer_physics := false) -> void:
 	_build_road()
 	_build_curbs()
 	_build_walls()
+	if has_banks():
+		_build_bank_decks()
 	_build_start_gate()
 	_build_boost_pads()
 	if not ramps.is_empty():
@@ -820,6 +849,9 @@ func get_direction_at(dist: float) -> Vector3:
 func get_transform_at(dist: float, lateral := 0.0) -> Transform3D:
 	var p := get_point_at(dist)
 	var t := get_direction_at(dist)
+	if not ups.is_empty():
+		var up := get_up_at(dist)
+		return Transform3D(Basis.looking_at(t, up), p + get_right_at(dist) * lateral)
 	var r := t.cross(Vector3.UP).normalized()
 	return Transform3D(Basis.looking_at(t, Vector3.UP), p + r * lateral)
 
@@ -868,12 +900,145 @@ func _sample_curve() -> void:
 	length = baked_length
 	_apply_bridges()
 	_apply_sections()
+	_compute_frames()
+	ups = PackedVector3Array()
+	bank_angles = PackedFloat32Array()
+	ground_samples = samples.duplicate()
+	if not banks.is_empty():
+		_apply_banks()
+
+
+func _compute_frames() -> void:
+	var count := samples.size()
+	tangents = PackedVector3Array()
+	rights = PackedVector3Array()
 	for i in count:
 		var t := (samples[(i + 1) % count] - samples[(i - 1 + count) % count]).normalized()
 		tangents.append(t)
 		var r := t.cross(Vector3.UP)
 		r.y = 0.0
 		rights.append(r.normalized())
+
+
+## Curvas inclinadas: a borda de dentro fica onde estava e a pista gira em volta dela
+## (o meio sobe e chega um pouco para dentro). Depois refaz tangentes e laterais e
+## deita `rights`/`ups` junto com o chão.
+func _apply_banks() -> void:
+	var count := samples.size()
+	bank_angles.resize(count)
+	bank_angles.fill(0.0)
+	for b in banks:
+		if b == null or b.end <= b.start or b.angle <= 0.0:
+			continue
+		var a := b.start * length
+		var e := b.end * length
+		var dir := float(b.side)
+		if dir == 0.0:
+			# Lado de fora da curva: virando para a direita, o esquerdo sobe.
+			var turn := 0.0
+			for i in count:
+				if distances[i] >= a and distances[i] <= e:
+					turn += tangents[i].cross(tangents[(i + 1) % count]).y
+			dir = -1.0 if turn < 0.0 else 1.0
+		var full := deg_to_rad(b.angle) * dir
+		for i in count:
+			var s := distances[i]
+			var f := 0.0
+			if s >= a and s <= e:
+				f = 1.0
+			else:
+				var before := fposmod(a - s, length)
+				var after := fposmod(s - e, length)
+				if before < b.ramp:
+					f = _ease_bank(1.0 - before / b.ramp)
+				elif after < b.ramp:
+					f = _ease_bank(1.0 - after / b.ramp)
+			# Somando (com o sinal) os trechos vizinhos emendam: de uma inclinação para a
+			# outra sem voltar a ficar plana nem trocar de lado de repente.
+			bank_angles[i] += full * f
+	_smooth_banks()
+	# Gira em volta de um ponto entre o meio e a borda de dentro (BANK_PIVOT): o meio
+	# sobe só uma parte e a borda de dentro afunda um pouco, com o chão em volta (o
+	# terreno segue `ground_samples`). Girando na borda de dentro o meio subia rápido
+	# demais logo no começo da transição, antes de a pista deitar.
+	var reach := road_width * 0.5 + shoulder_width
+	for i in count:
+		var ang := bank_angles[i]
+		if ang == 0.0:
+			continue
+		var s := signf(ang)
+		samples[i] += (rights[i] * (cos(ang) - 1.0) + Vector3.UP * sin(ang)) * reach * BANK_PIVOT * s
+		ground_samples[i].y -= reach * (1.0 - BANK_PIVOT) * absf(sin(ang))
+	_compute_frames()
+	ups.resize(count)
+	for i in count:
+		var ang := bank_angles[i]
+		if ang == 0.0:
+			ups[i] = Vector3.UP
+			continue
+		var r := rights[i]
+		var up0 := r.cross(tangents[i]).normalized()
+		rights[i] = (r * cos(ang) + up0 * sin(ang)).normalized()
+		ups[i] = (up0 * cos(ang) - r * sin(ang)).normalized()
+
+
+## Transição suave (smootherstep): o giro começa e termina devagar, sem tranco.
+static func _ease_bank(x: float) -> float:
+	x = clampf(x, 0.0, 1.0)
+	return x * x * x * (x * (x * 6.0 - 15.0) + 10.0)
+
+
+## Alisa a inclinação ao longo da pista (média gaussiana de ~BANK_SMOOTH m) e limita a
+## 85°: some qualquer quina entre um trecho e outro.
+func _smooth_banks() -> void:
+	var count := bank_angles.size()
+	var step := length / count
+	var sigma := BANK_SMOOTH / step
+	var reach := int(ceil(sigma * 2.5))
+	var weights := PackedFloat32Array()
+	for k in range(-reach, reach + 1):
+		weights.append(exp(-0.5 * (k / sigma) * (k / sigma)))
+	var out := PackedFloat32Array()
+	out.resize(count)
+	for i in count:
+		var sum := 0.0
+		var wsum := 0.0
+		for k in range(-reach, reach + 1):
+			var w := weights[k + reach]
+			sum += bank_angles[(i + k + count) % count] * w
+			wsum += w
+		var v := clampf(sum / wsum, -deg_to_rad(85.0), deg_to_rad(85.0))
+		out[i] = v if absf(v) > 0.0005 else 0.0
+	bank_angles = out
+
+
+func has_banks() -> bool:
+	return not ups.is_empty()
+
+
+## "Cima" da pista na amostra `i` (Vector3.UP sem curvas inclinadas).
+func up_at_index(i: int) -> Vector3:
+	return ups[i] if not ups.is_empty() else Vector3.UP
+
+
+func get_up_at(dist: float) -> Vector3:
+	var count := samples.size()
+	if ups.is_empty() or count == 0:
+		return Vector3.UP
+	var f := fposmod(dist, length) / (length / count)
+	var i := int(f) % count
+	return ups[i].slerp(ups[(i + 1) % count], f - floorf(f)).normalized()
+
+
+func get_right_at(dist: float) -> Vector3:
+	var count := samples.size()
+	if count == 0:
+		return Vector3.RIGHT
+	if ups.is_empty():
+		return get_direction_at(dist).cross(Vector3.UP).normalized()
+	var f := fposmod(dist, length) / (length / count)
+	var i := int(f) % count
+	return rights[i].lerp(rights[(i + 1) % count], f - floorf(f)).normalized()
 
 
 ## Marca as amostras em cima de ponte e levanta a pista (rampas suaves antes e
@@ -999,7 +1164,10 @@ func _compute_curvature() -> void:
 	raw.resize(count)
 	for i in count:
 		var d := tangents[(i + 2) % count] - tangents[(i - 2 + count) % count]
-		raw[i] = d.dot(rights[i]) / (step * 4.0)
+		var r := rights[i]
+		if not ups.is_empty():
+			r = Vector3(r.x, 0.0, r.z).normalized()
+		raw[i] = d.dot(r) / (step * 4.0)
 	curvature = PackedFloat32Array()
 	curvature.resize(count)
 	for i in count:
@@ -1087,10 +1255,24 @@ func _add_strip(md: MeshData, rail_a: PackedVector3Array, rail_b: PackedVector3A
 		md.add_tri(a + 1, a + 3, a + 2, face_normals[i])
 
 
+## Faixa lisa de `lat_a` a `lat_b`. Numa pista com curvas inclinadas ela é dividida em
+## faixas estreitas: onde a pista torce, cada quadrado de 2 m × a largura toda deixa de
+## ser plano e os dois triângulos formariam uma quina de ~10 cm (o kart pulava nela).
+func _add_split_strip(md: MeshData, lat_a: float, lat_b: float, height: float, u_a: float, u_b: float,
+		with_tangents := false, colors := PackedColorArray(), skip := PackedByteArray()) -> void:
+	var cols := 1 if ups.is_empty() else maxi(1, ceili(absf(lat_b - lat_a) / BANK_STRIP_WIDTH))
+	var normals := _repeat(Vector3.UP)
+	for c in cols:
+		var t0 := float(c) / cols
+		var t1 := float(c + 1) / cols
+		_add_strip(md, _offset_rail(lerpf(lat_a, lat_b, t0), height), _offset_rail(lerpf(lat_a, lat_b, t1), height),
+				normals, lerpf(u_a, u_b, t0), lerpf(u_a, u_b, t1), with_tangents, colors, skip)
+
+
 func _offset_rail(lateral: float, height: float) -> PackedVector3Array:
 	var rail := PackedVector3Array()
 	for i in samples.size():
-		rail.append(samples[i] + rights[i] * lateral + Vector3.UP * height)
+		rail.append(samples[i] + rights[i] * lateral + up_at_index(i) * height)
 	return rail
 
 
@@ -1098,11 +1280,13 @@ func _offset_rail(lateral: float, height: float) -> PackedVector3Array:
 func _variable_rail(laterals: PackedFloat32Array, height: float) -> PackedVector3Array:
 	var rail := PackedVector3Array()
 	for i in samples.size():
-		rail.append(samples[i] + rights[i] * laterals[i] + Vector3.UP * height)
+		rail.append(samples[i] + rights[i] * laterals[i] + up_at_index(i) * height)
 	return rail
 
 
 func _repeat(v: Vector3) -> PackedVector3Array:
+	if v == Vector3.UP and not ups.is_empty():
+		return ups.duplicate()
 	var arr := PackedVector3Array()
 	arr.resize(samples.size())
 	arr.fill(v)
@@ -1119,8 +1303,8 @@ func _scaled_rights(factor: float) -> PackedVector3Array:
 ## Normais de uma faixa inclinada que sobe `rise` metros em `run` metros para fora (`side`).
 func _slope_normals(side: float, run: float, rise: float) -> PackedVector3Array:
 	var arr := PackedVector3Array()
-	for r in rights:
-		arr.append((Vector3.UP * run - r * side * rise).normalized())
+	for i in rights.size():
+		arr.append((up_at_index(i) * run - rights[i] * side * rise).normalized())
 	return arr
 
 
@@ -1238,9 +1422,34 @@ func _build_water() -> void:
 	for key: String in params:
 		mat.set_shader_parameter(key, params[key])
 	plane.material = mat
-	var water := _add_mesh(plane, Transform3D(Basis(), Vector3(terrain.center.x, water_level, terrain.center.y)))
+	var center := Vector3(terrain.center.x, water_level, terrain.center.y)
+	var area := _bank_safe_water_area()
+	if area.size != Vector2.ZERO:
+		# Com curvas inclinadas o chão afunda embaixo delas (abaixo do nível da água):
+		# a água fica só onde ela existe de verdade (vales e rios), longe dessas curvas.
+		plane.size = area.size
+		center = Vector3(area.get_center().x, water_level, area.get_center().y)
+	var water := _add_mesh(plane, Transform3D(Basis(), center))
 	water.name = "Agua"
 	water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+
+## Retângulo (x, z) da água numa pista com curvas inclinadas e sem mar: os vales e rios
+## com folga. Vazio = a água cobre o mapa todo, como nas outras pistas.
+func _bank_safe_water_area() -> Rect2:
+	if not has_banks() or sea_distance > 0.0:
+		return Rect2()
+	var pts := PackedVector2Array()
+	for path in _valley_paths() + _river_paths():
+		for k in path.curve.point_count:
+			var p := path.transform * path.curve.get_point_position(k)
+			pts.append(Vector2(p.x, p.z))
+	if pts.is_empty():
+		return Rect2()
+	var area := Rect2(pts[0], Vector2.ZERO)
+	for p in pts:
+		area = area.expand(p)
+	return area.grow(WATER_AREA_MARGIN)
 
 
 ## Cor de cada amostra para o asfalto (COLOR): r = areia batida (na praia, a terra da
@@ -1274,7 +1483,7 @@ func _build_road() -> void:
 	var half := road_width * 0.5
 	var md := MeshData.new()
 	var colors := _road_colors()
-	_add_strip(md, _offset_rail(-half, 0.0), _offset_rail(half, 0.0), _repeat(Vector3.UP), 0.0, 1.0, true, colors)
+	_add_split_strip(md, -half, half, 0.0, 0.0, 1.0, true, colors)
 	# Laterais do asfalto (dão volume quando a pista tem subidas).
 	_add_strip(md, _offset_rail(-half, 0.0), _offset_rail(-half, -0.6), _scaled_rights(-1.0), 0.0, 0.0, true, colors)
 	_add_strip(md, _offset_rail(half, 0.0), _offset_rail(half, -0.6), _scaled_rights(1.0), 1.0, 1.0, true, colors)
@@ -1314,7 +1523,7 @@ func _build_road() -> void:
 		# mureta (asfalto + acostamento), senão o kart cairia no acostamento elevado.
 		var reach := half + shoulder_width + 0.15
 		var col := MeshData.new()
-		_add_strip(col, _offset_rail(-reach, 0.0), _offset_rail(reach, 0.0), _repeat(Vector3.UP), 0.0, 1.0)
+		_add_split_strip(col, -reach, reach, 0.0, 0.0, 1.0)
 		var faces := col.collision_faces()
 		physics_job(func() -> void:
 			var shape := ConcavePolygonShape3D.new()
@@ -1449,6 +1658,52 @@ func _build_walls() -> void:
 			shape.backface_collision = true
 			shape.set_faces(faces)
 			_add_static_body(shape, Transform3D.IDENTITY, "wall"))
+
+
+# --- Curvas inclinadas ---------------------------------------------------------------
+
+## Nas curvas inclinadas o terreno fica lá embaixo: o acostamento vira laje de concreto
+## deitada junto com a pista e, do lado que sobe, uma parede fecha tudo até o chão.
+func _build_bank_decks() -> void:
+	var count := samples.size()
+	var half := road_width * 0.5
+	var offset := half + shoulder_width
+	var outer := offset + wall_thickness
+	var flat := PackedByteArray()
+	flat.resize(count)
+	for i in count:
+		flat[i] = 1 if bank_angles[i] == 0.0 else 0
+	var deck := MeshData.new()
+	var skirt := MeshData.new()
+	for side: float in [-1.0, 1.0]:
+		_add_split_strip(deck, side * (half - 0.05), side * (offset + 0.05), -0.02, 0.0, 1.0, false, PackedColorArray(), flat)
+		# Parede embaixo da borda que sobe (só onde este lado está acima do chão).
+		var skip := flat.duplicate()
+		var bottom := PackedVector3Array()
+		var normals := PackedVector3Array()
+		for i in count:
+			if signf(bank_angles[i]) != side:
+				skip[i] = 1
+			var r := Vector3(rights[i].x, 0.0, rights[i].z).normalized()
+			var g := ground_samples[i] + r * side * outer
+			g.y = ground_samples[i].y - 1.5
+			bottom.append(g)
+			normals.append(r * side)
+		_add_strip(skirt, _offset_rail(side * outer, -0.3), bottom, normals, 0.0, 1.0, false, PackedColorArray(), skip)
+	var deck_mat := StandardMaterial3D.new()
+	deck_mat.albedo_color = Color(0.13, 0.13, 0.17) if city_track else Color(0.5, 0.5, 0.52)
+	deck_mat.roughness = 0.55 if city_track else 0.85
+	var deck_mi := _add_mesh(deck.to_mesh(deck_mat))
+	deck_mi.name = "LajeInclinada"
+	deck_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var skirt_mat := ShaderMaterial.new()
+	skirt_mat.shader = WALL_SHADER
+	skirt_mat.set_shader_parameter("outer_side", true)
+	skirt_mat.set_shader_parameter("wall_height", wall_height)
+	if city_track:
+		_city_wall_colors(skirt_mat, true)
+	var skirt_mi := _add_mesh(skirt.to_mesh(skirt_mat))
+	skirt_mi.name = "ParedeInclinada"
 
 
 # --- Pista de neve e gelo -----------------------------------------------------------
@@ -1859,7 +2114,7 @@ func _build_coins() -> void:
 			if _on_ramp(d):
 				continue
 			var xf := get_transform_at(d, line.y)
-			points.append(xf.origin + Vector3.UP * TrackCoins.HEIGHT)
+			points.append(xf.origin + xf.basis.y * TrackCoins.HEIGHT)
 			dirs.append(get_direction_at(d))
 			grounds.append(xf.origin)
 	if coins_on_ramps:

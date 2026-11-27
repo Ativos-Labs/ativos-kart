@@ -61,6 +61,8 @@ signal splashed(entering: bool)
 enum Surface { ASFALTO, AREIA, AREIA_FOFA, AREIA_MOVEDICA, GELO, NEVE, AREIA_BATIDA, AGUA_RASA, TERRA }
 
 const GRAVITY := 32.0
+## Quão rápido o "cima" do kart segue o da pista nas curvas inclinadas (1/s).
+const UP_FOLLOW_SHARPNESS := 18.0
 const HOP_VELOCITY := 4.6
 const MIN_DRIFT_SPEED := 9.0
 ## Tempo de drift (s) para atingir cada nível de mini-turbo.
@@ -378,6 +380,11 @@ var _visual_pitch := 0.0
 var _ground_pitch := 0.0
 var _ground_roll := 0.0
 var _was_on_floor := true
+## "Cima" da pista embaixo do kart (a corrida atualiza; Vector3.UP fora das curvas
+## inclinadas). Nas curvas inclinadas a gravidade e o corpo do kart seguem este eixo,
+## por isso dá para andar na parede.
+var ground_up := Vector3.UP
+var _up := Vector3.UP
 var _bump_cooldown := 0.0
 var _kart_bump_cooldown := 0.0
 ## true no ar depois de decolar de uma rampa (até aterrissar).
@@ -774,6 +781,10 @@ func _update_water() -> void:
 	if water_fx:
 		water_fx.set_spray(shallow and is_on_floor() and absf(speed) > SHALLOW_SPRAY_SPEED, absf(speed) / maxf(max_speed, 1.0))
 	var now := global_position.y + UNDERWATER_DEPTH * KartScale.ITEMS < water_level and not shallow
+	# Curva inclinada: a borda de baixo pode ficar abaixo do nível da água (o chão afunda
+	# junto), mas ali não tem água — senão o kart entraria e sairia dela a cada volta.
+	if ground_up != Vector3.UP:
+		now = false
 	if now == underwater:
 		return
 	underwater = now
@@ -781,6 +792,37 @@ func _update_water() -> void:
 		water_fx.set_underwater(now)
 		water_fx.burst(Vector3(global_position.x, water_level, global_position.z))
 	splashed.emit(now)
+
+
+## Luzes do jogador nas pistas à noite: uma luz suave em volta do kart (para ver o
+## chão, as muretas e os outros karts por perto) e um farol iluminando a pista à frente.
+## Sem sombra (barato também na web).
+func add_player_lights() -> void:
+	if has_node("LuzEmVolta"):
+		return
+	var glow := OmniLight3D.new()
+	glow.name = "LuzEmVolta"
+	glow.position = Vector3(0.0, 2.4, 0.4)
+	glow.omni_range = 11.0
+	glow.omni_attenuation = 0.9
+	glow.light_energy = 1.6
+	glow.light_color = Color(0.86, 0.82, 1.0)
+	glow.light_specular = 0.25
+	glow.shadow_enabled = false
+	add_child(glow)
+	var beam := SpotLight3D.new()
+	beam.name = "Farol"
+	beam.position = Vector3(0.0, 1.3, -0.6)
+	beam.rotation = Vector3(deg_to_rad(-9.0), 0.0, 0.0)
+	beam.spot_range = 42.0
+	beam.spot_angle = 30.0
+	beam.spot_angle_attenuation = 1.4
+	beam.spot_attenuation = 0.8
+	beam.light_energy = 3.2
+	beam.light_color = Color(1.0, 0.95, 0.86)
+	beam.light_specular = 0.35
+	beam.shadow_enabled = false
+	add_child(beam)
 
 
 func set_ground_theme(scenery: int) -> void:
@@ -795,8 +837,36 @@ func set_ground_theme(scenery: int) -> void:
 
 func get_forward() -> Vector3:
 	var f := -global_basis.z
-	f.y = 0.0
+	if _up == Vector3.UP:
+		f.y = 0.0
+	else:
+		f -= _up * f.dot(_up)
 	return f.normalized() if f.length_squared() > 0.0001 else Vector3.FORWARD
+
+
+## "Cima" do kart: o da pista embaixo dele (Vector3.UP fora das curvas inclinadas).
+func get_up() -> Vector3:
+	return _up
+
+
+## Segue `ground_up` aos poucos: gira o corpo do kart (mantendo a frente) para o novo
+## "cima". Fora das curvas inclinadas fica exatamente em Vector3.UP.
+func _follow_ground_up(delta: float) -> void:
+	if ground_up == Vector3.UP and _up == Vector3.UP:
+		return
+	var goal := ground_up.normalized()
+	var next := _up.slerp(goal, 1.0 - exp(-UP_FOLLOW_SHARPNESS * delta)).normalized()
+	if next.dot(goal) > 0.99995:
+		next = goal
+	var turn := Quaternion(_up, next)
+	_up = Vector3.UP if next.is_equal_approx(Vector3.UP) else next
+	var fwd := turn * -global_basis.z
+	fwd -= _up * fwd.dot(_up)
+	if fwd.length_squared() < 0.0001:
+		fwd = get_forward()
+	global_basis = Basis.looking_at(fwd.normalized(), _up)
+	velocity = turn * velocity
+	up_direction = _up
 
 
 func get_speed_kmh() -> float:
@@ -822,11 +892,17 @@ func teleport(xform: Transform3D) -> void:
 		end_super(false)
 	# O corpo do kart fica sempre em pé (só gira no eixo vertical); numa rampa a
 	# inclinação aparece só no modelo (veja _update_visuals).
+	var up := xform.basis.y.normalized()
+	if up.dot(Vector3.UP) > 0.9999:
+		up = Vector3.UP
+	_up = up
+	ground_up = up
+	up_direction = up
 	var fwd := -xform.basis.z
-	fwd.y = 0.0
+	fwd -= up * fwd.dot(up)
 	if fwd.length_squared() < 0.0001:
 		fwd = Vector3.FORWARD
-	global_transform = Transform3D(Basis.looking_at(fwd.normalized(), Vector3.UP), xform.origin)
+	global_transform = Transform3D(Basis.looking_at(fwd.normalized(), up), xform.origin)
 	_ground_pitch = 0.0
 	_ground_roll = 0.0
 	velocity = Vector3.ZERO
@@ -894,6 +970,7 @@ func _physics_process(delta: float) -> void:
 	steer_input = steer
 	throttle_input = throttle
 	_update_water()
+	_follow_ground_up(delta)
 	var on_floor := is_on_floor()
 	var ramp := _current_ramp() if on_floor else null
 	_trick_buffer = maxf(_trick_buffer - delta, 0.0)
@@ -1021,11 +1098,14 @@ func _physics_process(delta: float) -> void:
 		yaw *= ICE_TURN
 	# Suaviza a velocidade de giro: o kart não dá trancos ao entrar/sair do drift.
 	_yaw_rate = lerpf(_yaw_rate, yaw, 1.0 - exp(-yaw_smoothing * delta))
-	rotate_y(_yaw_rate * delta)
+	if _up == Vector3.UP:
+		rotate_y(_yaw_rate * delta)
+	else:
+		rotate(_up, _yaw_rate * delta)
 
 	# --- Movimento ------------------------------------------------------------
 	var fwd := get_forward()
-	var horizontal := Vector3(velocity.x, 0.0, velocity.z)
+	var horizontal := velocity - _up * velocity.dot(_up)
 	var traction := drift_grip if drifting else grip
 	if not on_floor:
 		traction *= GLIDE_TRACTION if gliding else 0.4
@@ -1067,7 +1147,7 @@ func _physics_process(delta: float) -> void:
 		_vertical = move_toward(_vertical, -_glide_sink(), (GLIDE_LAND_ACCEL if _glide_landing else GLIDE_GRAVITY) * delta)
 	else:
 		_vertical -= GRAVITY * (UNDERWATER_GRAVITY if underwater else 1.0) * delta
-	velocity = horizontal + Vector3.UP * _vertical
+	velocity = horizontal + _up * _vertical
 	move_and_slide()
 	var now_on_floor := is_on_floor()
 	if now_on_floor:
@@ -1076,7 +1156,8 @@ func _physics_process(delta: float) -> void:
 		if _vertical < 0.0:
 			_vertical = 0.0
 		var n := get_floor_normal()
-		_ground_vy = -(n.x * horizontal.x + n.z * horizontal.z) / maxf(n.y, 0.3)
+		var n_up := n.dot(_up)
+		_ground_vy = -(n - _up * n_up).dot(horizontal) / maxf(n_up, 0.3)
 		_air_time = 0.0
 	else:
 		if _was_on_floor and _vertical < 0.0:
@@ -1168,10 +1249,10 @@ func _handle_walls(fwd: Vector3, delta: float) -> void:
 		if wall_done:
 			continue
 		var normal := collision.get_normal()
-		if absf(normal.y) > 0.6:
+		var n_up := normal.dot(_up)
+		if absf(n_up) > 0.6:
 			continue
-		normal.y = 0.0
-		normal = normal.normalized()
+		normal = (normal - _up * n_up).normalized()
 		var impact := -fwd.dot(normal) * speed
 		if impact > 4.0 and _bump_cooldown <= 0.0:
 			var strength := clampf(impact / max_speed, 0.0, 1.0)
@@ -1194,12 +1275,11 @@ func _handle_walls(fwd: Vector3, delta: float) -> void:
 func _bump_kart(other: Kart, normal: Vector3, fwd: Vector3) -> void:
 	if _kart_bump_cooldown > 0.0 or other._kart_bump_cooldown > 0.0:
 		return
-	var push := normal
-	push.y = 0.0
+	var push := normal - _up * normal.dot(_up)
 	if push.length_squared() < 0.04:
 		# Em cima do outro kart (caiu de um pulo): escorrega para o lado.
 		push = global_position - other.global_position
-		push.y = 0.0
+		push -= _up * push.dot(_up)
 	if push.length_squared() < 0.0001:
 		push = global_basis.x
 	push = push.normalized()

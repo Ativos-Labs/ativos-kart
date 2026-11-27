@@ -354,6 +354,9 @@ func _add_racer(character: CharacterData, kart_data: KartData, slot_index: int, 
 	karts_root.add_child(k)
 	k.set_skid_marks(skid_marks)
 	k.set_ground_theme(track.scenery)
+	if slot and track.city_track:
+		# Pista à noite: o jogador leva luz própria para enxergar a pista.
+		k.add_player_lights()
 	if track.has_water_sections():
 		k.set_water_level(track.global_position.y + track.water_level)
 	k.obstacle_hit.connect(_on_obstacle_hit.bind(k))
@@ -803,6 +806,8 @@ func _update_racer(r: Racer, delta: float, lead: float) -> void:
 	r.along = along
 	r.index = index
 	var lateral := track.get_lateral(local, index)
+	if track.has_banks():
+		k.ground_up = track.global_basis * track.get_up_at(along)
 	k.is_offroad = absf(lateral) > track.road_width * 0.5 + 0.4
 	k.surface = track.surface_at(index, lateral)
 	# Asa-delta: passou da beira do outro lado do vale, desce para pousar logo ali.
@@ -1172,8 +1177,9 @@ func _cooldown_autopilot(k: Kart, r: Racer) -> Dictionary:
 	var along := track.get_along(local, r.autopilot_index)
 	var target := track.global_transform * track.get_point_at(along + 14.0)
 	var to_target := target - k.global_position
-	to_target.y = 0.0
-	var angle := k.get_forward().signed_angle_to(to_target.normalized(), Vector3.UP)
+	var k_up := k.get_up()
+	to_target -= k_up * to_target.dot(k_up)
+	var angle := k.get_forward().signed_angle_to(to_target.normalized(), k_up)
 	return {
 		"throttle": 0.55 if k.speed < k.max_speed * 0.55 else 0.0,
 		"brake": 0.0,
@@ -1192,7 +1198,7 @@ func _respawn(r: Racer) -> void:
 		index = (track.gap_exit(index) + 4) % track.samples.size()
 	var dist := track.distances[index]
 	var xf := track.get_transform_at(dist, _free_lateral(dist, r.kart))
-	xf.origin += Vector3.UP * 0.6
+	xf.origin += xf.basis.y * 0.6
 	r.kart.teleport(track.global_transform * xf)
 	r.rescue = 0.0
 	if r.ai:

@@ -202,7 +202,9 @@ func _build_wall_neon(parent: Node3D) -> void:
 			var a := track.samples[i] + track.rights[i] * side * lat
 			var b := track.samples[j] + track.rights[j] * side * lat
 			var nrm := -track.rights[i] * side
-			TrackStadium._quad(md, [a + Vector3.UP * y0, b + Vector3.UP * y0, b + Vector3.UP * y1, a + Vector3.UP * y1],
+			var ua := track.up_at_index(i)
+			var ub := track.up_at_index(j)
+			TrackStadium._quad(md, [a + ua * y0, b + ub * y0, b + ub * y1, a + ua * y1],
 					[nrm, nrm, nrm, nrm], uvs, nrm, col)
 	var mi := MeshInstance3D.new()
 	mi.name = "NeonMureta"
@@ -227,6 +229,9 @@ func _build_lamps(parent: Node3D) -> void:
 		next = track.distances[i] + LAMP_SPACING * 0.5
 		side = -side
 		if track.is_gap(i) or absf(track.distances[i]) < 25.0 or track.distances[i] > track.length - 25.0:
+			continue
+		# Nas curvas inclinadas a mureta deita: sem poste.
+		if track.up_at_index(i).y < 0.97:
 			continue
 		var base := track.samples[i] + track.rights[i] * side * lat + Vector3.UP * track.wall_height
 		if not _outside_stadium(base.x, base.z, 0.0):
