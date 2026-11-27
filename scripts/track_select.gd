@@ -246,7 +246,12 @@ func _layout(data: TrackData) -> Track:
 
 func _input(event: InputEvent) -> void:
 	# O analógico chega como ui_left/ui_right... (MenuInput), um passo por vez.
-	if _confirming or event is InputEventJoypadMotion:
+	if event is InputEventJoypadMotion:
+		return
+	if _confirming:
+		# Pista escolhida, esperando a corrida: nenhuma entrada (setas, Q/E, mouse nos
+		# cartões, copas e botões) chega à tela.
+		get_viewport().set_input_as_handled()
 		return
 	var move := 0
 	if event.is_action_pressed("ui_left") or event.is_action_pressed("esquerda"):
@@ -411,6 +416,14 @@ func _confirm() -> void:
 	else:
 		_show_toast("Rumo ao %s!" % data.display_name)
 	var card := _cards[index]
+	card.picked = true
+	race_button.picked = true
+	var others: Array = [back_button]
+	others.append_array(_cups)
+	for k in _cards.size():
+		if k != index:
+			others.append(_cards[k])
+	UiKit.dim(self, others, true)
 	var tw := create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	card.scale = Vector2.ONE * 1.15
 	tw.tween_property(card, "scale", Vector2.ONE, 0.35)

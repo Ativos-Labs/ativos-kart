@@ -3,8 +3,10 @@ extends Node3D
 ## (acena, sorri e, ao ser escolhido, faz o gesto dele: CharacterData.pick_gesture), nome,
 ## atributos e dicas de teclas.
 ##
-## Sozinho: depois de confirmar, a tela espera o gesto acabar e segue para os karts; A/Enter
-## (ou clicar de novo) pula a espera e B/Esc desfaz a escolha.
+## Sozinho: depois de confirmar, o quadradinho fica marcado (aro firme e visto), o resto
+## da tela escurece e a tela espera o gesto acabar e segue para os karts. Nesse meio-tempo
+## nenhuma outra entrada vale: A/Enter (ou clicar de novo no quadradinho ou no botão)
+## pula a espera e B/Esc desfaz a escolha.
 ##
 ## No multijogador todos escolhem ao mesmo tempo na mesma grade: cada jogador tem um
 ## cursor na cor dele (etiqueta J1, J2... no quadradinho) e um cartão com o piloto
@@ -106,13 +108,16 @@ func _input(event: InputEvent) -> void:
 	if _multi or event is InputEventJoypadMotion:
 		return
 	if _confirming:
-		# Durante o gesto de escolha: A/Enter segue logo, B/Esc desfaz a escolha.
+		# Durante o gesto de escolha: A/Enter (ou clicar no escolhido) segue logo, B/Esc
+		# desfaz a escolha; o resto (setas, mouse, foco dos botões) não chega à tela.
 		if event.is_action_pressed("ui_accept"):
 			_leave()
-			get_viewport().set_input_as_handled()
 		elif event.is_action_pressed("ui_cancel"):
 			_unconfirm()
-			get_viewport().set_input_as_handled()
+		elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT \
+				and (_under_mouse(_tiles[index]) or _under_mouse(confirm_button)):
+			_leave()
+		get_viewport().set_input_as_handled()
 		return
 	var move := 0
 	if event.is_action_pressed("ui_left") or event.is_action_pressed("esquerda"):
@@ -287,9 +292,28 @@ func _confirm() -> void:
 	create_tween().set_trans(Tween.TRANS_SINE).tween_property(turntable, "rotation:y", 0.0, 0.3)
 	var wait := _celebrate(_rig, tile.data)
 	_show_toast("%s está pronto!" % tile.data.display_name)
+	_show_picked(true)
 	await get_tree().create_timer(wait + PICK_LINGER).timeout
 	if token == _confirm_token and _confirming:
 		_leave()
+
+
+static func _under_mouse(control: Control) -> bool:
+	return control.get_global_rect().has_point(control.get_global_mouse_position())
+
+
+## Marca (ou desmarca) a escolha na tela: o quadradinho e o botão ficam marcados e o
+## resto escurece.
+func _show_picked(on: bool) -> void:
+	_tiles[index].picked = on
+	confirm_button.picked = on
+	var others: Array = [back_button]
+	for t in _tiles.size():
+		if t != index:
+			others.append(_tiles[t])
+	UiKit.dim(self, others, on)
+	if on:
+		_bump(_tiles[index])
 
 
 func _leave() -> void:
@@ -305,6 +329,7 @@ func _unconfirm() -> void:
 		return
 	_confirming = false
 	_confirm_token += 1
+	_show_picked(false)
 	Sfx.play(self, &"ui_back", -10.0)
 	if is_instance_valid(_rig):
 		_rig.end_gesture()

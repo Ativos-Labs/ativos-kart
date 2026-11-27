@@ -15,7 +15,15 @@ var selected := false:
 	set(value):
 		selected = value
 		_time = 0.0
-		set_process(value)
+		set_process(value or picked)
+		queue_redraw()
+
+## Pista confirmada: aro firme e selo de visto até sair da tela (UiKit.draw_picked).
+var picked := false:
+	set(value):
+		picked = value
+		_time = 0.0
+		set_process(value or selected)
 		queue_redraw()
 
 var _time := 0.0
@@ -95,10 +103,13 @@ func _draw() -> void:
 
 	# Borda.
 	var hot := is_hovered()
-	if selected:
-		var pulse := 0.5 + 0.5 * sin(_time * 7.0)
-		_border(r.grow(4.0 + pulse * 3.0), UiKit.YELLOW.lerp(Color.WHITE, pulse * 0.4), 7, radius + 5)
-		_border(r, Color.WHITE, 6, radius)
+	if picked or selected:
+		if picked:
+			UiKit.draw_picked(self, r, radius, _time)
+		else:
+			var pulse := 0.5 + 0.5 * sin(_time * 7.0)
+			_border(r.grow(4.0 + pulse * 3.0), UiKit.YELLOW.lerp(Color.WHITE, pulse * 0.4), 7, radius + 5)
+			_border(r, Color.WHITE, 6, radius)
 		var tag := Rect2(Vector2(-10, -16), Vector2(54, 30))
 		UiKit.draw_ribbon(self, tag, 8.0, UiKit.RED)
 		draw_string(UiKit.FONT_ITALIC, Vector2(tag.position.x + 11, tag.position.y + 23), "1P", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color.WHITE)

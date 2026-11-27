@@ -12,6 +12,16 @@ extends Button
 ## Botão de destaque (ex.: "Correr!"): fica amarelo mesmo sem estar selecionado.
 @export var primary := false
 
+## Escolha confirmada (o botão que confirmou): fica amarelo, maior e com as setas
+## paradas nas pontas até a tela seguir ou a escolha ser desfeita.
+var picked := false:
+	set(value):
+		if picked == value:
+			return
+		picked = value
+		_animate_scale(1.08 if value else (1.05 if _selected else 1.0))
+		queue_redraw()
+
 var _tween: Tween
 var _time := 0.0
 var _selected := false
@@ -67,7 +77,7 @@ func _on_focus_entered() -> void:
 func _on_focus_exited() -> void:
 	_selected = false
 	set_process(false)
-	_animate_scale(1.0)
+	_animate_scale(1.08 if picked else 1.0)
 	queue_redraw()
 
 
@@ -79,7 +89,7 @@ func _on_pressed() -> void:
 		_tween.kill()
 	_tween = create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	scale = Vector2.ONE * 0.94
-	_tween.tween_property(self, "scale", Vector2.ONE * (1.05 if _selected else 1.0), 0.2)
+	_tween.tween_property(self, "scale", Vector2.ONE * (1.08 if picked else (1.05 if _selected else 1.0)), 0.2)
 
 
 func _animate_scale(target: float) -> void:
@@ -94,7 +104,7 @@ func _draw() -> void:
 	var h := size.y
 	var notch := h * 0.32
 	var rect := Rect2(Vector2.ZERO, size)
-	var hot := (_selected or primary) and not disabled
+	var hot := (_selected or primary or picked) and not disabled
 	var down := get_draw_mode() == DRAW_PRESSED or get_draw_mode() == DRAW_HOVER_PRESSED
 
 	var outer := UiKit.hex_points(rect, notch)
@@ -107,7 +117,7 @@ func _draw() -> void:
 	if disabled:
 		top = Color(0.86, 0.87, 0.9)
 		bottom = Color(0.68, 0.7, 0.75)
-	elif down:
+	elif down or picked:
 		top = UiKit.YELLOW_DARK
 		bottom = UiKit.ORANGE
 	elif hot:
@@ -146,8 +156,8 @@ func _draw() -> void:
 	draw_string(font, Vector2(x, baseline), text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, ink)
 
 	# Setas piscando nas pontas quando selecionado.
-	if _selected and not disabled:
-		var bob := (0.5 + 0.5 * sin(_time * 7.0)) * 6.0
+	if (_selected or picked) and not disabled:
+		var bob := 6.0 if picked else (0.5 + 0.5 * sin(_time * 7.0)) * 6.0
 		_draw_chevron(-12.0 - bob, h, notch, -1.0)
 		_draw_chevron(w + 12.0 + bob, h, notch, 1.0)
 

@@ -89,7 +89,12 @@ func _idle_steer(visual: KartVisual, delta: float, phase: float) -> void:
 
 func _input(event: InputEvent) -> void:
 	# O analógico chega como ui_left/ui_right (MenuInput), um passo por vez.
-	if _multi or _confirming or event is InputEventJoypadMotion:
+	if _multi or event is InputEventJoypadMotion:
+		return
+	if _confirming:
+		# Escolhido, esperando a próxima tela: nenhuma entrada (setas, mouse, foco dos
+		# botões) chega à tela.
+		get_viewport().set_input_as_handled()
 		return
 	if event.is_action_pressed("esquerda") or event.is_action_pressed("ui_left"):
 		_change(-1)
@@ -133,6 +138,8 @@ func _confirm() -> void:
 	if _confirming:
 		return
 	_confirming = true
+	race_button.picked = true
+	UiKit.dim(self, [back_button, prev_button, next_button], true)
 	GameState.players[0].kart_index = index
 	_thumbs_up(_kart_visual)
 	Sfx.play(self, &"ui_accept", -8.0)

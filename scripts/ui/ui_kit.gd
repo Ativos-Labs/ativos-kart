@@ -266,3 +266,50 @@ static func draw_outlined(ci: CanvasItem, font: Font, pos: Vector2, text: String
 		color: Color, outline: Color, outline_size: int) -> void:
 	ci.draw_string_outline(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, size, outline_size, outline)
 	ci.draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, size, color)
+
+
+# --- Escolha confirmada ----------------------------------------------------------------
+
+## Quanto dura o anel que se espalha ao confirmar uma escolha (s).
+const PICK_FLASH := 0.45
+## Quanto os outros itens da tela escurecem enquanto a escolha está confirmada.
+const PICK_DIM := Color(0.5, 0.52, 0.6, 0.85)
+
+
+## Borda de um item escolhido (quadradinho de personagem, cartão de pista) depois de
+## confirmar: aro amarelo firme (sem piscar), um anel que se espalha e some logo depois
+## de confirmar (`t` = segundos desde a confirmação) e o selo de visto no canto.
+static func draw_picked(ci: CanvasItem, r: Rect2, radius: int, t: float) -> void:
+	if t < PICK_FLASH:
+		var k := t / PICK_FLASH
+		_rounded_border(ci, r.grow(6.0 + k * 22.0), Color(YELLOW_LIGHT, 1.0 - k), 6, radius + 6 + int(k * 22.0))
+	_rounded_border(ci, r.grow(6.0), YELLOW, 9, radius + 6)
+	_rounded_border(ci, r, Color.WHITE, 5, radius)
+	# Selo de visto, com um pulinho ao aparecer.
+	var pop := 1.0 + 0.35 * maxf(0.0, 1.0 - t / 0.25) * sin(minf(t / 0.25, 1.0) * PI)
+	var c := Vector2(r.end.x - 4.0, r.position.y + 4.0)
+	var rad := 19.0 * pop
+	ci.draw_circle(c + Vector2(0, 3), rad + 3.0, Color(0, 0, 0, 0.3))
+	ci.draw_circle(c, rad + 3.0, Color.WHITE)
+	ci.draw_circle(c, rad, GREEN)
+	var s := rad * 0.5
+	ci.draw_polyline(PackedVector2Array([c + Vector2(-s, 0.05 * s), c + Vector2(-0.3 * s, 0.7 * s), c + Vector2(s, -0.6 * s)]),
+			Color.WHITE, 5.0 * pop, true)
+
+
+static func _rounded_border(ci: CanvasItem, r: Rect2, color: Color, width: int, radius: int) -> void:
+	var sb := StyleBoxFlat.new()
+	sb.draw_center = false
+	sb.border_color = color
+	sb.set_border_width_all(width)
+	sb.set_corner_radius_all(radius)
+	sb.draw(ci.get_canvas_item(), r)
+
+
+## Escurece (ou volta ao normal) os itens que não foram escolhidos enquanto a escolha
+## está confirmada.
+static func dim(owner: Node, items: Array, on: bool) -> void:
+	var tw := owner.create_tween().set_parallel()
+	for item: CanvasItem in items:
+		if is_instance_valid(item):
+			tw.tween_property(item, "modulate", PICK_DIM if on else Color.WHITE, 0.2)

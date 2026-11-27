@@ -11,6 +11,14 @@ var selected := false:
 		_time = 0.0
 		_update_process()
 		queue_redraw()
+## Escolha confirmada (sozinho): fica com o aro firme e o selo de visto até seguir ou
+## desfazer (UiKit.draw_picked).
+var picked := false:
+	set(value):
+		picked = value
+		_time = 0.0
+		_update_process()
+		queue_redraw()
 ## Multijogador: jogadores (0 = J1...) com o cursor aqui e quais deles já confirmaram.
 var cursors: Array[int] = []
 var cursors_ready: Array[bool] = []
@@ -47,7 +55,7 @@ func set_cursors(players: Array[int], ready: Array[bool]) -> void:
 
 
 func _update_process() -> void:
-	set_process(selected or not cursors.is_empty())
+	set_process(selected or picked or not cursors.is_empty())
 
 
 func _process(delta: float) -> void:
@@ -83,6 +91,9 @@ func _draw() -> void:
 		_border(r.grow(-1.0), Color.WHITE, 3, radius)
 		for k in cursors.size():
 			_draw_player_tag(cursors[k], cursors_ready[k])
+	elif picked:
+		UiKit.draw_picked(self, r, radius, _time)
+		_draw_tag()
 	elif selected:
 		var pulse := 0.5 + 0.5 * sin(_time * 7.0)
 		_border(r.grow(4.0 + pulse * 3.0), UiKit.YELLOW.lerp(Color.WHITE, pulse * 0.4), 7, radius + 5)
