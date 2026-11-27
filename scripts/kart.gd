@@ -592,6 +592,8 @@ func _setup_glider() -> void:
 	glider_visual.name = "AsaDelta"
 	add_child(glider_visual)
 	glider_visual.setup(g)
+	if has_node("LuzEmVolta"):
+		_mark_lit(glider_visual)
 	_glider_mount = glider_visual.fit_to(kart_visual) if kart_visual else Vector3(0.0, 0.9 * KartScale.ITEMS, 0.0)
 	if gliding:
 		glider_visual.set_open(true, true)
@@ -794,22 +796,38 @@ func _update_water() -> void:
 	splashed.emit(now)
 
 
-## Luzes do jogador nas pistas à noite: uma luz suave em volta do kart (para ver o
-## chão, as muretas e os outros karts por perto) e um farol iluminando a pista à frente.
-## Sem sombra (barato também na web).
-func add_player_lights() -> void:
+## Camada de render só dos karts com luz própria (malhas do kart, do piloto e da asa):
+## a luz em volta (LuzEmVolta) só ilumina essa camada, não o chão. As 11-18 são das
+## etiquetas e placas (race.gd, item_effects.gd).
+const LIT_LAYER := 10
+
+## Luzes dos karts nas pistas à noite: uma luz em volta do kart que só ilumina o próprio
+## kart, o piloto e a asa (light_cull_mask = LIT_LAYER), para ele aparecer no escuro sem
+## mancha de luz no chão, e, só no jogador (`headlight`), um farol iluminando a pista à
+## frente. Sem sombra (barato também na web); a luz dos adversários some de longe
+## (distance fade), onde nem daria para ver.
+func add_night_lights(headlight: bool) -> void:
 	if has_node("LuzEmVolta"):
 		return
+	_mark_lit(self)
 	var glow := OmniLight3D.new()
 	glow.name = "LuzEmVolta"
-	glow.position = Vector3(0.0, 2.4, 0.4)
-	glow.omni_range = 11.0
-	glow.omni_attenuation = 0.9
-	glow.light_energy = 1.6
+	# Atrás e acima: a câmera de quem vem atrás vê o kart iluminado.
+	glow.position = Vector3(0.0, 2.2, 1.6)
+	glow.omni_range = 6.0
+	glow.omni_attenuation = 0.6
+	glow.light_energy = 2.2
 	glow.light_color = Color(0.86, 0.82, 1.0)
 	glow.light_specular = 0.25
+	glow.light_cull_mask = 1 << (LIT_LAYER - 1)
 	glow.shadow_enabled = false
+	if not headlight:
+		glow.distance_fade_enabled = true
+		glow.distance_fade_begin = 80.0
+		glow.distance_fade_length = 20.0
 	add_child(glow)
+	if not headlight:
+		return
 	var beam := SpotLight3D.new()
 	beam.name = "Farol"
 	beam.position = Vector3(0.0, 1.3, -0.6)
@@ -823,6 +841,12 @@ func add_player_lights() -> void:
 	beam.light_specular = 0.35
 	beam.shadow_enabled = false
 	add_child(beam)
+
+
+## Põe as malhas de `node` (e de dentro dele) também na LIT_LAYER (continuam na delas).
+func _mark_lit(node: Node) -> void:
+	for gi: GeometryInstance3D in node.find_children("*", "GeometryInstance3D", true, false):
+		gi.set_layer_mask_value(LIT_LAYER, true)
 
 
 func set_ground_theme(scenery: int) -> void:

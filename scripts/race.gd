@@ -354,9 +354,10 @@ func _add_racer(character: CharacterData, kart_data: KartData, slot_index: int, 
 	karts_root.add_child(k)
 	k.set_skid_marks(skid_marks)
 	k.set_ground_theme(track.scenery)
-	if slot and track.city_track:
-		# Pista à noite: o jogador leva luz própria para enxergar a pista.
-		k.add_player_lights()
+	if track.city_track:
+		# Pista à noite: todo kart leva luz própria para aparecer no escuro; o jogador
+		# ainda leva o farol para enxergar a pista.
+		k.add_night_lights(slot != null)
 	if track.has_water_sections():
 		k.set_water_level(track.global_position.y + track.water_level)
 	k.obstacle_hit.connect(_on_obstacle_hit.bind(k))

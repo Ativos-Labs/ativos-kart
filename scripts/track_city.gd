@@ -18,6 +18,7 @@ const BUILDING_SHADER := preload("res://shaders/city_building.gdshader")
 const NEON_SHADER := preload("res://shaders/neon.gdshader")
 const BEAM_SHADER := preload("res://shaders/light_beam.gdshader")
 const MIST_SHADER := preload("res://shaders/city_mist.gdshader")
+const LAMP_CONE_SHADER := preload("res://shaders/lamp_cone.gdshader")
 const CELERINO_ICON := preload("res://assets/ui/carregando_celerino.png")
 
 const CYAN := Color(0.1, 0.95, 1.0)
@@ -37,6 +38,18 @@ const SKYLINE_WIDTH := 520.0
 ## Blocos de malha (m): poucos e grandes, para não multiplicar as chamadas de desenho.
 const CHUNK := 320.0
 const LAMP_SPACING := 34.0
+## Cada poste tem um facho visível (cone aditivo, lamp_cone.gdshader) da luminária até o
+## chão, na cor do neon da luminária, e uma SpotLight3D fraca da mesma cor, sem sombra, que só marca a mancha de luz no asfalto.
+## Facho: raio na luminária e meia-abertura (graus). Luz: alcance (m), abertura (graus),
+## força, e a partir de que distância da câmera ela some (mais o trecho do fade), para
+## só as dos postes perto da câmera custarem.
+const LAMP_CONE_TOP := 0.35
+const LAMP_CONE_HALF_ANGLE := 24.0
+const LAMP_LIGHT_RANGE := 20.0
+const LAMP_LIGHT_ANGLE := 34.0
+const LAMP_LIGHT_ENERGY := 3.0
+const LAMP_LIGHT_FADE_BEGIN := 70.0
+const LAMP_LIGHT_FADE_LENGTH := 25.0
 const ARCH_SPACING := 150.0
 ## Neblina: tamanho das placas (m) e as camadas [altura acima do chão, densidade, escala
 ## do ruído, vento, distância mínima até o meio da pista]. A rasante (0,45 m) cobre também
@@ -131,6 +144,10 @@ func _mat(key: String) -> Material:
 			m = b
 		"neon":
 			m = neon_material()
+		"lamp_cone":
+			var c := ShaderMaterial.new()
+			c.shader = LAMP_CONE_SHADER
+			m = c
 		"tint":
 			var t := StandardMaterial3D.new()
 			t.vertex_color_use_as_albedo = true
@@ -218,6 +235,8 @@ func _build_wall_neon(parent: Node3D) -> void:
 func _build_lamps(parent: Node3D) -> void:
 	var poles := {}
 	var heads := {}
+	var cones := {}
+	var lights := _node("LuzesPostes", parent)
 	var n := track.samples.size()
 	var step_len := track.length / n
 	var lat := track.road_width * 0.5 + track.shoulder_width + track.wall_thickness * 0.5
@@ -242,13 +261,58 @@ func _build_lamps(parent: Node3D) -> void:
 		if not poles.has(key):
 			poles[key] = Track.MeshData.new()
 			heads[key] = Track.MeshData.new()
+			cones[key] = Track.MeshData.new()
 		TrackStadium._beam_md(poles[key], base, top + Vector3.UP * 0.2, 0.22, 0.22, STEEL_DARK)
 		TrackStadium._beam_md(poles[key], top, reach, 0.16, 0.16, STEEL_DARK)
 		var col := CYAN if side > 0.0 else MAGENTA
 		TrackStadium._beam_md(heads[key], reach - track.rights[i] * side * 0.2 + Vector3.DOWN * 0.12,
 				reach + track.rights[i] * side * 1.3 + Vector3.DOWN * 0.12, 0.32, 0.1, col)
+		var lamp := reach + track.rights[i] * side * 0.55 + Vector3.DOWN * 0.25
+		_add_lamp_cone(cones[key], lamp, lamp.y - track.samples[i].y, col)
+		_add_lamp_light(lights, lamp, col)
 	_commit(poles, _mat("tint"), "Postes", parent)
 	_commit(heads, _mat("neon"), "Luminarias", parent, false)
+	_commit(cones, _mat("lamp_cone"), "FachosPostes", parent, false)
+
+
+## Facho do poste: cone aberto de `top` (luminária) descendo `height` m até o chão.
+func _add_lamp_cone(md: Track.MeshData, top: Vector3, height: float, color: Color) -> void:
+	const SEGMENTS := 14
+	var r1 := LAMP_CONE_TOP + height * tan(deg_to_rad(LAMP_CONE_HALF_ANGLE))
+	var slope := (r1 - LAMP_CONE_TOP) / height
+	var first := md.verts.size()
+	for k in SEGMENTS + 1:
+		var a := TAU * k / SEGMENTS
+		var dir := Vector3(cos(a), 0.0, sin(a))
+		var nrm := (dir + Vector3.UP * slope).normalized()
+		md.add_vertex(top + dir * LAMP_CONE_TOP, nrm, Vector2(float(k) / SEGMENTS, 0.0))
+		md.add_vertex(top + dir * r1 + Vector3.DOWN * height, nrm, Vector2(float(k) / SEGMENTS, 1.0))
+		md.colors.append(color)
+		md.colors.append(color)
+	for k in SEGMENTS:
+		var v := first + k * 2
+		md.indices.append_array([v, v + 2, v + 1, v + 1, v + 2, v + 3])
+
+
+## Luz da luminária, na cor do neon dela, apontada para o chão (a mancha de luz embaixo do
+## facho).
+func _add_lamp_light(parent: Node3D, at: Vector3, color: Color) -> void:
+	var light := SpotLight3D.new()
+	light.name = "Luz"
+	# O SpotLight3D aponta para -Z: deitado para olhar para baixo.
+	light.transform = Transform3D(Basis(Vector3.RIGHT, -PI * 0.5), at)
+	light.light_color = color
+	light.light_energy = LAMP_LIGHT_ENERGY
+	light.light_specular = 0.5
+	light.spot_range = LAMP_LIGHT_RANGE
+	light.spot_angle = LAMP_LIGHT_ANGLE
+	light.spot_angle_attenuation = 1.2
+	light.spot_attenuation = 0.5
+	light.shadow_enabled = false
+	light.distance_fade_enabled = true
+	light.distance_fade_begin = LAMP_LIGHT_FADE_BEGIN
+	light.distance_fade_length = LAMP_LIGHT_FADE_LENGTH
+	parent.add_child(light)
 
 
 ## Portais de neon por cima da pista: dois pilares e a viga, contorno de neon por dentro
