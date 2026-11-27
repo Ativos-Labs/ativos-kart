@@ -92,15 +92,10 @@ color = Color(0.149, 0.239, 0.749, 1)
 [node name="CupBox" type="VBoxContainer" parent="UI/Root"]
 layout_mode = 0
 offset_left = 40.0
-offset_top = 100.0
+offset_top = 98.0
 offset_right = 552.0
-offset_bottom = 246.0
+offset_bottom = 136.0
 theme_override_constants/separation = 8
-
-[node name="Cups" type="HBoxContainer" parent="UI/Root/CupBox"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 18
 
 [node name="CupRibbon" type="Control" parent="UI/Root/CupBox"]
 unique_name_in_owner = true
@@ -118,9 +113,9 @@ slant = 16.0
 unique_name_in_owner = true
 layout_mode = 0
 offset_left = 46.0
-offset_top = 266.0
+offset_top = 168.0
 offset_right = 540.0
-offset_bottom = 610.0
+offset_bottom = 512.0
 theme_override_constants/h_separation = 22
 theme_override_constants/v_separation = 22
 columns = 2
@@ -252,4 +247,4 @@ grow_horizontal = 2
 grow_vertical = 0
 mouse_filter = 2
 script = ExtResource("4_hints")
-hints = PackedStringArray("↑  ↓  ←  →|Escolher pista", "Q  E|Trocar de copa", "Enter|Correr!", "Esc|Voltar")
+hints = PackedStringArray("↑  ↓  ←  →|Escolher pista", "Enter|Correr!", "Esc|Copas")

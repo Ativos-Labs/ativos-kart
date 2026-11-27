@@ -1,10 +1,10 @@
 extends Node3D
 ## Tela de seleção de asa-delta: o kart e o piloto escolhidos girando no palco com a
 ## asa aberta em cima, o nome e a descrição da asa e botões para voltar ou seguir para
-## a escolha da pista. A asa abre nas rampas de asa-delta das pistas; todas planam
+## a escolha da copa. A asa abre nas rampas de asa-delta das pistas; todas planam
 ## igual (a escolha é só de estilo). No multijogador todos escolhem ao mesmo tempo, cada
 ## um no seu cartão (PickPanel): ←/→ troca, A confirma, B desfaz; quando todos
-## confirmam a tela segue para as pistas.
+## confirmam a tela segue para as copas.
 
 @onready var turntable: Node3D = $Palco/Giro
 @onready var name_label: Label = %GliderName
@@ -155,7 +155,7 @@ func _confirm() -> void:
 	GameState.players[0].glider_index = index
 	_celebrate(_kart_visual, _glider)
 	await get_tree().create_timer(0.6).timeout
-	GameState.goto_scene(GameState.SCENE_TRACK_SELECT)
+	GameState.goto_scene(GameState.SCENE_CUP_SELECT)
 
 
 ## Piloto comemora e a asa dá um "estalo" de novo.
@@ -307,7 +307,7 @@ func _setup_multi() -> void:
 	_multi.confirm_requested.connect(_multi_confirm)
 	_multi.unconfirmed.connect(_multi_unconfirm)
 	_multi.back_requested.connect(_back)
-	_multi.all_ready.connect(func(): GameState.goto_scene(GameState.SCENE_TRACK_SELECT))
+	_multi.all_ready.connect(func(): GameState.goto_scene(GameState.SCENE_CUP_SELECT))
 
 	for p in GameState.players.size():
 		var slot := GameState.players[p]

@@ -337,18 +337,28 @@ LB/RB trocam de aba no controle.
 
 Menu principal → **Modo de jogo** (e "Quem vai jogar?" com 2+ jogadores) → **Escolha seu
 piloto** → **Escolha seu kart** → **Escolha sua asa-delta** (cada uma uma vez para cada
-jogador) → **Escolha a pista** (no Grand Prix, a copa) → Corrida → Resultado (classificação dos 8 karts, suas voltas; correr de novo,
+jogador) → **Escolha a copa** → **Escolha a pista** (no Grand Prix, as pistas da copa) → Corrida → Resultado (classificação dos 8 karts, suas voltas; correr de novo,
 trocar pista, trocar piloto, trocar kart ou voltar ao menu). No Grand Prix o resultado
 mostra a classificação geral com os pontos e o botão "Próxima corrida" (na última, "Nova
 copa").
 
+Na tela de copas cada copa é um cartão (emblema com o logo "at" no anel da cor da copa,
+o nome e as fotos das 4 pistas numa grade 2×2); ao fundo, as vistas aéreas das pistas da
+copa escolhida dividem a tela lado a lado, em colunas com linhas pretas inclinadas entre
+elas: **← / →** (ou clicar) escolhe, **Enter / A**
+segue para as pistas dela. Copas que ainda não existem aparecem como "?" (a copa de cada
+pista é o `cup_name` do `TrackData`, na ordem da lista `GameState.tracks`; a escolhida
+fica em `GameState.selected_cup`).
+
 Na tela de pistas a vista aérea da pista escolhida aparece ao fundo (uma imagem pronta, sem
-gerar a pista em 3D: a tela fica leve e troca de pista sem travar). À esquerda ficam
-as copas (emblemas com o logo "at" no anel da cor da copa) e os cartões das pistas da copa
-escolhida; à direita, o mapa do traçado, extensão, voltas, curvas, dificuldade e recordes.
-Vagas sem pista aparecem como "?". Cada copa é uma página de 4 cartões: troca-se clicando
-no emblema, com **Page Up / Page Down** ou com **LB / RB** no controle (a copa de cada
-pista é o `cup_name` do `TrackData`, na ordem da lista `GameState.tracks`).
+gerar a pista em 3D: a tela fica leve e troca de pista sem travar). À esquerda ficam o
+nome da copa e os cartões das pistas dela; à direita, o mapa do traçado, extensão, voltas,
+curvas, dificuldade e recordes. Vagas sem pista aparecem como "?". **Esc / B** volta para
+as copas.
+
+Nas telas de escolha, depois de confirmar o item escolhido fica marcado (aro firme e selo
+de visto), o resto escurece e nenhuma outra entrada vale até a tela trocar; na de pilotos
+**Enter / A** ainda pula a espera e **Esc / B** desfaz a escolha.
 
 ## As pistas
 
@@ -380,7 +390,8 @@ scenes/
   character_select.tscn  Seleção de piloto (grade de retratos + personagem 3D)
   kart_select.tscn       Seleção de kart (kart com o piloto girando + atributos)
   glider_select.tscn     Seleção de asa-delta (kart e piloto com a asa aberta girando)
-  track_select.tscn      Seleção de pista (vista aérea ao fundo, copas, cartões, mapa e recordes)
+  cup_select.tscn        Seleção de copa (um cartão por copa com as fotos das pistas dela)
+  track_select.tscn      Seleção de pista (vista aérea ao fundo, cartões da copa, mapa e recordes)
   race.tscn              Corrida (carrega a pista escolhida + kart + câmera + HUD + pausa)
   kart.tscn              O kart (física, faíscas, turbo, som do motor)
   tracks/circuito_ativos.tscn   Circuito Ativos (campo)
@@ -471,6 +482,7 @@ scripts/
                         por pista e aplicada atrás do fade
   snowfall.gd           Neve caindo em volta da câmera
   drifting_prop.gd      Movimento do dirigível e dos balões
+  cup_select.gd         Tela de seleção de copa
   track_select.gd       Tela de seleção de pista
   race.gd               Grid com os adversários, contagem, voltas e posições de cada kart,
                         contramão, chegada e classificação
@@ -1093,8 +1105,8 @@ não cavam perto da pista. No nó raiz, em **Rios**: largura, profundidade, marg
    (passo a passo em `tools/track_shots/README.md`). Sem imagem, o cartão mostra o logo
    "at" e o fundo fica liso.
 
-Ela aparece no lugar de um dos "?" da tela de pistas. Pistas com outro nome de copa
-ganham um emblema próprio na fileira de copas.
+Ela aparece no lugar de um dos "?" da tela de pistas (e na grade da copa dela na tela de
+copas). Pistas com outro nome de copa ganham um cartão próprio na tela de copas.
 
 ## Versão web (navegador)
 

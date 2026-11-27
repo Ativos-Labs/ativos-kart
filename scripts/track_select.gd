@@ -1,10 +1,8 @@
 extends Node
-## Tela de seleção de pista: ao fundo, a vista aérea da pista escolhida (uma imagem
-## pronta), com as copas (emblemas com o logo "at"), os cartões das pistas da copa
-## escolhida, o mapa do traçado, os recordes e o botão para correr. Vagas sem pista
-## ainda aparecem como "?" (em breve). Cada copa é uma página de cartões: troca-se
-## clicando no emblema, com Q/E ou Page Up/Page Down no teclado ou com os gatilhos LB/RB
-## do controle.
+## Tela de seleção de pista, depois da de copas (cup_select.gd): ao fundo, a vista aérea
+## da pista escolhida (uma imagem pronta), com o nome da copa, os cartões das pistas dela
+## (GameState.selected_cup), o mapa do traçado, os recordes e o botão para correr. Vagas
+## sem pista ainda aparecem como "?" (em breve). Esc/B volta para as copas.
 ## No Grand Prix a escolha é da copa: dá para olhar cada pista, e "Começar copa"
 ## corre todas em sequência, a partir da primeira.
 ##
@@ -28,7 +26,6 @@ const FADE := 0.25
 @onready var background: TextureRect = %Background
 ## Imagem nova aparecendo por cima da atual.
 @onready var background_next: TextureRect = %BackgroundNext
-@onready var cups_row: HBoxContainer = %Cups
 @onready var cup_ribbon: RibbonLabel = %CupRibbon
 @onready var grid: GridContainer = %Grid
 @onready var info_panel: Control = %InfoPanel
@@ -44,10 +41,8 @@ const FADE := 0.25
 var index := 0
 var _slots: Array[TrackData] = []
 var _cards: Array[TrackCard] = []
-var _cups: Array[CupBadge] = []
-## Copas com pista (na ordem da lista de pistas) e a que está na tela.
-var _cup_names: Array[String] = []
-var _cup := 0
+## Copa na tela (a escolhida na tela de copas).
+var _cup_name := ""
 ## TrackData → Track fora da árvore, só com o traçado (`prepare_layout`).
 var _layouts := {}
 ## Caminho → imagem de fundo já carregada; e os caminhos pedidos à thread de carga.
@@ -62,20 +57,19 @@ var _toast_tween: Tween
 
 
 func _ready() -> void:
-	for t in GameState.tracks:
-		if not _cup_names.has(t.cup_name):
-			_cup_names.append(t.cup_name)
 	var current := GameState.get_selected_track()
-	_cup = maxi(_cup_names.find(current.cup_name), 0) if current else 0
+	_cup_name = GameState.selected_cup
+	if _cup_name == "" or not GameState.tracks.any(func(t: TrackData) -> bool: return t.cup_name == _cup_name):
+		_cup_name = current.cup_name if current else GameState.tracks[0].cup_name
+	cup_ribbon.text = _cup_name.to_upper()
 	_build_slots()
-	_build_cups()
 	_build_cards()
 	_build_stats()
 	back_button.pressed.connect(_back)
 	race_button.pressed.connect(_confirm)
 	toast.modulate.a = 0.0
 	if _is_cup_mode():
-		($UI/Root/Header as RibbonLabel).text = "ESCOLHA A COPA"
+		($UI/Root/Header as RibbonLabel).text = "PISTAS DA COPA"
 		race_button.text = "Começar copa"
 	index = maxi(_slots.find(current), 0)
 	_select(index, true)
@@ -105,36 +99,16 @@ func _exit_tree() -> void:
 
 ## Pistas da copa na tela, completando as vagas com "?".
 func _build_slots() -> void:
-	var cup_name := _cup_names[_cup] if not _cup_names.is_empty() else "Copa Ativos"
 	_slots.clear()
 	for t in GameState.tracks:
-		if t.cup_name == cup_name:
+		if t.cup_name == _cup_name:
 			_slots.append(t)
 	while _slots.size() < GameState.track_slots:
 		var placeholder := TrackData.new()
 		placeholder.display_name = "???"
-		placeholder.cup_name = cup_name
+		placeholder.cup_name = _cup_name
 		placeholder.locked = true
 		_slots.append(placeholder)
-
-
-func _build_cups() -> void:
-	for i in maxi(GameState.cup_slots, _cup_names.size()):
-		var badge := CupBadge.new()
-		var unlocked := i < _cup_names.size()
-		var tint := Color("263dbf")
-		if unlocked:
-			# A cor da primeira pista da copa (a Copa Ativos fica no azul da marca).
-			for t in GameState.tracks:
-				if t.cup_name == _cup_names[i]:
-					tint = t.color
-					break
-		badge.setup(_cup_names[i] if unlocked else "???", unlocked, tint)
-		badge.selected = i == _cup
-		badge.pressed.connect(_on_cup_pressed.bind(i))
-		cups_row.add_child(badge)
-		_cups.append(badge)
-	cup_ribbon.text = (_cup_names[_cup] if not _cup_names.is_empty() else "Copa").to_upper()
 
 
 ## Pede à thread as imagens de fundo das pistas da copa que ainda não carregaram.
@@ -249,8 +223,8 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventJoypadMotion:
 		return
 	if _confirming:
-		# Pista escolhida, esperando a corrida: nenhuma entrada (setas, Q/E, mouse nos
-		# cartões, copas e botões) chega à tela.
+		# Pista escolhida, esperando a corrida: nenhuma entrada (setas, mouse nos cartões
+		# e botões) chega à tela.
 		get_viewport().set_input_as_handled()
 		return
 	var move := 0
@@ -262,24 +236,7 @@ func _input(event: InputEvent) -> void:
 		move = -COLUMNS
 	elif event.is_action_pressed("ui_down"):
 		move = COLUMNS
-	var cup_step := 0
-	if event.is_action_pressed("ui_page_up"):
-		cup_step = -1
-	elif event.is_action_pressed("ui_page_down"):
-		cup_step = 1
-	elif event is InputEventKey and event.pressed and not event.echo \
-			and (event.physical_keycode == KEY_Q or event.physical_keycode == KEY_E):
-		cup_step = -1 if event.physical_keycode == KEY_Q else 1
-	elif event is InputEventJoypadButton and event.pressed:
-		if event.button_index == JOY_BUTTON_LEFT_SHOULDER:
-			cup_step = -1
-		elif event.button_index == JOY_BUTTON_RIGHT_SHOULDER:
-			cup_step = 1
-	if cup_step != 0:
-		if _cup_names.size() > 1:
-			_switch_cup(wrapi(_cup + cup_step, 0, _cup_names.size()))
-		get_viewport().set_input_as_handled()
-	elif move != 0:
+	if move != 0:
 		_move(move)
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("ui_accept") and not back_button.has_focus():
@@ -309,49 +266,6 @@ func _on_card_pressed(i: int) -> void:
 	else:
 		Sfx.play(self, &"ui_move", -12.0)
 		_select(i, false)
-
-
-func _on_cup_pressed(i: int) -> void:
-	if _cups[i].unlocked:
-		_switch_cup(i)
-		return
-	_show_toast("Novas copas em breve!")
-	Sfx.play(self, &"ui_back", -10.0)
-	_shake(_cups[i])
-
-
-## Mostra as pistas de outra copa (a primeira delas fica escolhida).
-func _switch_cup(i: int) -> void:
-	if i == _cup or i < 0 or i >= _cup_names.size() or _confirming:
-		return
-	_cup = i
-	Sfx.play(self, &"ui_move", -10.0)
-	for k in _cups.size():
-		_cups[k].selected = k == _cup
-	cup_ribbon.text = _cup_names[_cup].to_upper()
-	var badge := _cups[_cup]
-	badge.pivot_offset = badge.size * 0.5
-	badge.scale = Vector2.ONE * 1.15
-	create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT).tween_property(badge, "scale", Vector2.ONE, 0.25)
-	_build_slots()
-	_build_cards()
-	_request_backgrounds()
-	_select(0, false)
-	_animate_cards()
-
-
-## Cartões entrando (troca de copa).
-func _animate_cards() -> void:
-	await get_tree().process_frame
-	var delay := 0.0
-	for card in _cards:
-		card.pivot_offset = card.size * 0.5
-		card.scale = Vector2.ONE * 0.6
-		card.modulate.a = 0.0
-		var tw := create_tween().set_parallel().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-		tw.tween_property(card, "scale", Vector2.ONE, 0.3).set_delay(delay)
-		tw.tween_property(card, "modulate:a", 1.0, 0.18).set_delay(delay)
-		delay += 0.05
 
 
 func _select(i: int, first: bool) -> void:
@@ -419,7 +333,6 @@ func _confirm() -> void:
 	card.picked = true
 	race_button.picked = true
 	var others: Array = [back_button]
-	others.append_array(_cups)
 	for k in _cards.size():
 		if k != index:
 			others.append(_cards[k])
@@ -435,7 +348,7 @@ func _back() -> void:
 	if _confirming:
 		return
 	Sfx.play(self, &"ui_back", -10.0)
-	GameState.goto_scene(GameState.SCENE_GLIDER_SELECT)
+	GameState.goto_scene(GameState.SCENE_CUP_SELECT)
 
 
 # --- Utilidades ---------------------------------------------------------------------
@@ -489,11 +402,6 @@ func _animate_intro() -> void:
 		tw.tween_property(card, "scale", Vector2.ONE, 0.35).set_delay(delay)
 		tw.tween_property(card, "modulate:a", 1.0, 0.2).set_delay(delay)
 		delay += 0.06
-	for badge in _cups:
-		badge.pivot_offset = badge.size * 0.5
-		badge.scale = Vector2.ZERO
-		create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT).tween_property(badge, "scale", Vector2.ONE, 0.3).set_delay(delay * 0.5)
-		delay += 0.04
 	var x := info_panel.position.x
 	info_panel.position.x = x + 560.0
 	create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT).tween_property(info_panel, "position:x", x, 0.45)

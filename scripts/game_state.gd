@@ -17,6 +17,7 @@ const SCENE_MODE_SELECT := "res://scenes/mode_select.tscn"
 const SCENE_CHARACTER_SELECT := "res://scenes/character_select.tscn"
 const SCENE_KART_SELECT := "res://scenes/kart_select.tscn"
 const SCENE_GLIDER_SELECT := "res://scenes/glider_select.tscn"
+const SCENE_CUP_SELECT := "res://scenes/cup_select.tscn"
 const SCENE_TRACK_SELECT := "res://scenes/track_select.tscn"
 const SCENE_RACE := "res://scenes/race.tscn"
 
@@ -151,6 +152,9 @@ var selected_character_index: int:
 	set(value):
 		players[0].character_index = value
 var selected_track_index := 0
+## Copa escolhida na tela de copas (TrackData.cup_name): a tela de pistas mostra as dela.
+## Vazia até a primeira escolha (vale a copa da pista escolhida).
+var selected_cup := ""
 ## Voltas da corrida (a tela de pistas usa o valor da pista escolhida).
 var laps := 3
 
@@ -547,7 +551,7 @@ func _compile_scripts() -> void:
 	var seen := {}
 	var order: Array[String] = []
 	for path in [SCENE_MAIN_MENU, SCENE_MODE_SELECT, SCENE_CHARACTER_SELECT, SCENE_KART_SELECT,
-			SCENE_GLIDER_SELECT, SCENE_TRACK_SELECT, SCENE_RACE]:
+			SCENE_GLIDER_SELECT, SCENE_CUP_SELECT, SCENE_TRACK_SELECT, SCENE_RACE]:
 		_collect_dependencies(path, seen, order)
 	for class_path: String in _global_classes.values():
 		_collect_dependencies(class_path, seen, order)

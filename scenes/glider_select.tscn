@@ -332,4 +332,4 @@ grow_horizontal = 2
 grow_vertical = 0
 mouse_filter = 2
 script = ExtResource("7_hints")
-hints = PackedStringArray("←  →|Trocar asa", "Arraste|Girar", "Enter|Escolher pista", "Esc|Voltar")
+hints = PackedStringArray("←  →|Trocar asa", "Arraste|Girar", "Enter|Escolher copa", "Esc|Voltar")
